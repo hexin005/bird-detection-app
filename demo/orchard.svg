@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680">
+<defs>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b7d6d1"/><stop offset="1" stop-color="#e6e9c9"/></linearGradient>
+<linearGradient id="land" x2="0" y2="1"><stop stop-color="#96ad72"/><stop offset="1" stop-color="#344e36"/></linearGradient>
+<linearGradient id="leaf" x2=".6" y2="1"><stop stop-color="#7d9b50"/><stop offset="1" stop-color="#294d37"/></linearGradient>
+<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".65" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".07"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter>
+<g id="tree"><path d="M-4 0 0-112 9 0" fill="#635947"/><path d="m0-42-26-29m29 10 24-28" stroke="#635947" stroke-width="5"/><ellipse cy="-99" rx="48" ry="42" fill="url(#leaf)"/><circle cx="-30" cy="-85" r="28" fill="#507444"/><circle cx="28" cy="-91" r="31" fill="#648347"/><circle cx="-6" cy="-122" r="29" fill="#829650"/><g fill="#c29746"><circle cx="-24" cy="-104" r="4"/><circle cx="18" cy="-111" r="4"/><circle cx="30" cy="-78" r="4"/><circle cx="-7" cy="-79" r="4"/></g></g>
+<g id="bird"><path d="M-17 0Q-7-11 3-3 17-6 24 2L12 4 2 15-6 13-12 6-25 2Z" fill="#342e29"/><circle cx="18" cy="0" r="1.2" fill="#ded5b5"/><path d="M3 13 0 20m6-8 1 8" stroke="#342e29" stroke-width="2"/><path d="M-12 1-1 6 9 4" stroke="#a49a7d" stroke-width="3" fill="none"/></g>
+</defs>
+<g filter="url(#grain)"><path fill="url(#sky)" d="M0 0h1000v680H0z"/><circle cx="780" cy="123" r="46" fill="#f3edc9" opacity=".8"/>
+<path d="M0 310 110 190 230 252 390 158 535 268 690 220 850 290 1000 208V450H0" fill="#8ca69a"/><path d="M0 347 230 278 440 326 638 252 810 325 1000 281V450H0" fill="#769783"/>
+<path d="M0 358Q500 300 1000 357V680H0" fill="url(#land)"/>
+<path d="M488 337 571 337 862 680H226Z" fill="#b3ae82"/><path d="m510 338 26 0 113 342H444Z" fill="#c3bc92"/>
+<g stroke="#b5bd88" stroke-width="5" opacity=".45"><path d="M445 341 45 680M380 341-140 680M587 340 992 680M640 339 1160 680"/></g>
+<g opacity=".85"><use href="#tree" transform="translate(432 362) scale(.35)"/><use href="#tree" transform="translate(602 362) scale(.35)"/><use href="#tree" transform="translate(358 366) scale(.4)"/><use href="#tree" transform="translate(679 366) scale(.4)"/></g>
+<use href="#tree" transform="translate(390 403) scale(.65)"/><use href="#tree" transform="translate(650 403) scale(.65)"/>
+<use href="#tree" transform="translate(278 413) scale(.75)"/><use href="#tree" transform="translate(764 413) scale(.75)"/>
+<use href="#tree" transform="translate(330 480) scale(1.05)"/><use href="#tree" transform="translate(720 480) scale(1.05)"/>
+<use href="#tree" transform="translate(149 493) scale(1.2)"/><use href="#tree" transform="translate(895 493) scale(1.2)"/>
+<use href="#tree" transform="translate(224 610) scale(1.65)"/><use href="#tree" transform="translate(825 610) scale(1.65)"/>
+<use href="#tree" transform="translate(-35 650) scale(2.1)"/><use href="#tree" transform="translate(1060 650) scale(2.1)"/>
+<path d="M0 664Q153 623 268 674M783 680Q881 622 1000 655" fill="#314c36"/>
+<use href="#bird" transform="translate(480 498) scale(1.1)"/><use href="#bird" transform="translate(579 556) scale(.85)"/><use href="#bird" transform="translate(610 468) scale(.65)"/>
+<g fill="#d6d5a3" opacity=".45"><path d="m60 680 9-31 3 31m73 0 8-38 5 38m754 0 13-29 3 29"/></g></g>
+</svg>

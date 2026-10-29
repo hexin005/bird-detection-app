@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f2"><meta name="description" content="青禾果园守护：鸟类监测与模拟驱离交互演示。">
+  <title>青禾 · 果园守护</title><link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="workspace">
+    <aside class="presentation">
+      <a class="brand" href="#monitor"><span class="brand-mark">青</span><span>青禾<span class="brand-sub">ORCHARD WATCH</span></span></a>
+      <div class="presentation-main"><div class="eyebrow">一座果园 · 一份安心</div><h1>看见每一次来访，<br>守护每一份收获。</h1><p>让识别有依据，让行动有回应。<br>从发现鸟类到远程处理，<br>在手机上完成一次果园巡护。</p>
+      <div class="flow-list"><div data-step="monitor"><b>01</b><span>发现<small>查看监控与识别结果</small></span></div><div data-step="alarms"><b>02</b><span>判断<small>查看告警，确认是否处理</small></span></div><div data-step="control"><b>03</b><span>行动<small>下达指令，等待执行反馈</small></span></div><div data-step="records"><b>04</b><span>回看<small>每一次处理，都有迹可循</small></span></div></div></div>
+      <div class="presentation-foot"><span class="tiny-dot"></span> 交互原型 · 所有数据与设备均为模拟</div>
+    </aside>
+    <div class="app-shell"><header class="app-header"><div><div class="location-line"><span class="location-dot"></span> 青禾示范果园 <span class="demo-tag">DEMO</span></div><div class="header-sub">东区 · 01 号监控点</div></div><button class="icon-button" data-action="settings" aria-label="演示设置" id="settings-button"></button></header>
+      <main id="app"></main><nav class="bottom-nav" aria-label="主导航" id="nav"></nav>
+    </div>
+    <aside class="guide"><span class="eyebrow">体验提示</span><h3>从一条告警开始</h3><p>进入「告警」，查看识别详情，再确认一次模拟驱离。</p><div class="guide-line"></div><p>想测试其他情况？<br>点击右上角设置，切换离线或超时场景。</p><span class="guide-note">本次演示不连接模型、服务器或真实设备。</span></aside>
+  </div>
+  <div id="overlay"></div><div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body></html>
