@@ -1,0 +1,11 @@
+export type Alarm = { id: string; task_id: string; species: string; count: number; confidence: number; at: number; last_seen: number; hits: number; status: string; snapshot: string; video_time: number; frame_id: number; site: string }
+export type Command = { id: string; alarm_id: string | null; duration: number; scenario: string; status: string; at: number; started_at: number | null; ended_at: number | null; message: string }
+export type Event = { id: number; kind: string; ref_id: string; at: number; message: string }
+export type Frame = { key: string; frame_id: number; video_time: number; duration: number; at: number; count: number; inference_ms: number; detections: { species: string; class_name: string; confidence: number; bbox: number[] }[] }
+export type Preferences = { scenario: 'normal' | 'offline' | 'timeout'; confidence: number; consecutive: number; cooldown: number }
+export type State = {
+  alarms: Alarm[]; commands: Command[]; events: Event[];
+  counts: { total: number; pending: number; completed: number }; settings: Preferences;
+  monitor: { status: string; task_id: string | null; message: string; frame: Frame | null; source: string; model: string; device: string; sample_fps: number; source_ready: boolean; model_ready: boolean };
+  media_ticket: string; server_time: number;
+}

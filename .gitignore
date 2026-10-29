@@ -3,3 +3,10 @@ node_modules/
 .env.*
 !.env.example
 *.log
+.runtime/
+.venv/
+__pycache__/
+*.pyc
+mobile/dist/
+mobile/unpackage/
+.pytest_cache/

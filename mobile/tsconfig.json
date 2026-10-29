@@ -1,0 +1,5 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "compilerOptions": { "types": ["@dcloudio/types"], "strict": true, "skipLibCheck": true, "moduleResolution": "Bundler", "target": "ES2020" },
+  "include": ["src/**/*.ts", "src/**/*.vue"]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "青禾果园守护",
+  "appid": "",
+  "description": "果园识鸟与模拟远程驱离 MVP",
+  "versionName": "0.2.0",
+  "versionCode": 20,
+  "transformPx": false,
+  "vueVersion": "3",
+  "app-plus": {
+    "usingComponents": true,
+    "compilerVersion": 3,
+    "splashscreen": { "alwaysShowBeforeRender": true, "autoclose": true },
+    "distribute": { "android": { "permissions": ["<uses-permission android:name=\"android.permission.INTERNET\"/>", "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>"] } }
+  },
+  "h5": { "title": "青禾 · 果园守护", "router": { "mode": "hash" } },
+  "uniStatistics": { "enable": false }
+}
