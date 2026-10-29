@@ -1,7 +1,16 @@
 {
-  "name": "orchard-watch-demo",
-  "version": "0.1.0",
+  "name": "orchard-watch",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "node scripts/serve.mjs", "test": "node --test tests/demo.test.mjs tests/server.test.mjs", "check": "node --check demo/app.js && node --check demo/state.js && node --check scripts/serve.mjs" }
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "dev:mvp": "powershell -NoProfile -File scripts/start-mvp.ps1",
+    "dev:h5": "npm --prefix mobile run dev:h5",
+    "build:h5": "npm --prefix mobile run build:h5",
+    "build:app": "npm --prefix mobile run build:app",
+    "typecheck": "npm --prefix mobile run typecheck",
+    "test": "node --test tests/demo.test.mjs tests/server.test.mjs",
+    "check": "node --check demo/app.js && node --check demo/state.js && node --check scripts/serve.mjs"
+  }
 }
