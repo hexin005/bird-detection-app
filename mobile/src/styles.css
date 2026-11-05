@@ -217,9 +217,14 @@ uni-page-body {
   display: flex;
   flex-direction: column;
   gap: var(--section-gap);
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--space-6);
   scrollbar-width: thin;
   scrollbar-color: rgba(52, 80, 47, 0.22) transparent;
+}
+
+/* 内容区子元素不允许被压缩：超出时滚动，而不是压扁卡片/视频 */
+.page__content > * {
+  flex-shrink: 0;
 }
 
 /* 桌面端可见的细滚动条 */

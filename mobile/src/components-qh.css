@@ -36,7 +36,7 @@
 .qh-badge__text { line-height:1; font-size:var(--text-xs); }
 .qh-pill__text { line-height:1; font-size:var(--text-xs); }
 
-.qh-video { position:relative; height:160px; border-radius:var(--radius-3xl); background:linear-gradient(135deg,#2a331e 0%,#1c2318 55%,#151b10 100%); overflow:hidden; }
+.qh-video { position:relative; height:160px; min-height:160px; flex-shrink:0; border-radius:var(--radius-3xl); background:linear-gradient(135deg,#2a331e 0%,#1c2318 55%,#151b10 100%); overflow:hidden; }
 .qh-video__tag { position:absolute; display:inline-flex; padding:5px 8px; border-radius:var(--radius-xs); background:rgba(20,26,16,.72); color:#e8ecdd; font-size:var(--text-2xs); font-weight:500; }
 .qh-video__tag--tl { top:12px; left:12px; }
 .qh-video__tag--bl { bottom:12px; left:12px; }
