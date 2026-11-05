@@ -1,0 +1,158 @@
+/* ==========================================================================
+   青禾 · 设计变量层（Design Tokens）
+   --------------------------------------------------------------------------
+   所有颜色、字号、间距、圆角、阴影、动效都从这里取值。
+   组件与页面禁止再写死具体数值，统一用 var(--token)。
+   修改主题只需改本文件。
+   ========================================================================== */
+
+page,
+:root {
+  /* ---------- 品牌色：果园绿 ---------- */
+  --brand-900: #1b3a29;
+  --brand-800: #2c503c;
+  --brand-700: #355e3d;
+  --brand-600: #3f6b49;
+  --brand-500: #4f7d56;
+  --brand-400: #6f9871;
+  --brand-300: #a7b78e;
+  --brand-200: #cdd9b8;
+  --brand-100: #e7efd9;
+  --brand-50: #f1f5e7;
+
+  /* ---------- 中性色：带绿的暖灰，与品牌色同调 ---------- */
+  --ink-900: #1f2f26; /* 主标题 */
+  --ink-800: #2b3d32;
+  --ink-700: #43584a; /* 正文强调 */
+  --ink-600: #5b6f60;
+  --ink-500: #6d7f6c; /* 次要正文 */
+  --ink-400: #8b9587; /* 说明文字 */
+  --ink-300: #a3ae9c; /* 极弱提示 */
+  --ink-200: #c3cbbc;
+
+  /* ---------- 表面 ---------- */
+  --surface-canvas: #e9ece0; /* 最外层画布 */
+  --surface-app: #f8f9f3; /* 手机外壳底色 */
+  --surface-card: #ffffff; /* 卡片 */
+  --surface-raised: #fafbf6; /* 浮层 / 弹窗 */
+  --surface-sunken: #eef1e5; /* 凹陷区 / tabs 槽 */
+  --surface-muted: #f2f4ea; /* 次级区块 */
+
+  /* ---------- 描边 ---------- */
+  --line-strong: #d5ddc6;
+  --line: #e3e8d9;
+  --line-soft: #edf0e5;
+
+  /* ---------- 语义色 ---------- */
+  /* 待处理 / 需关注：暖琥珀 */
+  --warn-bg: #fbf1dc;
+  --warn-fg: #9a6c2f;
+  --warn-line: #eddfc0;
+
+  /* 危险 / 失败 */
+  --danger-bg: #f8ebe0;
+  --danger-fg: #9c6150;
+  --danger-line: #ecd7c8;
+
+  /* 成功 / 已完成 */
+  --success-bg: #e6f0dd;
+  --success-fg: #4f7245;
+  --success-line: #d3e3c6;
+
+  /* 进行中 / 活跃 */
+  --info-bg: #e2ecdd;
+  --info-fg: #3f6b49;
+  --info-line: #cfe0c7;
+
+  /* 未知 / 中断 */
+  --neutral-bg: #eceee6;
+  --neutral-fg: #6d7f6c;
+  --neutral-line: #dde1d5;
+
+  /* ---------- 字号 ---------- */
+  --text-2xs: 9px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 13px;
+  --text-lg: 14px;
+  --text-xl: 17px;
+  --text-2xl: 21px;
+  --text-3xl: 25px;
+  --text-4xl: 29px;
+  --text-5xl: 34px;
+
+  /* ---------- 字重 ---------- */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-heavy: 750;
+
+  /* ---------- 行高 ---------- */
+  --leading-tight: 1.25;
+  --leading-snug: 1.45;
+  --leading-normal: 1.65;
+  --leading-relaxed: 1.9;
+  --leading-loose: 2;
+
+  /* ---------- 字距 ---------- */
+  --tracking-tight: -0.8px;
+  --tracking-normal: 0;
+  --tracking-wide: 1px;
+  --tracking-wider: 2px;
+  --tracking-widest: 3px;
+
+  /* ---------- 间距（8px 基准节奏） ---------- */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 16px;
+  --space-8: 18px;
+  --space-9: 20px;
+  --space-10: 24px;
+  --space-11: 28px;
+  --space-12: 32px;
+  --space-14: 40px;
+  --space-16: 48px;
+
+  /* ---------- 圆角 ---------- */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 30px;
+  --radius-pill: 999px;
+
+  /* ---------- 阴影（分层，避免脏灰） ---------- */
+  --shadow-xs: 0 1px 2px rgba(31, 47, 38, 0.05);
+  --shadow-sm: 0 2px 6px rgba(31, 47, 38, 0.06);
+  --shadow-md: 0 4px 14px rgba(31, 47, 38, 0.08);
+  --shadow-lg: 0 12px 32px rgba(31, 47, 38, 0.1);
+  --shadow-shell: 0 18px 60px rgba(31, 47, 38, 0.08);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --shadow-focus: 0 0 0 3px rgba(63, 107, 73, 0.16);
+
+  /* ---------- 动效 ---------- */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ---------- 层级 ---------- */
+  --z-nav: 5;
+  --z-overlay: 20;
+  --z-toast: 40;
+
+  /* ---------- 尺寸 ---------- */
+  --shell-width: 430px;
+  --intro-width: 330px;
+  --aside-width: 190px;
+  --control-height: 46px;
+}

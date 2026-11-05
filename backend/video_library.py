@@ -85,4 +85,21 @@ class VideoLibrary:
             MIN(video_time) first_seen FROM samples GROUP BY species ORDER BY videos DESC,species''')
 
     def alarm_groups(self):
-        return self.store.rows("SELECT species,COUNT(*) total,SUM(status='new') pending FROM alarms GROUP BY species ORDER BY pending DESC,total DESC")
+        """按鸟类聚合告警，并附上一张代表性抓拍作为分类封面。
+
+        封面优先取该鸟类置信度最高的告警抓拍，供前端分类下拉框展示。
+        """
+        return self.store.rows(
+            """SELECT species,
+                      COUNT(*) total,
+                      SUM(status='new') pending,
+                      (SELECT snapshot FROM alarms a2
+                        WHERE a2.species = a1.species AND a2.snapshot IS NOT NULL
+                        ORDER BY a2.confidence DESC LIMIT 1) cover,
+                      (SELECT confidence FROM alarms a3
+                        WHERE a3.species = a1.species
+                        ORDER BY a3.confidence DESC LIMIT 1) best_confidence
+                 FROM alarms a1
+                GROUP BY species
+                ORDER BY pending DESC, total DESC""")
+

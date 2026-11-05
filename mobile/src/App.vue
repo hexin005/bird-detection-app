@@ -6,5 +6,7 @@ onShow(() => store.resume())
 onHide(() => store.suspend())
 </script>
 <style>
+@import './tokens.css';
+@import './components-qh.css';
 @import './styles.css';
 </style>

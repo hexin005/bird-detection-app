@@ -5,9 +5,23 @@ import { useOrchard } from '../store'
 const props = defineProps<{ path: string; seek?: number; autoplay?: boolean }>()
 const store = useOrchard()
 const host = ref<unknown>(null), message = ref('正在缓冲检测视频…')
+/** 视频技术参数，取自 <video> 元素元数据 */
+const meta = ref({ w: 0, h: 0, fps: 0, frames: 0, current: 0, duration: 0 })
 let video: HTMLVideoElement | null = null, hls: Hls | null = null
-let loadedPath = '', restoreTime = 0, resumePlayback = false
+let loadedPath = '', restoreTime = 0, resumePlayback = false, ticker: ReturnType<typeof setInterval> | null = null
+
 function seek() { if (video && Number.isFinite(props.seek)) video.currentTime = Math.max(0, props.seek || 0) }
+function readMeta() {
+  if (!video) return
+  meta.value = {
+    w: video.videoWidth || 0,
+    h: video.videoHeight || 0,
+    fps: meta.value.fps,
+    frames: meta.value.frames,
+    current: video.currentTime || 0,
+    duration: Number.isFinite(video.duration) ? video.duration : 0
+  }
+}
 function load() {
   if (!video || !props.path) return
   const sameTask = loadedPath.split('/')[1] === props.path.split('/')[1]
@@ -30,40 +44,44 @@ onMounted(() => {
   const element = node?.$el || node
   video = document.createElement('video')
   video.controls = true; video.playsInline = true; video.muted = true; video.preload = 'auto'
-  video.style.cssText = 'width:100%;height:100%;display:block;background:#1f382c;object-fit:contain'
+  video.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;background:transparent;object-fit:cover'
   element?.appendChild(video)
   video.addEventListener('canplay', () => { message.value = ''; if (props.autoplay || resumePlayback) void video?.play().catch(() => {}) })
-  video.addEventListener('loadedmetadata', () => { if (video) video.currentTime = restoreTime })
+  video.addEventListener('loadedmetadata', () => {
+    if (video) video.currentTime = restoreTime
+    readMeta()
+    // 帧率无法从 <video> 直接读取，按检测管线默认 30fps 估算总帧
+    if (video && video.duration > 0 && !meta.value.fps) {
+      meta.value.fps = 30
+      meta.value.frames = Math.round(30 * video.duration)
+    }
+  })
+  video.addEventListener('timeupdate', readMeta)
   video.addEventListener('error', () => { message.value = '视频暂不可播放，请重新加载' })
   load()
+  ticker = setInterval(readMeta, 500)
 })
 watch(() => props.path, load)
 watch(() => props.seek, seek)
-onBeforeUnmount(() => { hls?.destroy(); if (video) { video.pause(); video.removeAttribute('src'); video.load(); video.remove() } })
+onBeforeUnmount(() => {
+  hls?.destroy()
+  if (ticker) clearInterval(ticker)
+  if (video) { video.pause(); video.removeAttribute('src'); video.load(); video.remove() }
+})
 </script>
-<template><view class="video-player"><view ref="host" class="video-host"/><view v-if="message" class="video-message" @click="load">{{ message }}</view></view></template>
-<style scoped>
-.video-player {
-  position: relative;
-  background: var(--brand-900);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
-}
-.video-host {
-  height: 260px;
-}
-.video-message {
-  position: absolute;
-  top: var(--space-4);
-  left: var(--space-4);
-  right: var(--space-4);
-  font-size: var(--text-sm);
-  color: #fff;
-  background: rgba(32, 56, 45, 0.74);
-  backdrop-filter: blur(4px);
-  border-radius: var(--radius-xs);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-}
-</style>
+<template>
+  <view class="qh-video">
+    <!-- 左上角：视频播放参数 -->
+    <view class="qh-video__tag qh-video__tag--tl qh-video__meta">
+      <text v-if="meta.w">{{ meta.w }}×{{ meta.h }}</text>
+      <text v-if="meta.fps">· {{ meta.fps }}fps</text>
+      <text v-if="meta.duration">· {{ meta.duration.toFixed(1) }}s</text>
+    </view>
+    <view ref="host" style="position:absolute;top:0;left:0;width:100%;height:100%"/>
+    <text v-if="message" class="qh-video__tag" style="top:12px;left:50%;transform:translateX(-50%)" @click="load">{{ message }}</text>
+    <!-- 左下角：当前播放进度 -->
+    <view class="qh-video__tag qh-video__tag--bl">
+      <text>{{ meta.current.toFixed(1) }}s / {{ meta.duration.toFixed(1) }}s</text>
+    </view>
+  </view>
+</template>
