@@ -37,7 +37,17 @@ class Store:
           CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, ref_id TEXT, at REAL, message TEXT);
           CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, status TEXT, at REAL, ended_at REAL, message TEXT);
+          CREATE TABLE IF NOT EXISTS videos (id TEXT PRIMARY KEY, name TEXT, path TEXT, duration REAL, fps REAL, at REAL);
+          CREATE TABLE IF NOT EXISTS samples (task_id TEXT, species TEXT, video_time REAL, count INTEGER, confidence REAL, frame_id INTEGER);
+          CREATE INDEX IF NOT EXISTS sample_lookup ON samples(task_id,species,video_time);
         ''')
+        columns = {r[1] for r in self.db.execute('PRAGMA table_info(tasks)')}
+        for name, kind in [('video_id','TEXT'),('duration','REAL DEFAULT 0'),('progress','REAL DEFAULT 0'),('result_ready','INTEGER DEFAULT 0')]:
+            if name not in columns:
+                self.db.execute(f'ALTER TABLE tasks ADD COLUMN {name} {kind}')
+        if 'last_video_time' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
+            self.db.execute('ALTER TABLE alarms ADD COLUMN last_video_time REAL')
+        self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
                 db.execute('INSERT INTO users VALUES (1,?,?)', (settings.username, hash_password(settings.password)))
@@ -101,17 +111,18 @@ class Store:
             db.execute('UPDATE settings SET value=? WHERE id=1', (json.dumps(config),))
         return config
 
-    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None):
+    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None, video_clock=False):
         now = now if now is not None else time.time()
         with self.tx() as db:
             old = db.execute('SELECT * FROM alarms WHERE task_id=? AND species=? ORDER BY last_seen DESC LIMIT 1', (task_id, species)).fetchone()
-            if old and now - old['last_seen'] < cooldown:
+            age = (video_time - (old['last_video_time'] if old['last_video_time'] is not None else old['video_time'])) if old and video_clock else (now - old['last_seen'] if old else cooldown)
+            if old and 0 <= age < cooldown:
                 # Preserve the original evidence/count; hits tracks repeated detections, not individual birds.
-                db.execute('UPDATE alarms SET last_seen=?,hits=hits+1 WHERE id=?', (now, old['id']))
+                db.execute('UPDATE alarms SET last_seen=?,last_video_time=?,hits=hits+1 WHERE id=?', (now, video_time, old['id']))
                 return old['id'], False
             aid = 'A' + secrets.token_hex(5)
-            db.execute('INSERT INTO alarms VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id))
+            db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time))
             self.event(db, 'detection', aid, f'检测到{species}，画面中 {count} 只')
             return aid, True
 
@@ -176,7 +187,7 @@ class Store:
 
     def task(self, task_id, status, message=''):
         with self.tx() as db:
-            db.execute('INSERT OR IGNORE INTO tasks VALUES (?,?,?,?,?)', (task_id, status, time.time(), None, message))
+            db.execute('INSERT OR IGNORE INTO tasks(id,status,at,ended_at,message) VALUES (?,?,?,?,?)', (task_id, status, time.time(), None, message))
             db.execute('UPDATE tasks SET status=?,message=?,ended_at=? WHERE id=?',
                        (status, message, None if status in ('starting', 'running', 'stopping') else time.time(), task_id))
 

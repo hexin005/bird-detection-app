@@ -2,17 +2,20 @@ import asyncio
 import contextlib
 import threading
 import time
+import secrets
+from urllib.parse import unquote
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import ROOT, Settings
-from .detector import VideoMonitor
+from .video_pipeline import VideoPipeline
 from .security import check_media, digest, media_ticket
 from .store import Conflict, Store
 
@@ -35,10 +38,14 @@ class Preferences(BaseModel):
     cooldown: float = Field(ge=1, le=300)
 
 
+class StartVideo(BaseModel):
+    video_id: Optional[str] = None
+
+
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
-    monitor = VideoMonitor(settings, store)
+    monitor = VideoPipeline(settings, store)
     shutdown = threading.Event()
 
     def worker():
@@ -61,7 +68,7 @@ def create_app(settings=None):
     app = FastAPI(title='青禾果园守护 MVP', lifespan=lifespan)
     app.state.store, app.state.monitor = store, monitor
     app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5178', 'http://localhost:5178'],
-                       allow_methods=['GET', 'POST', 'PUT'], allow_headers=['Authorization', 'Content-Type'])
+                       allow_methods=['GET', 'POST', 'PUT'], allow_headers=['Authorization', 'Content-Type', 'X-Filename'])
 
     @app.exception_handler(Conflict)
     async def conflict(_, exc):
@@ -120,8 +127,78 @@ def create_app(settings=None):
         return rows[0]
 
     @app.post('/api/monitor/start')
-    def start(user=Depends(auth)):
-        return monitor.start()
+    def start(body: Optional[StartVideo] = None, user=Depends(auth)):
+        return monitor.start(body.video_id if body else None)
+
+    @app.post('/api/videos')
+    async def upload(request: Request, x_filename: str = Header(default='video.mp4'), user=Depends(auth)):
+        name = unquote(x_filename).replace('\\', '/').split('/')[-1][:160]
+        suffix = name.rsplit('.', 1)[-1].lower()
+        if suffix not in ('mp4', 'mov', 'avi', 'webm', 'mkv'):
+            raise HTTPException(415, '请选择 MP4、MOV、AVI、MKV 或 WebM 视频')
+        target = monitor.library.root / (secrets.token_hex(16) + '.' + suffix)
+        size = 0
+        try:
+            with target.open('wb') as output:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > 500 * 1024 * 1024:
+                        raise HTTPException(413, '视频不能超过 500 MB')
+                    output.write(chunk)
+            video = await run_in_threadpool(monitor.library.register, target, name)
+            return {key: value for key, value in video.items() if key != 'path'}
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
+
+    @app.get('/api/videos')
+    def videos(user=Depends(auth)):
+        return {'items': store.rows('SELECT id,name,duration,fps,at FROM videos ORDER BY at DESC LIMIT 30')}
+
+    @app.get('/api/library')
+    def library(species: Optional[str] = None, offset: int = Query(0, ge=0), user=Depends(auth)):
+        return {'items': monitor.library.list(species, offset), 'species': monitor.library.species(), 'alarm_groups': monitor.library.alarm_groups()}
+
+    @app.get('/api/library/{task_id}')
+    def video_detail(task_id: str, user=Depends(auth)):
+        return monitor.library.detail(task_id)
+
+    @app.get('/api/alarm-list')
+    def alarm_list(species: Optional[str] = None, pending: bool = False, before: Optional[float] = None, user=Depends(auth)):
+        clauses, values = [], []
+        if species:
+            clauses.append('species=?'); values.append(species)
+        if pending:
+            clauses.append("status='new'")
+        if before is not None:
+            clauses.append('at<?'); values.append(before)
+        condition = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
+        return {'items': store.rows('SELECT * FROM alarms' + condition + ' ORDER BY at DESC LIMIT 100', tuple(values))}
+
+    @app.get('/api/media/{task_id}/{name}', dependencies=[Depends(media_auth)])
+    def video_media(task_id: str, name: str, ticket: str, download: bool = False):
+        if name == 'source':
+            import mimetypes
+            from pathlib import Path
+            rows = store.rows('SELECT v.path,v.name FROM tasks t JOIN videos v ON v.id=t.video_id WHERE t.id=?', (task_id,))
+            if not rows or not Path(rows[0]['path']).is_file():
+                raise HTTPException(404, '原视频已不存在')
+            return FileResponse(rows[0]['path'], media_type=mimetypes.guess_type(rows[0]['path'])[0] or 'application/octet-stream',
+                                filename=rows[0]['name'] if download else None, headers={'Cache-Control':'private, max-age=0'})
+        folder = (monitor.library.jobs / task_id).resolve()
+        path = (folder / name).resolve()
+        if folder.parent != monitor.library.jobs.resolve() or path.parent != folder or not path.is_file():
+            raise HTTPException(404, '视频仍在生成或文件不存在')
+        if name == 'index.m3u8':
+            # Only segment requests receive a scoped media ticket, never an API session token.
+            text = path.read_text(encoding='utf-8')
+            lines = [line if not line or line.startswith('#') else line + '?ticket=' + ticket for line in text.splitlines()]
+            return Response('\n'.join(lines)+'\n', media_type='application/vnd.apple.mpegurl', headers={'Cache-Control':'no-store'})
+        if name == 'result.mp4' or (name.startswith('seg') and name.endswith('.ts')):
+            return FileResponse(path, media_type='video/mp4' if name.endswith('.mp4') else 'video/mp2t',
+                                filename='orchard-'+task_id+'.mp4' if download and name == 'result.mp4' else None,
+                                headers={'Cache-Control':'private, max-age=0'})
+        raise HTTPException(404)
 
     @app.post('/api/monitor/stop')
     def stop(user=Depends(auth)):

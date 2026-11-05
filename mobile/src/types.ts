@@ -6,6 +6,6 @@ export type Preferences = { scenario: 'normal' | 'offline' | 'timeout'; confiden
 export type State = {
   alarms: Alarm[]; commands: Command[]; events: Event[];
   counts: { total: number; pending: number; completed: number }; settings: Preferences;
-  monitor: { status: string; task_id: string | null; message: string; frame: Frame | null; source: string; model: string; device: string; sample_fps: number; source_ready: boolean; model_ready: boolean };
+  monitor: { status: string; task_id: string | null; message: string; frame: Frame | null; source: string; model: string; device: string; sample_fps: number; source_ready: boolean; model_ready: boolean; progress?: number; result_ready?: boolean; stream_ready?: boolean; video_id?: string };
   media_ticket: string; server_time: number;
 }

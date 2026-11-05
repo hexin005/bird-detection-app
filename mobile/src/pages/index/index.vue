@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useOrchard } from '../../store'
-import FrameView from '../../components/FrameView.vue'
+import VideoWorkspace from '../../components/VideoWorkspace.vue'
+import VideoLibrary from '../../components/VideoLibrary.vue'
+import BirdAlarms from '../../components/BirdAlarms.vue'
 import type { Alarm, Command, Event, Preferences } from '../../types'
 
 const store = useOrchard()
 const page = ref('monitor'), modal = ref(''), selectedAlarm = ref<string | null>(null)
-const detailId = ref(''), filter = ref('all'), recordFilter = ref('all'), duration = ref(3)
+const recordMode = ref('videos'), archiveTask = ref(''), archiveTime = ref(0), archiveNonce = ref(0)
+const detailId = ref(''), recordFilter = ref('all'), duration = ref(3)
 const credentials = reactive({ server: store.server, username: 'orchard', password: '' })
 const preferences = reactive<Preferences>({ scenario: 'normal', confidence: .35, consecutive: 2, cooldown: 20 })
 const older = ref<Event[]>([]), historyEnd = ref(false)
@@ -15,7 +18,6 @@ const s = computed(() => store.state)
 const alarm = computed(() => s.value?.alarms.find(a => a.id === detailId.value) || (fetchedAlarm.value?.id === detailId.value ? fetchedAlarm.value : null))
 const command = computed(() => s.value?.commands.find(c => c.id === detailId.value) || (fetchedCommand.value?.id === detailId.value ? fetchedCommand.value : null))
 const pending = computed(() => s.value?.alarms.filter(a => a.status === 'new') || [])
-const alarmList = computed(() => s.value?.alarms.filter(a => filter.value === 'all' || (filter.value === 'done' ? ['handled', 'ignored'].includes(a.status) : a.status === 'new')) || [])
 const events = computed(() => {
   const unique = new Map<number, Event>()
   for (const e of [...older.value, ...(s.value?.events || [])]) unique.set(e.id, e)
@@ -23,7 +25,7 @@ const events = computed(() => {
 })
 const running = computed(() => ['starting', 'running', 'stopping'].includes(s.value?.monitor.status || ''))
 const remaining = computed(() => store.active ? Math.min(store.active.duration, Math.max(0, Math.ceil(store.active.duration - (store.now - (store.active.started_at || store.now))))) : 0)
-const statusNames: Record<string,string> = { new:'待处理', processing:'执行中', handled:'已处理', ignored:'已忽略', pending:'待执行', running:'执行中', completed:'已完成', failed:'执行超时', cancelled:'已停止', unknown:'结果未知', idle:'未开始', starting:'加载模型', stopping:'正在停止', stopped:'已停止', ended:'录像结束', interrupted:'服务中断', error:'检测异常' }
+const statusNames: Record<string,string> = { new:'待处理', processing:'执行中', handled:'已处理', ignored:'已忽略', pending:'待执行', running:'执行中', completed:'已完成', failed:'执行超时', cancelled:'已停止', unknown:'结果未知', idle:'未开始', starting:'加载模型', stopping:'正在停止', stopped:'已停止', ended:'检测完成', interrupted:'服务中断', error:'检测异常' }
 const names = (value: string) => statusNames[value] || value
 const time = (value: number) => new Date(value * 1000).toLocaleString('zh-CN', { hour12:false })
 const clock = (value: number) => new Date(value * 1000).toLocaleTimeString('zh-CN', { hour12:false, hour:'2-digit', minute:'2-digit' })
@@ -33,8 +35,9 @@ async function run(action: () => Promise<unknown>) {
   store.busy = true
   try { await action() } catch(e) { notify((e as Error).message) } finally { store.busy = false }
 }
-function go(value: string) { page.value = value; uni.pageScrollTo({ scrollTop:0, duration:0 }) }
-function openAlarm(a: Alarm) { detailId.value = a.id; modal.value = 'alarm' }
+function go(value: string) { if(value!=='records')archiveTask.value='';page.value = value; uni.pageScrollTo({ scrollTop:0, duration:0 }) }
+function openAlarm(a: Alarm) { fetchedAlarm.value = a; detailId.value = a.id; modal.value = 'alarm' }
+function replayAlarm(a: Alarm) { modal.value=''; recordMode.value='videos'; archiveTask.value=a.task_id; archiveTime.value=a.video_time; archiveNonce.value++;go('records') }
 function settings() { if (s.value) Object.assign(preferences, s.value.settings); modal.value = 'settings' }
 function handle() { selectedAlarm.value = detailId.value; modal.value = ''; go('control') }
 async function execute() { await store.command(duration.value, selectedAlarm.value); modal.value = ''; selectedAlarm.value = null; notify('已提交至模拟执行器') }
@@ -62,7 +65,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, sta
       <view class="brand"><text class="brand-mark">青</text><view><text class="brand-name">青禾</text><text class="brand-en">ORCHARD WATCH</text></view></view>
       <text class="eyebrow">一座果园 · 一份安心</text>
       <text class="intro-title">{{ '看见每一次来访，\n守护每一份收获。' }}</text>
-      <text class="intro-description">{{ '让识别有依据，让行动有回应。\n在手机上完成一次果园巡护。' }}</text>
+      <text class="intro-description">{{ '让识别有依据，让行动有回应。\n从视频识别到结果归档。' }}</text>
       <view class="steps"><view v-for="(step,i) in ['发现 · 查看真实识别','判断 · 核对告警画面','行动 · 确认模拟驱离','回看 · 追溯操作记录']" :key="step" class="step"><text class="step-number">0{{ i + 1 }}</text><text>{{ step }}</text></view></view>
       <text class="intro-foot">MVP · 真实模型 / 预录视频 / 模拟设备</text>
     </view>
@@ -86,22 +89,17 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, sta
         <view v-else class="page">
           <template v-if="page === 'monitor'">
             <view class="title-row"><view><text class="title">果园，尽在掌握</text><text class="subtitle">今日巡护，从这里开始。</text></view><text class="badge" :class="s.monitor.status">{{ s.monitor.status === 'running' ? '正在监测' : names(s.monitor.status) }}</text></view>
-            <FrameView />
-            <view class="monitor-actions"><text class="small">{{ s.monitor.message }}</text><button :class="running ? 'secondary' : 'primary'" :disabled="store.busy || s.monitor.status === 'stopping'" @click="run(() => store.mutate('/monitor/' + (running ? 'stop' : 'start')))">{{ running ? '停止监测' : '开始监测' }}</button></view>
+            <VideoWorkspace />
             <view class="metrics"><view><text>待处理告警</text><text class="metric-value">{{ s.counts.pending }}<text class="metric-unit">条</text></text></view><view><text>检测事件</text><text class="metric-value">{{ s.counts.total }}<text class="metric-unit">条</text></text></view><view><text>模拟执行完成</text><text class="metric-value">{{ s.counts.completed }}<text class="metric-unit">次</text></text></view></view>
             <view class="section-heading"><text>需要你的关注</text><button class="text-button" @click="go('alarms')">全部告警 ›</button></view>
             <view v-if="pending.length" class="alert-card" @click="openAlarm(pending[0])"><view class="row"><text class="bird-symbol">♧</text><view class="grow"><text class="card-title">发现 {{ pending[0].count }} 只{{ pending[0].species }}</text><text class="small">东区果园 · CAM 01</text></view><text class="badge new">待处理</text></view><view class="card-footer"><text>{{ clock(pending[0].at) }} · {{ (pending[0].confidence * 100).toFixed(0) }}%</text><text>查看并处理 ›</text></view></view>
             <view v-else class="empty compact"><text>暂无待处理告警</text><text class="small">监测开始后，连续检出将形成告警。</text></view>
             <view class="device-strip" @click="go('control')"><text class="bird-symbol">◉</text><view class="grow"><text class="card-title">声学驱鸟器 01</text><text class="small">模拟设备 · 人工确认后执行</text></view><text :class="s.settings.scenario === 'offline' ? 'offline' : 'online'">● {{ s.settings.scenario === 'offline' ? '离线' : '在线' }}</text></view>
-            <text class="note">画面为预录视频的连续抽帧推理。离开此页后，服务器仍会继续监测。</text>
+            <text class="note">离开首页后，服务器继续分析；完成后在记录中回看。</text>
           </template>
 
           <template v-if="page === 'alarms'">
-            <text class="title">告警中心</text><text class="subtitle">{{ s.counts.pending }} 条待处理 · 来自真实模型识别</text>
-            <view class="tabs"><button v-for="item in [{id:'all',name:'全部'},{id:'new',name:'待处理'},{id:'done',name:'已处理'}]" :key="item.id" :class="{selected:filter===item.id}" @click="filter=item.id">{{ item.name }}</button></view>
-            <view v-for="item in alarmList" :key="item.id" class="list-card" @click="openAlarm(item)"><view class="row"><image class="thumb" :src="store.media('captures/' + item.snapshot)" mode="aspectFill" /><view class="grow"><text class="card-title">{{ item.species }} · {{ item.count }} 只</text><text class="small">{{ item.site }}</text></view><text class="badge" :class="item.status">{{ names(item.status) }}</text></view><view class="card-footer"><text>{{ clock(item.at) }} · 置信度 {{ (item.confidence * 100).toFixed(0) }}%</text><text>详情 ›</text></view></view>
-            <view v-if="!alarmList.length" class="empty"><text>这里暂时没有告警</text><text class="small">开始监测后，满足条件的事件将出现在这里。</text></view>
-            <text class="note">显示最近 100 条告警，较早事件可在巡护记录中查阅。连续检出合并为同一事件，不重复累计鸟只数。</text>
+            <BirdAlarms @open="openAlarm" />
           </template>
 
           <template v-if="page === 'control'">
@@ -116,13 +114,17 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, sta
           </template>
 
           <template v-if="page === 'records'">
-            <text class="title">巡护记录</text><text class="subtitle">从发现到处理，每一步都有迹可循。</text>
+            <text class="title">检测档案</text><text class="subtitle">按视频回看，按鸟类查找。</text>
+            <view class="tabs"><button :class="{selected:recordMode==='videos'}" @click="recordMode='videos'">视频与鸟类</button><button :class="{selected:recordMode==='actions'}" @click="recordMode='actions'">处理操作记录</button></view>
+            <VideoLibrary v-if="recordMode==='videos'" :key="archiveNonce" :initial-task="archiveTask" :initial-time="archiveTime" />
+            <template v-else>
             <view class="summary"><view><text class="metric-value">{{ s.counts.total }}</text><text class="small">检测事件</text></view><view><text class="metric-value">{{ s.counts.completed }}</text><text class="small">模拟执行完成</text></view></view>
             <view class="tabs"><button v-for="item in [{id:'all',name:'全部记录'},{id:'detection',name:'检测事件'},{id:'actions',name:'处理操作'}]" :key="item.id" :class="{selected:recordFilter===item.id}" @click="recordFilter=item.id">{{ item.name }}</button></view>
             <view v-for="event in events" :key="event.id" class="event-row" @click="run(() => inspectEvent(event))"><view class="event-dot"/><view class="grow"><text class="card-title">{{ event.message }}</text><text class="small">{{ time(event.at) }} · {{ event.ref_id }}</text></view><text>›</text></view>
             <view v-if="!events.length" class="empty"><text>开始巡护，留下第一条记录</text></view>
             <button v-if="!historyEnd && (s.events.length >= 100 || older.length)" class="secondary full" :disabled="store.busy" @click="run(loadHistory)">加载更早记录</button>
             <text class="note">记录保存在服务器，退出登录或刷新页面不会丢失。</text>
+            </template>
           </template>
         </view>
         <view class="nav"><button v-for="item in [{id:'monitor',icon:'▣',name:'监控'},{id:'alarms',icon:'♧',name:'告警'},{id:'control',icon:'◉',name:'控制'},{id:'records',icon:'▤',name:'记录'}]" :key="item.id" :class="{active:page===item.id}" @click="go(item.id)"><text class="nav-icon">{{ item.icon }}</text><text>{{ item.name }}{{ item.id==='alarms' && s?.counts.pending ? ' · '+s.counts.pending : '' }}</text></button></view>
@@ -148,6 +150,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, sta
         <image class="capture" :src="store.media('captures/' + alarm.snapshot)" mode="aspectFit"/>
         <view class="detail-grid"><view><text class="small">识别鸟类</text><text>{{ alarm.species }} · {{ alarm.count }} 只</text></view><view><text class="small">模型置信度</text><text>{{ (alarm.confidence*100).toFixed(1) }}%</text></view><view><text class="small">发现时间</text><text>{{ time(alarm.at) }}</text></view><view><text class="small">录像位置</text><text>{{ alarm.video_time.toFixed(1) }}s · 帧 {{ alarm.frame_id }}</text></view></view>
         <view class="callout">{{ names(alarm.status) }} · 连续检出 {{ alarm.hits }} 次。抓拍与数量以首次告警画面为准。检测到鸟类不等同于发生鸟害。</view>
+        <button class="secondary full" @click="replayAlarm(alarm)">回看对应视频 · {{ alarm.video_time.toFixed(1) }} 秒 ›</button>
         <view v-if="alarm.status==='new'" class="button-row"><button class="secondary" :disabled="store.busy" @click="run(async()=>{await store.mutate('/alarms/'+alarm!.id+'/ignore');modal=''})">忽略这次告警</button><button class="primary" :disabled="store.busy" @click="handle">确认并去驱离</button></view>
         <view v-for="c in s?.commands.filter(c=>c.alarm_id===alarm!.id)" :key="c.id" class="result-card" @click="detailId=c.id;modal='record'"><text>{{ c.id }} · {{ names(c.status) }} ›</text></view>
       </template>
