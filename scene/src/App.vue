@@ -152,8 +152,8 @@ function toggleRotate() {
   <div class="scene-root">
     <canvas ref="canvas" class="scene-canvas" />
 
-    <!-- 加载遮罩 -->
-    <div class="hud-loading" :class="{ 'is-hidden': ready && !needLogin }">
+    <!-- 加载遮罩：场景就绪即隐藏（登录表单在遮罩之上，未登录时也要露出来） -->
+    <div class="hud-loading" :class="{ 'is-hidden': ready }">
       <div class="hud-loading__mark">青</div>
       <div class="hud-loading__text">{{ ready ? '等待登录' : '正在构建果园场景' }}</div>
       <div class="hud-loading__bar"><div class="hud-loading__fill" :style="{ width: loadProgress + '%' }" /></div>
@@ -300,7 +300,7 @@ function toggleRotate() {
   justify-content: center;
   background: rgba(16, 22, 14, 0.72);
   backdrop-filter: blur(6px);
-  z-index: 30;
+  z-index: 45;
 }
 
 .login-card {
