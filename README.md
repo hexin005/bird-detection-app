@@ -112,19 +112,21 @@ python -m venv .venv
 bird-detection-app/
 ├── assets/
 │   ├── best.pt          # YOLOv8 权重（约 6 MB，13 类果园常见鸟类）
-│   └── demo-bird.mp4    # 演示视频（约 64 MB，含鸟类，可跑通完整流程）
+│   └── demo-bird.mp4    # 演示视频（约 1.6 MB，30 秒 1080p，含鸟类）
 ```
 
 两个文件的 SHA-256 校验值（用于确认下载完整）：
 
 ```text
 C0772AA06C9DE7EDF5A871E5AB980C408FCE823B263F81A140E380E2E155D8DF  best.pt
-77D980C525823E7168480735DCD9014586FF8D43D9CC4037905641D8038B9441  demo-bird.mp4
+15D228EF3A0ACDA1878AB1D5AB4F23C4C0E320933A8801946EBC7E740A9A8F65  demo-bird.mp4
 ```
 
 后端首次启动时会自动把默认模型/视频路径指向 `assets/best.pt` 与 `assets/demo-bird.mp4`，所以**第 4 步通常可以跳过**，直接看第 5 步启动即可。只有在你想换成自己的模型/视频时，才需要第 4 步的配置。
 
 > 如果所在仓库托管平台对单文件大小有限制，可改用 Git LFS 跟踪 `assets/`，见第 4.3 小节。
+
+> **视频格式说明**：`demo-bird.mp4` 为 HEVC/H.265 编码、1920×1080、30fps、30 秒。后端用 OpenCV 解码（支持 HEVC），但如果浏览器直接播放原片遇到兼容问题，改用检测结果归档的 MP4 即可（FFmpeg 统一转码为 H.264）。
 
 ### 第 4 步：配置模型与视频路径（仅换模型/视频时需要）
 
