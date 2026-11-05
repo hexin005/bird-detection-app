@@ -254,5 +254,17 @@ def create_app(settings=None):
 
     build = ROOT / 'mobile/dist/build/h5'
     if build.exists():
+        # 本机演示场景：开发期间反复重建产物，必须禁用浏览器缓存，
+        # 否则改了样式但浏览器仍用旧的 index.html / css，看起来像是修复没生效。
+        @app.middleware('http')
+        async def no_cache_for_static(request: Request, call_next):
+            response = await call_next(request)
+            path = request.url.path
+            if path.startswith('/assets/') or path == '/' or path.endswith('.html'):
+                response.headers['Cache-Control'] = 'no-store, must-revalidate'
+                response.headers['Pragma'] = 'no-cache'
+                response.headers['Expires'] = '0'
+            return response
+
         app.mount('/', StaticFiles(directory=build, html=True), name='mobile')
     return app
