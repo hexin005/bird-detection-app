@@ -3,28 +3,8 @@
    --------------------------------------------------------------------------
    依赖 tokens.css。本文件逐行取自设计稿，类名与样式值不做任何改写。
    ========================================================================== */
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body { background:#e5e3d6; font-family:var(--font-sans); display:flex; justify-content:center; min-height:100vh; }
-
-/* 手机壳 */
-.phone {
-  width:390px; min-height:844px; background:var(--surface-canvas); position:relative;
-  overflow:hidden; display:flex; flex-direction:column;
-  box-shadow:0 18px 60px rgba(31,47,38,.18);
-}
-@media (max-width:420px){ .phone{ width:100vw; min-height:100vh; box-shadow:none; } }
-
-/* 状态栏 */
-.statusbar { height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; flex-shrink:0; }
-.statusbar .time { font-family:var(--font-num); font-size:15px; font-weight:600; color:var(--ink-900); }
-.statusbar .icons { display:flex; gap:6px; align-items:center; }
-.statusbar svg { display:block; }
-
-/* 页面结构 */
-.page { display:none; flex-direction:column; flex:1; min-height:0; }
-.page.is-current { display:flex; }
-.page__content { flex:1; overflow-y:auto; padding:var(--page-pad); display:flex; flex-direction:column; gap:var(--section-gap); padding-bottom:calc(var(--tabbar-height) + 16px); }
-.page--nologin .page__content { padding-bottom:24px; }
+/* 全局重置、.phone / .statusbar / .page 等布局骨架统一在 styles.css 定义，
+   本文件只保留业务组件样式，避免重复定义互相覆盖。 */
 
 /* ===== 组件（components.css 同源） ===== */
 .qh-page-title { font-family:var(--font-serif); font-size:var(--text-title); font-weight:700; color:var(--ink-900); line-height:var(--leading-tight); }
