@@ -3,10 +3,9 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 if (-not $Python) {
+    # 优先使用项目内虚拟环境，其次退回系统 python
     $LocalPython = Join-Path $ProjectRoot '.venv\Scripts\python.exe'
-    $ExistingPython = Join-Path (Split-Path -Parent $ProjectRoot) 'bird-detection-web\backend\.venv\Scripts\python.exe'
     if (Test-Path $LocalPython) { $Python = $LocalPython }
-    elseif (Test-Path $ExistingPython) { $Python = $ExistingPython }
     else { $Python = 'python' }
 }
 & $Python -c "from backend.config import Settings; s=Settings.load(); print('Account:', s.username); print('Password:', s.password); print('Video:',s.video_path); print('Model:',s.model_path)"
