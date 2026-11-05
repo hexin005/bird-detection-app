@@ -252,19 +252,29 @@ def create_app(settings=None):
             with contextlib.suppress(RuntimeError):
                 await ws.close()
 
+    # 本机演示场景：开发期间反复重建产物，必须禁用浏览器缓存，
+    # 否则改了样式但浏览器仍用旧的 index.html / css，看起来像是修复没生效。
+    @app.middleware('http')
+    async def no_cache_for_static(request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if (
+            path.startswith('/assets/')
+            or path.startswith('/scene')
+            or path == '/'
+            or path.endswith('.html')
+        ):
+            response.headers['Cache-Control'] = 'no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
+    # 3D 场景必须挂在 '/' 之前，否则 StaticFiles(html=True) 会先截获请求。
+    scene_build = ROOT / 'scene/dist'
+    if scene_build.exists():
+        app.mount('/scene', StaticFiles(directory=scene_build, html=True), name='scene')
+
     build = ROOT / 'mobile/dist/build/h5'
     if build.exists():
-        # 本机演示场景：开发期间反复重建产物，必须禁用浏览器缓存，
-        # 否则改了样式但浏览器仍用旧的 index.html / css，看起来像是修复没生效。
-        @app.middleware('http')
-        async def no_cache_for_static(request: Request, call_next):
-            response = await call_next(request)
-            path = request.url.path
-            if path.startswith('/assets/') or path == '/' or path.endswith('.html'):
-                response.headers['Cache-Control'] = 'no-store, must-revalidate'
-                response.headers['Pragma'] = 'no-cache'
-                response.headers['Expires'] = '0'
-            return response
-
         app.mount('/', StaticFiles(directory=build, html=True), name='mobile')
     return app

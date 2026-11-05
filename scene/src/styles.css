@@ -1,0 +1,431 @@
+/* ==========================================================================
+   青禾 · 果园 3D 演示 — 布局与 HUD
+   ========================================================================== */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #10160e;
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 3D 画布 */
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ==========================================================================
+   顶部状态条
+   ========================================================================== */
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-6) var(--space-8);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  background: linear-gradient(to bottom, rgba(16, 22, 14, 0.72), transparent);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hud-brand__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hud-brand__name {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: #f2f4e8;
+  letter-spacing: 1px;
+  line-height: 1.2;
+}
+
+.hud-brand__tag {
+  padding: 3px 7px;
+  border-radius: var(--radius-xs);
+  background: rgba(211, 232, 86, 0.16);
+  border: 1px solid rgba(211, 232, 86, 0.34);
+  color: var(--detect);
+  font-family: var(--font-num);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.hud-brand__site {
+  font-size: var(--text-sm);
+  color: rgba(242, 244, 232, 0.62);
+}
+
+/* 右上角状态徽标组 */
+.hud-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  height: 22px;
+  background: rgba(35, 43, 29, 0.55);
+  border: 1px solid rgba(242, 244, 232, 0.16);
+  color: #dfe4d3;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+.hud-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-300);
+  flex-shrink: 0;
+}
+
+.hud-badge.is-live {
+  background: rgba(52, 80, 47, 0.8);
+  border-color: rgba(211, 232, 86, 0.4);
+  color: #f2f4e8;
+}
+.hud-badge.is-live .hud-badge__dot {
+  background: var(--detect);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.hud-badge.is-ended .hud-badge__dot { background: var(--brand-300); }
+.hud-badge.is-warn {
+  background: rgba(150, 104, 43, 0.55);
+  border-color: rgba(231, 213, 174, 0.4);
+  color: #f5ebd5;
+}
+.hud-badge.is-warn .hud-badge__dot { background: #e7d5ae; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ==========================================================================
+   右侧信息面板
+   ========================================================================== */
+
+.hud-panel {
+  position: absolute;
+  top: 92px;
+  right: var(--space-8);
+  width: 244px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  z-index: 10;
+}
+
+.hud-card {
+  background: rgba(251, 250, 243, 0.94);
+  border: 1px solid rgba(233, 230, 215, 0.9);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+}
+
+.hud-card__title {
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  letter-spacing: 1px;
+  margin-bottom: var(--space-3);
+}
+
+/* 统计数据 */
+.hud-stats {
+  display: flex;
+  gap: var(--space-3);
+}
+.hud-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hud-stat__num {
+  font-family: var(--font-num);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.1;
+}
+.hud-stat__num.is-warn { color: var(--warn-fg); }
+.hud-stat__label {
+  font-size: var(--text-2xs);
+  color: var(--ink-400);
+}
+
+/* 最近检测 */
+.hud-detect {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid rgba(233, 230, 215, 0.7);
+}
+.hud-detect:last-child { border-bottom: 0; padding-bottom: 0; }
+.hud-detect:first-child { padding-top: 0; }
+
+.hud-detect__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--detect);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(211, 232, 86, 0.18);
+}
+.hud-detect__dot.is-alarm {
+  background: var(--warn-fg);
+  box-shadow: 0 0 0 3px rgba(150, 104, 43, 0.18);
+}
+.hud-detect__body { flex: 1; min-width: 0; }
+.hud-detect__name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-800);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-detect__meta {
+  display: block;
+  font-family: var(--font-num);
+  font-size: var(--text-2xs);
+  color: var(--ink-400);
+  margin-top: 1px;
+}
+
+.hud-empty {
+  font-size: var(--text-xs);
+  color: var(--ink-300);
+  padding: var(--space-3) 0;
+}
+
+/* 设备行 */
+.hud-device {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.hud-device__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--brand-600);
+}
+.hud-device__body { flex: 1; min-width: 0; }
+.hud-device__name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-800);
+}
+.hud-device__desc {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--ink-400);
+}
+
+.hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  border: 1px solid var(--line-soft);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--success-fg);
+  flex-shrink: 0;
+}
+.hud-pill__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success-fg);
+}
+.hud-pill.is-off { color: var(--warn-fg); }
+.hud-pill.is-off .hud-pill__dot { background: var(--warn-fg); }
+
+/* ==========================================================================
+   底部提示与图例
+   ========================================================================== */
+
+.hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-6) var(--space-8);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+  background: linear-gradient(to top, rgba(16, 22, 14, 0.7), transparent);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.hud-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  color: rgba(242, 244, 232, 0.72);
+}
+.hud-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.hud-note {
+  font-size: var(--text-2xs);
+  color: rgba(242, 244, 232, 0.5);
+  text-align: right;
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   加载遮罩
+   ========================================================================== */
+
+.hud-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  background: #10160e;
+  z-index: 40;
+  transition: opacity 0.5s ease;
+}
+.hud-loading.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.hud-loading__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: #f5f7ec;
+  box-shadow: 0 8px 24px rgba(52, 80, 47, 0.5);
+}
+.hud-loading__text {
+  font-size: var(--text-md);
+  color: rgba(242, 244, 232, 0.7);
+  letter-spacing: 2px;
+}
+.hud-loading__bar {
+  width: 180px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(242, 244, 232, 0.14);
+  overflow: hidden;
+}
+.hud-loading__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--detect);
+  transition: width 0.3s ease;
+}
+
+/* ==========================================================================
+   响应式：窄屏收起右侧面板
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .hud-panel {
+    width: 200px;
+    top: 84px;
+    right: var(--space-5);
+  }
+  .hud-top, .hud-bottom {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+}
+
+@media (max-width: 640px) {
+  .hud-panel { display: none; }
+  .hud-brand__name { font-size: var(--text-xl); }
+  .hud-legend { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; }
+}

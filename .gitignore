@@ -10,6 +10,7 @@ __pycache__/
 mobile/dist/
 mobile/unpackage/
 .pytest_cache/
+scene/dist/
 
 # 资产文件需要随项目一并交付给大赛组委会：
 # 模型权重 best.pt 与演示视频 demo-bird.mp4 默认提交到仓库，请勿忽略 assets/。

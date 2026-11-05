@@ -1,0 +1,93 @@
+/* ==========================================================================
+   青禾 · 果园 3D — 设计变量（与 mobile/src/tokens.css 同源）
+   ========================================================================== */
+
+:root {
+  /* 品牌墨绿 */
+  --brand-900: #22371f;
+  --brand-800: #27402a;
+  --brand-700: #34502f;
+  --brand-600: #3f5c33;
+  --brand-500: #4f6b3f;
+  --brand-400: #7b9b63;
+  --brand-300: #a7b78e;
+  --brand-200: #cdd9b8;
+  --brand-100: #e4eddc;
+  --brand-50: #f4f6ea;
+
+  /* 墨色 */
+  --ink-900: #232b1d;
+  --ink-800: #2a3324;
+  --ink-700: #43503e;
+  --ink-600: #6d7f6c;
+  --ink-500: #7c8472;
+  --ink-400: #8a917f;
+  --ink-300: #a3ab97;
+  --ink-200: #b8bfa9;
+
+  /* 纸面 */
+  --surface-canvas: #f3f1e7;
+  --surface-card: #ffffff;
+  --surface-raised: #fbfaf3;
+  --surface-sunken: #edefdf;
+  --surface-video: #1c2318;
+  --surface-mask: rgba(35, 43, 29, 0.55);
+
+  --line: #e9e6d7;
+  --line-soft: #e5e2d2;
+  --line-strong: #dcd9c8;
+
+  /* 语义 */
+  --warn-bg: #f5ebd5;
+  --warn-fg: #96682b;
+  --warn-line: #e7d5ae;
+  --danger-bg: #f3e4dd;
+  --danger-fg: #9c5546;
+  --success-bg: #e9f0dc;
+  --success-fg: #56753f;
+  --info-bg: #e4eddc;
+  --info-fg: #3f6b49;
+  --neutral-bg: #edeee4;
+  --neutral-fg: #6d7f6c;
+
+  /* 检测框荧绿 */
+  --detect: #d3e856;
+  --detect-text: #22301f;
+
+  /* 字号 */
+  --text-2xs: 9px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 13px;
+  --text-lg: 14px;
+  --text-xl: 15px;
+  --text-2xl: 18px;
+  --text-title: 25px;
+
+  --font-sans: "Noto Sans SC", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-num: "Inter", "SF Pro Text", "Noto Sans SC", sans-serif;
+
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 16px;
+  --space-8: 20px;
+  --space-9: 24px;
+
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 13px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 6px rgba(36, 43, 28, 0.08);
+  --shadow-md: 0 4px 14px rgba(36, 43, 28, 0.12);
+  --shadow-lg: 0 12px 36px rgba(36, 43, 28, 0.18);
+}
