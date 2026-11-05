@@ -28,49 +28,67 @@ page,
   box-sizing: border-box;
 }
 
+/* uni-app 框架样式表在构建后加载，选择器特异性与这里相同但顺序在后，
+   因此必须用 :where() 之外的显式提权（uni-button 自带 padding:14px、
+   ::after 边框、background、font-size 等）才能稳定覆盖。 */
+uni-button,
+uni-button:not([class]),
 button,
-uni-button {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-family: var(--font-sans);
-  line-height: inherit;
-  text-align: inherit;
+button:not([class]),
+button[type],
+uni-button[type] {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  font: inherit !important;
+  font-family: var(--font-sans) !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  text-align: inherit !important;
   overflow: visible;
+  box-sizing: border-box;
   -webkit-appearance: none;
   appearance: none;
 }
 
 /* uni-app 的伪元素边框：导航/按钮上的横线就是它 */
 button::after,
-uni-button::after {
-  display: none;
-  border: 0;
-  content: none;
+uni-button::after,
+button:not([class])::after,
+uni-button:not([class])::after {
+  display: none !important;
+  border: 0 !important;
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 button[disabled],
 uni-button[disabled] {
-  opacity: 1;
-  color: inherit;
-  background: transparent;
+  opacity: 1 !important;
+  color: inherit !important;
+  background: transparent !important;
 }
 
+/* 输入框同理：uni-input 自带内边距与边框 */
 input,
-uni-input {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  outline: none;
-  padding: 0;
-  margin: 0;
-  min-height: 0;
-  line-height: normal;
+uni-input,
+input:not([class]),
+uni-input:not([class]) {
+  font: inherit !important;
+  font-size: inherit !important;
+  color: inherit !important;
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  line-height: normal !important;
+  box-sizing: border-box;
 }
 
 text,
