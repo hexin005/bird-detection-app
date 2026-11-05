@@ -31,8 +31,8 @@ class Settings:
             config.write_text(json.dumps({
                 'username': 'orchard', 'password': secrets.token_urlsafe(12),
                 'secret': secrets.token_hex(32),
-                'model_path': str(ROOT.parent / 'bird-detection-web/backend/models/best.pt'),
-                'video_path': str(ROOT.parent / 'bird-detection-web/backend/uploads/6b04f07432584e0f9669344b603d4e07.mp4'),
+                'model_path': str(ROOT / 'assets/best.pt'),
+                'video_path': str(ROOT / 'assets/demo-bird.mp4'),
             }, ensure_ascii=False, indent=2), encoding='utf-8')
         values = json.loads(config.read_text(encoding='utf-8'))
         return cls(data, Path(os.getenv('BIRD_MODEL_PATH', values['model_path'])),
