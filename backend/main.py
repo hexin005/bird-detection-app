@@ -256,8 +256,14 @@ def create_app(settings=None):
     # 否则改了样式但浏览器仍用旧的 index.html / css，看起来像是修复没生效。
     @app.middleware('http')
     async def no_cache_for_static(request: Request, call_next):
-        response = await call_next(request)
+        # Starlette StaticFiles 遇到 Windows 非法字符（如 '**'、未编码中文等）
+        # 会在 os.stat 时抛 OSError [WinError 123] 导致 500，而不是优雅 404。
+        # 这里提前拦截这类非法路径，返回 404。
         path = request.url.path
+        try:
+            response = await call_next(request)
+        except OSError:
+            return JSONResponse({'detail': 'Not Found'}, status_code=404)
         if (
             path.startswith('/assets/')
             or path.startswith('/scene')
