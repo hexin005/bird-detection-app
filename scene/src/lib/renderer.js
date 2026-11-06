@@ -45,11 +45,12 @@ export function createOrchardScene(canvas, options = {}) {
   scene.fog = new THREE.Fog(PALETTE.fog, 34, 74)
 
   const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 260)
-  camera.position.set(17, 12.5, 19)
-  camera.lookAt(0, 2.4, 0)
+  // 正对果园中心，带一定俯视角度，让果树、摄像头、驱鸟器都进画面
+  camera.position.set(15, 13.5, 17)
+  camera.lookAt(0, 1.8, 0)
 
   const controls = new OrbitControls(camera, canvas)
-  controls.target.set(0, 2.2, 0)
+  controls.target.set(0, 1.8, 0)
   controls.enableDamping = true
   controls.dampingFactor = 0.06
   controls.minDistance = 9
@@ -174,18 +175,45 @@ export function createOrchardScene(canvas, options = {}) {
     })
   }
 
-  /* ---------- 扫描线（监测中画面横线） ---------- */
-  const scanGeo = new THREE.PlaneGeometry(30, 0.12)
-  const scanMat = new THREE.MeshBasicMaterial({
+  /* ---------- 立体扫描（监测中：扫描幕布 + 扩散圆环） ---------- */
+  // 竖直扫描幕布：一面上下起伏的半透明平面，像激光幕墙扫过果园
+  const curtainGeo = new THREE.PlaneGeometry(36, 12, 1, 1)
+  const curtainMat = new THREE.MeshBasicMaterial({
     color: PALETTE.detect,
     transparent: true,
     opacity: 0,
+    side: THREE.DoubleSide,
     depthWrite: false,
   })
-  const scanLine = new THREE.Mesh(scanGeo, scanMat)
-  scanLine.rotation.x = -Math.PI / 2
-  scanLine.position.y = 0.06
-  scene.add(scanLine)
+  const curtain = new THREE.Mesh(curtainGeo, curtainMat)
+  curtain.position.y = 5.4
+  scene.add(curtain)
+
+  // 扩散圆环：从果园中心向外扩散的地面圆环，形成立体扫描感
+  const rippleGeo = new THREE.RingGeometry(0.96, 1.04, 64)
+  const rippleMat = new THREE.MeshBasicMaterial({
+    color: PALETTE.detect,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+  const ripple = new THREE.Mesh(rippleGeo, rippleMat)
+  ripple.rotation.x = -Math.PI / 2
+  ripple.position.y = 0.08
+  scene.add(ripple)
+
+  // 扫描点阵：果园上方若干荧绿小点，模拟立体采样
+  const dots = new THREE.Group()
+  for (let i = 0; i < 18; i += 1) {
+    const dotGeo = new THREE.SphereGeometry(0.09, 6, 6)
+    const dotMat = new THREE.MeshBasicMaterial({ color: PALETTE.detect, transparent: true, opacity: 0 })
+    const dot = new THREE.Mesh(dotGeo, dotMat)
+    const a = (i / 18) * Math.PI * 2
+    dot.position.set(Math.cos(a) * 14, 1.2 + Math.sin(i * 1.7) * 1.6, Math.sin(a) * 14)
+    dots.add(dot)
+  }
+  scene.add(dots)
 
   /* ---------- 尺寸自适应 ---------- */
   function resize() {
@@ -215,6 +243,35 @@ export function createOrchardScene(canvas, options = {}) {
     executing: false,
     offline: false,
     detTime: 0,
+  }
+
+  /* ---------- 叙事运镜 ---------- */
+  // 平时：自动环绕果园全景
+  // 有检出：相机向果园中心轻轻推进
+  // 有告警：更近一点，突出告警对象
+  const camPose = {
+    overview: { pos: new THREE.Vector3(15, 13.5, 17), target: new THREE.Vector3(0, 1.8, 0) },
+    detection: { pos: new THREE.Vector3(11, 9.5, 13), target: new THREE.Vector3(0, 3.6, 0) },
+    alarm: { pos: new THREE.Vector3(8.5, 7.2, 10.5), target: new THREE.Vector3(0, 5.2, 0) },
+  }
+  let poseName = 'overview'
+  let userAutoRotate = true  // 用户手动开关，优先于运镜逻辑
+
+  function updateCameraPose(dt) {
+    const hasAlarm = visual.running && visual.alarms.length > 0
+    const hasDetection = visual.running && visual.detections.length > 0
+    const next = hasAlarm ? 'alarm' : hasDetection ? 'detection' : 'overview'
+    if (next !== poseName) {
+      poseName = next
+      // 只有用户没有手动关闭时，才让运镜逻辑控制自动环绕
+      if (userAutoRotate) {
+        controls.autoRotate = poseName === 'overview'
+      }
+    }
+    const pose = camPose[poseName]
+    // 缓动推进，避免硬切
+    camera.position.lerp(pose.pos, Math.min(dt * 1.6, 1))
+    controls.target.lerp(pose.target, Math.min(dt * 2.2, 1))
   }
 
   function updateBirds(dt, elapsed) {
@@ -337,13 +394,29 @@ export function createOrchardScene(canvas, options = {}) {
       mat.opacity = (1 - t) * 0.55
     })
 
-    // 扫描线：监测中从场景一侧扫到另一侧
+    // 立体扫描：监测中扫描幕布扫过 + 圆环扩散 + 点阵呼吸
     if (visual.running) {
-      scanProgress = (scanProgress + dt * 0.32) % 1
-      scanLine.position.z = -18 + scanProgress * 36
-      scanMat.opacity = 0.16
+      scanProgress = (scanProgress + dt * 0.22) % 1
+
+      // 扫描幕布：沿 z 轴往复扫过果园
+      const cz = -16 + scanProgress * 32
+      curtain.position.z = cz
+      curtainMat.opacity = 0.10 + Math.sin(scanProgress * Math.PI) * 0.06
+
+      // 扩散圆环：从中心向外扩散，循环
+      const rippleT = (elapsed * 0.35) % 1
+      ripple.scale.setScalar(0.5 + rippleT * 22)
+      rippleMat.opacity = (1 - rippleT) * 0.22
+
+      // 点阵呼吸：模拟立体采样点
+      dots.children.forEach((dot, i) => {
+        dot.material.opacity = 0.25 + Math.sin(elapsed * 2.4 + i * 0.7) * 0.2
+        dot.position.y = 1.2 + Math.sin(elapsed * 1.3 + i * 0.9) * 1.6
+      })
     } else {
-      scanMat.opacity = 0
+      curtainMat.opacity = 0
+      rippleMat.opacity = 0
+      dots.children.forEach((dot) => { dot.material.opacity = 0 })
     }
   }
 
@@ -353,6 +426,7 @@ export function createOrchardScene(canvas, options = {}) {
     const dt = Math.min(clock.getDelta(), 0.05)
     const elapsed = clock.elapsedTime
 
+    updateCameraPose(dt)
     controls.update()
     updateBirds(dt, elapsed)
     updateDevices(dt, elapsed)
@@ -373,14 +447,18 @@ export function createOrchardScene(canvas, options = {}) {
       visual.offline = !!offline
       visual.detTime = detTime || 0
     },
-    /** 暂停/恢复自动环绕 */
+    /** 暂停/恢复自动环绕（用户手动控制，优先于运镜逻辑） */
     setAutoRotate(on) {
+      userAutoRotate = !!on
       controls.autoRotate = !!on
     },
-    /** 重置视角 */
+    /** 重置视角（回到俯瞰全景，并恢复自动环绕） */
     resetView() {
-      camera.position.set(17, 12.5, 19)
-      controls.target.set(0, 2.2, 0)
+      poseName = 'overview'
+      userAutoRotate = true
+      controls.autoRotate = true
+      camera.position.set(15, 13.5, 17)
+      controls.target.set(0, 1.8, 0)
       controls.update()
     },
     resize,
