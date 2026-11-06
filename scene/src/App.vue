@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { createOrchardScene } from './lib/renderer.js'
-import { state, connect, disconnect, defaultServer } from './lib/data.js'
+import { state, connect, disconnect, resume, clearSession, defaultServer } from './lib/data.js'
 
 /* ---------- 场景 ---------- */
 const canvas = ref(null)
@@ -15,6 +15,7 @@ const password = ref('')
 const needLogin = computed(() => !state.token)
 const loginError = ref('')
 const loggingIn = ref(false)
+const sceneError = ref('')  // WebGL 不可用或场景初始化失败
 
 let handle = null
 
@@ -46,6 +47,41 @@ const recentAlarms = computed(() => state.alarms.slice(0, 3))
 
 const executing = computed(() => !!state.activeCommand)
 
+/** 待驱离鸟数（由 3D 场景回报） */
+const birdCount = ref(0)
+/** 本次演示的驱离次数 */
+const repelCount = ref(0)
+/** 上一次已结算的驱离指令 id，避免重复触发 */
+let settledCommandId = ''
+
+/**
+ * 监听驱离指令完成：每次成功驱离驱散一部分鸟。
+ * 后端的指令状态流转：pending -> running -> completed
+ */
+watch(
+  () => state.commands,
+  (cmds) => {
+    if (!Array.isArray(cmds)) return
+    for (const c of cmds) {
+      if (c.status !== 'completed') continue
+      if (c.id === settledCommandId) continue
+      // 只结算最近 30 秒内的指令，避免加载历史数据时批量触发
+      if (c.ended_at && Date.now() / 1000 - c.ended_at > 30) {
+        settledCommandId = c.id
+        continue
+      }
+      settledCommandId = c.id
+      if (handle) {
+        const left = handle.disperse()
+        birdCount.value = left
+        repelCount.value += 1
+      }
+      break
+    }
+  },
+  { deep: false },
+)
+
 const timeText = (at) => {
   if (!at) return ''
   const d = new Date(at * 1000)
@@ -64,7 +100,24 @@ function pushStateToScene() {
     // 当前帧的录像时间戳，用于告警精确关联
     detTime: state.snapshot?.monitor?.frame?.video_time ?? 0,
   })
+  // 同步待驱离鸟数到 HUD
+  birdCount.value = handle.occupantCount()
 }
+
+// 重新开始检测时清空上一轮的居留鸟群
+watch(
+  () => state.monitorStatus,
+  (now, before) => {
+    const starting = now === 'running' || now === 'starting'
+    const wasIdle = before === 'ended' || before === 'stopped' || before === 'idle'
+    if (starting && wasIdle && handle) {
+      handle.clearOccupants()
+      birdCount.value = 0
+      repelCount.value = 0
+    }
+  },
+  { flush: 'post' },
+)
 
 watch(
   () => [
@@ -83,12 +136,30 @@ watch(
 /* ---------- 生命周期 ---------- */
 onMounted(() => {
   loadProgress.value = 30
-  handle = createOrchardScene(canvas.value, {
-    onReady: () => {
-      loadProgress.value = 100
-      ready.value = true
-    },
-  })
+
+  // WebGL 可用性检测
+  const testCanvas = document.createElement('canvas')
+  const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl')
+  if (!gl) {
+    loadProgress.value = 100
+    ready.value = true
+    sceneError.value = '你的浏览器不支持 WebGL，无法渲染 3D 场景。请尝试更新浏览器或启用硬件加速。'
+    return
+  }
+
+  try {
+    handle = createOrchardScene(canvas.value, {
+      onReady: () => {
+        loadProgress.value = 100
+        ready.value = true
+      },
+    })
+  } catch (err) {
+    loadProgress.value = 100
+    ready.value = true
+    sceneError.value = '3D 场景初始化失败：' + (err.message || err)
+    return
+  }
 
   serverInput.value = defaultServer() || window.location.origin
   // 若已有 token（同源共享 localStorage）直接连
@@ -97,6 +168,7 @@ onMounted(() => {
   if (savedToken && savedServer) {
     state.token = savedToken
     state.server = savedServer
+    resume(savedToken, savedServer)
     // 用已有 token 拉状态
     fetch(`${savedServer}/api/state`, { headers: { Authorization: 'Bearer ' + savedToken } })
       .then((r) => (r.ok ? r.json() : null))
@@ -145,6 +217,42 @@ function resetView() {
   if (handle) handle.resetView()
 }
 
+/* ---------- 声波驱离 ---------- */
+const repelling = ref(false)
+
+/** 在 3D 场景里发起一次驱离：调用后端 /api/commands，完成后由 watch 结算 */
+async function repel() {
+  if (repelling.value || executing.value) return
+  if (!state.token) return
+  repelling.value = true
+  try {
+    // 关联第一条待处理告警（如果有）
+    const alarm = state.alarms.find((a) => a.status === 'new')
+    const requestId = 'ui' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+    const res = await fetch(`${state.server}/api/commands`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + state.token,
+      },
+      body: JSON.stringify({
+        request_id: requestId,
+        alarm_id: alarm ? alarm.id : null,
+        duration: 3,
+      }),
+    })
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}))
+      state.error = detail.detail || '驱离指令下发失败'
+    }
+    // 指令完成后会由 watch(state.commands) 触发 disperse()
+  } catch (err) {
+    state.error = '驱离请求失败：' + (err.message || err)
+  } finally {
+    repelling.value = false
+  }
+}
+
 const autoRotate = ref(true)
 function toggleRotate() {
   autoRotate.value = !autoRotate.value
@@ -159,12 +267,22 @@ function toggleRotate() {
     <!-- 加载遮罩：场景就绪即隐藏（登录表单在遮罩之上，未登录时也要露出来） -->
     <div class="hud-loading" :class="{ 'is-hidden': ready }">
       <div class="hud-loading__mark">青</div>
-      <div class="hud-loading__text">{{ ready ? '等待登录' : '正在构建果园场景' }}</div>
+      <div class="hud-loading__text">{{ sceneError || (ready ? '等待登录' : '正在构建果园场景') }}</div>
       <div class="hud-loading__bar"><div class="hud-loading__fill" :style="{ width: loadProgress + '%' }" /></div>
     </div>
 
+    <!-- 场景错误（WebGL 不可用等） -->
+    <div v-if="sceneError && ready" class="login-mask">
+      <div class="login-card">
+        <div class="login-mark" style="background: var(--danger-fg)">!</div>
+        <div class="login-title">无法加载 3D 场景</div>
+        <div class="login-sub">{{ sceneError }}</div>
+        <div class="login-hint">你可以尝试：更新浏览器、启用硬件加速、或换用 Chrome/Edge</div>
+      </div>
+    </div>
+
     <!-- 登录浮层 -->
-    <div v-if="needLogin && ready" class="login-mask">
+    <div v-if="needLogin && ready && !sceneError" class="login-mask">
       <div class="login-card">
         <div class="login-mark">青</div>
         <div class="login-title">青禾 · 果园 3D 演示</div>
@@ -258,6 +376,20 @@ function toggleRotate() {
             <i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}
           </span>
         </div>
+
+        <!-- 待驱离鸟群：检测结束后鸟留在场景，需多次驱离才清空 -->
+        <div v-if="birdCount > 0" class="hud-device" style="margin-top: 10px; border-top: 1px solid rgba(233,230,215,.7); padding-top: 10px;">
+          <div class="hud-device__icon" style="color: var(--warn-fg)">🕊</div>
+          <div class="hud-device__body">
+            <span class="hud-device__name">待驱离鸟群</span>
+            <span class="hud-device__desc">
+              剩 {{ birdCount }} 只{{ repelCount > 0 ? ` · 已驱离 ${repelCount} 次` : ' · 点击驱离' }}
+            </span>
+          </div>
+          <span class="hud-pill is-off">
+            <i class="hud-pill__dot" />{{ birdCount }}
+          </span>
+        </div>
       </div>
     </aside>
 
@@ -278,6 +410,14 @@ function toggleRotate() {
         </span>
       </div>
       <div style="display: flex; align-items: center; gap: 12px; pointer-events: auto">
+        <button
+          v-if="birdCount > 0"
+          class="hud-action hud-action--repel"
+          :disabled="executing"
+          @click="repel"
+        >
+          {{ executing ? '驱离执行中…' : `声波驱离（剩 ${birdCount}）` }}
+        </button>
         <button class="hud-action" @click="toggleRotate">{{ autoRotate ? '停止环绕' : '自动环绕' }}</button>
         <button class="hud-action" @click="resetView">重置视角</button>
       </div>
@@ -436,6 +576,22 @@ function toggleRotate() {
 .hud-action:hover {
   background: rgba(52, 80, 47, 0.85);
   color: #f2f4e8;
+}
+
+/* 声波驱离按钮：告警橙，突出主操作 */
+.hud-action--repel {
+  background: rgba(150, 104, 43, 0.88);
+  border-color: rgba(231, 213, 174, 0.5);
+  color: #f5ebd5;
+  font-weight: 600;
+}
+.hud-action--repel:hover:not(:disabled) {
+  background: rgba(180, 126, 52, 0.95);
+  color: #fff8e8;
+}
+.hud-action--repel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .hud-note-abs {

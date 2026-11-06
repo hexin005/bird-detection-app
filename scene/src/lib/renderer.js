@@ -245,38 +245,72 @@ export function createOrchardScene(canvas, options = {}) {
     detTime: 0,
   }
 
-  /* ---------- 叙事运镜 ---------- */
-  // 平时：自动环绕果园全景
-  // 有检出：相机向果园中心轻轻推进
-  // 有告警：更近一点，突出告警对象
-  const camPose = {
-    overview: { pos: new THREE.Vector3(15, 13.5, 17), target: new THREE.Vector3(0, 1.8, 0) },
-    detection: { pos: new THREE.Vector3(11, 9.5, 13), target: new THREE.Vector3(0, 3.6, 0) },
-    alarm: { pos: new THREE.Vector3(8.5, 7.2, 10.5), target: new THREE.Vector3(0, 5.2, 0) },
-  }
-  let poseName = 'overview'
-  let userAutoRotate = true  // 用户手动开关，优先于运镜逻辑
+  /* ---------- 相机控制 ---------- */
+  // 视角完全交给用户：不自动推进、不自动拉近，只在用户开启"自动环绕"时缓慢绕转。
+  // 用户一旦手动拖拽，立即停止自动环绕，且不会自己恢复。
+  let userAutoRotate = true
 
-  function updateCameraPose(dt) {
-    const hasAlarm = visual.running && visual.alarms.length > 0
-    const hasDetection = visual.running && visual.detections.length > 0
-    const next = hasAlarm ? 'alarm' : hasDetection ? 'detection' : 'overview'
-    if (next !== poseName) {
-      poseName = next
-      // 只有用户没有手动关闭时，才让运镜逻辑控制自动环绕
-      if (userAutoRotate) {
-        controls.autoRotate = poseName === 'overview'
-      }
-    }
-    const pose = camPose[poseName]
-    // 缓动推进，避免硬切
-    camera.position.lerp(pose.pos, Math.min(dt * 1.6, 1))
-    controls.target.lerp(pose.target, Math.min(dt * 2.2, 1))
+  function bindUserControl() {
+    controls.addEventListener('start', () => {
+      // 用户开始拖拽：立刻停掉自动环绕，避免"抢视角"
+      controls.autoRotate = false
+      userAutoRotate = false
+    })
+  }
+  bindUserControl()
+
+  /* ---------- 居留鸟群（演示核心） ----------
+   * 检测结束后鸟不立即飞走，而是留在场景作为"待驱离目标"。
+   * 每次驱离成功按概率驱散一部分，可能需要 2~3 次才能清空。
+   */
+  const occupants = []   // 当前留在场景里的鸟 { species, confidence, bbox, scared }
+  let lastDetKey = ''    // 用于识别"新的检测帧"
+  let scareBoost = 0     // 驱离瞬间的惊飞强度 0~1，随时间衰减
+
+  /** 从检测结果固化一批「居留鸟」 */
+  function adoptDetections(dets) {
+    occupants.length = 0
+    dets.slice(0, MAX_BIRDS).forEach((d) => {
+      occupants.push({
+        species: d.species || '',
+        confidence: d.confidence ?? 0.7,
+        bbox: Array.isArray(d.bbox) ? d.bbox.slice() : null,
+        scared: false,
+      })
+    })
+  }
+
+  /** 执行一次驱离：按概率驱散部分鸟，返回是否还有剩余 */
+  function disperse(force = 0) {
+    if (!occupants.length) return 0
+    scareBoost = 1
+    // 一次驱离散掉约一半（至少 1 只），所以 2~3 次能清空
+    const n = occupants.length
+    let removeCount = Math.max(1, Math.ceil(n * 0.5))
+    // 只剩 1 只时有小概率没驱走（拟真），除非 force
+    if (n === 1 && force < 1 && Math.random() < 0.3) removeCount = 0
+    removeCount = Math.min(removeCount, n)
+    for (let i = 0; i < removeCount; i += 1) occupants.pop()
+    return occupants.length
   }
 
   function updateBirds(dt, elapsed) {
-    // 监测中且有检出：让对应数量的鸟出现在上空
-    const wantBirds = visual.running ? Math.min(visual.detections.length, MAX_BIRDS) : 0
+    // ---- 同步居留鸟群与检测数据 ----
+    // 检测进行中：实时跟随检出结果
+    // 检测结束：冻结最后一帧的检出，作为待驱离目标
+    const detKey = visual.detTime + '|' + visual.detections.length
+    if (visual.detections.length && detKey !== lastDetKey) {
+      // 有新检测数据就更新鸟群（无论是否 running）
+      // 这样页面后加载时也能看到上一轮留下的鸟
+      lastDetKey = detKey
+      adoptDetections(visual.detections)
+    }
+    // 注意：running 变 false 时不清空 occupants —— 鸟留在场景等驱离
+
+    // 惊飞强度衰减
+    scareBoost = Math.max(0, scareBoost - dt * 0.55)
+
+    const wantBirds = Math.min(occupants.length, MAX_BIRDS)
 
     birds.forEach((b, i) => {
       const shouldShow = i < wantBirds
@@ -293,8 +327,9 @@ export function createOrchardScene(canvas, options = {}) {
       }
       if (!b.active) return
 
-      const det = visual.detections[i]
-      b.species = det ? det.species : ''
+      const occ = occupants[i]
+      const det = occ ? { species: occ.species, confidence: occ.confidence, bbox: occ.bbox } : null
+      b.species = occ ? occ.species : ''
 
       // ---- 用 bbox 映射鸟在果园中的位置 ----
       // 画面坐标系：x 左→右（0~960），y 上→下（0~540）
@@ -314,11 +349,13 @@ export function createOrchardScene(canvas, options = {}) {
       }
 
       // 圆周飞行 + 上下浮动（叠加 bbox 偏移）
-      b.angle += b.speed * dt
-      b.bob += dt * 2.2
-      const x = Math.cos(b.angle) * b.radius + (b.offsetX || 0)
-      const z = Math.sin(b.angle) * b.radius * 0.72 + (b.offsetZ || 0)
-      const y = b.height + Math.sin(b.bob) * 0.55
+      // 驱离时：加速盘旋 + 抬升，模拟鸟被声波惊扰
+      const panic = scareBoost
+      b.angle += b.speed * (1 + panic * 2.6) * dt
+      b.bob += dt * (2.2 + panic * 4)
+      const x = Math.cos(b.angle) * b.radius * (1 + panic * 0.35) + (b.offsetX || 0)
+      const z = Math.sin(b.angle) * b.radius * 0.72 * (1 + panic * 0.35) + (b.offsetZ || 0)
+      const y = b.height + Math.sin(b.bob) * 0.55 + panic * 2.2
       b.mesh.position.set(x, y, z)
 
       // 朝向飞行切线方向
@@ -326,8 +363,8 @@ export function createOrchardScene(canvas, options = {}) {
       const nextZ = Math.sin(b.angle + 0.08) * b.radius * 0.72 + (b.offsetZ || 0)
       b.mesh.lookAt(nextX, y, nextZ)
 
-      // 翅膀扑动
-      const flap = Math.sin(elapsed * 9 + i) * 0.55
+      // 翅膀扑动（惊飞时更快）
+      const flap = Math.sin(elapsed * (9 + panic * 14) + i) * (0.55 + panic * 0.5)
       b.mesh.userData.wings.forEach(({ mesh, dir }) => {
         mesh.rotation.x = dir * flap
       })
@@ -426,7 +463,7 @@ export function createOrchardScene(canvas, options = {}) {
     const dt = Math.min(clock.getDelta(), 0.05)
     const elapsed = clock.elapsedTime
 
-    updateCameraPose(dt)
+    // 不再自动操控相机，视角完全由用户掌握
     controls.update()
     updateBirds(dt, elapsed)
     updateDevices(dt, elapsed)
@@ -446,15 +483,43 @@ export function createOrchardScene(canvas, options = {}) {
       visual.executing = !!executing
       visual.offline = !!offline
       visual.detTime = detTime || 0
+
+      // 同步登记居留鸟群：有新检测数据立即采纳（不等渲染循环）
+      // 检测结束后 detections 停留在最后一帧，鸟就留在场景等待驱离
+      const detKey = visual.detTime + '|' + visual.detections.length
+      if (visual.detections.length && detKey !== lastDetKey) {
+        lastDetKey = detKey
+        adoptDetections(visual.detections)
+      }
     },
-    /** 暂停/恢复自动环绕（用户手动控制，优先于运镜逻辑） */
+    /** 暂停/恢复自动环绕 */
     setAutoRotate(on) {
       userAutoRotate = !!on
       controls.autoRotate = !!on
     },
+    /**
+     * 执行一次驱离，返回剩余鸟数。
+     * 每次驱散约一半，故通常需要 2~3 次才能清空。
+     */
+    disperse() {
+      return disperse(1)
+    },
+    /** 当前留在场景里的鸟数（待驱离目标） */
+    occupantCount() {
+      return occupants.length
+    },
+    /** 清空居留鸟群（重新开始检测时调用） */
+    clearOccupants() {
+      occupants.length = 0
+      lastDetKey = ''
+      scareBoost = 0
+    },
+    /** 当前惊飞强度 0~1（供 HUD 判断是否在驱离中） */
+    panicLevel() {
+      return scareBoost
+    },
     /** 重置视角（回到俯瞰全景，并恢复自动环绕） */
     resetView() {
-      poseName = 'overview'
       userAutoRotate = true
       controls.autoRotate = true
       camera.position.set(15, 13.5, 17)

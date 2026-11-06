@@ -135,8 +135,13 @@ function openSocket() {
     }
   }
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     state.connected = false
+    // 4401 = token 无效/过期，清除本地凭据让用户重新登录
+    if (event.code === 4401 && !manualClose) {
+      clearSession()
+      return
+    }
     if (!manualClose) scheduleReconnect()
   }
 
@@ -171,4 +176,26 @@ export function disconnect() {
   closeSocket()
   state.token = ''
   state.snapshot = null
+}
+
+/** 使用已有 token 恢复 WebSocket（绕过密码重新登录） */
+export function resume(token, server) {
+  state.token = token
+  state.server = server || normalizeUrl(defaultServer())
+  manualClose = false
+  closeSocket()
+  openSocket()
+}
+
+/** WS 鉴权失败时调用：清除本地凭据，让用户重新登录 */
+export function clearSession() {
+  manualClose = true
+  closeSocket()
+  state.token = ''
+  state.snapshot = null
+  state.connected = false
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('bird-scene-token')
+    localStorage.removeItem('bird-scene-server')
+  }
 }

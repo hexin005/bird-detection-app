@@ -10,7 +10,7 @@ from typing import Literal, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -278,6 +278,12 @@ def create_app(settings=None):
     # 3D 场景必须挂在 '/' 之前，否则 StaticFiles(html=True) 会先截获请求。
     scene_build = ROOT / 'scene/dist'
     if scene_build.exists():
+        # 手输地址常漏末尾斜杠，/scene 会 404 到 mobile 的 StaticFiles 上。
+        # 这里显式重定向到 /scene/，避免"链接打不开"。
+        @app.get('/scene', include_in_schema=False)
+        async def redirect_scene():
+            return RedirectResponse(url='/scene/', status_code=307)
+
         app.mount('/scene', StaticFiles(directory=scene_build, html=True), name='scene')
 
     build = ROOT / 'mobile/dist/build/h5'
