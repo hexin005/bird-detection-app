@@ -168,6 +168,9 @@ export function createOrchardScene(canvas, options = {}) {
       bob: Math.random() * Math.PI * 2,
       active: false,
       species: '',
+      // bbox 映射的位置偏移（平滑过渡）
+      offsetX: 0,
+      offsetZ: 0,
     })
   }
 
@@ -211,6 +214,7 @@ export function createOrchardScene(canvas, options = {}) {
     alarms: [],
     executing: false,
     offline: false,
+    detTime: 0,
   }
 
   function updateBirds(dt, elapsed) {
@@ -235,17 +239,34 @@ export function createOrchardScene(canvas, options = {}) {
       const det = visual.detections[i]
       b.species = det ? det.species : ''
 
-      // 圆周飞行 + 上下浮动
+      // ---- 用 bbox 映射鸟在果园中的位置 ----
+      // 画面坐标系：x 左→右（0~960），y 上→下（0~540）
+      // 映射到果园：bbox 中心 x 决定横向偏移（-14~+14），
+      //             bbox 中心 y 决定纵向位置（画面越靠下 = 离摄像头越近）
+      if (det && Array.isArray(det.bbox) && det.bbox.length === 4) {
+        const [x1, y1, x2, y2] = det.bbox
+        const cx = (x1 + x2) / 2 / 960   // 0~1 归一化
+        const cy = (y1 + y2) / 2 / 540
+        // 横向：画面中心(0.5) → 果园中心(0)，左右各约 ±13
+        const offsetX = (cx - 0.5) * 26
+        // 纵向：画面越靠下(cy 大) → 越靠果园前侧(z 小)
+        const offsetZ = (cy - 0.5) * 14
+        // 叠加在圆周运动上，让鸟的位置跟随画面
+        b.offsetX += (offsetX - b.offsetX) * Math.min(dt * 3, 1)
+        b.offsetZ += (offsetZ - b.offsetZ) * Math.min(dt * 3, 1)
+      }
+
+      // 圆周飞行 + 上下浮动（叠加 bbox 偏移）
       b.angle += b.speed * dt
       b.bob += dt * 2.2
-      const x = Math.cos(b.angle) * b.radius
-      const z = Math.sin(b.angle) * b.radius * 0.72
+      const x = Math.cos(b.angle) * b.radius + (b.offsetX || 0)
+      const z = Math.sin(b.angle) * b.radius * 0.72 + (b.offsetZ || 0)
       const y = b.height + Math.sin(b.bob) * 0.55
       b.mesh.position.set(x, y, z)
 
       // 朝向飞行切线方向
-      const nextX = Math.cos(b.angle + 0.08) * b.radius
-      const nextZ = Math.sin(b.angle + 0.08) * b.radius * 0.72
+      const nextX = Math.cos(b.angle + 0.08) * b.radius + (b.offsetX || 0)
+      const nextZ = Math.sin(b.angle + 0.08) * b.radius * 0.72 + (b.offsetZ || 0)
       b.mesh.lookAt(nextX, y, nextZ)
 
       // 翅膀扑动
@@ -254,15 +275,29 @@ export function createOrchardScene(canvas, options = {}) {
         mesh.rotation.x = dir * flap
       })
 
-      // 检测框：随画面中的 bbox 比例缩放；无 bbox 时给个默认大小
+      // ---- 检测框：用 bbox 真实宽高比例映射尺寸 ----
+      let bw = 1.5, bh = 1.1
+      if (det && Array.isArray(det.bbox) && det.bbox.length === 4) {
+        const [x1, y1, x2, y2] = det.bbox
+        // bbox 宽高相对画面比例 → 3D 检测框尺寸
+        // 画面 960 宽的物体，映射到 3D 约 3 单位宽；540 高映射约 2 单位
+        const wRatio = (x2 - x1) / 960
+        const hRatio = (y2 - y1) / 540
+        bw = 0.9 + wRatio * 3.2
+        bh = 0.7 + hRatio * 2.4
+      }
       const conf = det ? det.confidence : 0.7
-      const s = 0.9 + conf * 0.7
-      b.detectBox.scale.set(s * 1.5, s * 1.1, s * 1.5)
+      const confScale = 0.85 + conf * 0.4
+      b.detectBox.scale.set(bw * confScale, bh * confScale, bw * confScale)
       b.detectBox.position.set(0, 0, 0)
       b.detectBox.material.opacity = 0.55 + Math.sin(elapsed * 4 + i) * 0.2
 
-      // 告警标记：命中当前物种则显示
-      const isAlarm = visual.alarms.some((a) => a.species === b.species)
+      // ---- 告警标记：精确关联到「这一只鸟」 ----
+      // 匹配规则：物种相同，且告警的 video_time 接近当前帧时间
+      const detTime = visual.detTime ?? 0
+      const isAlarm = visual.alarms.some(
+        (a) => a.species === b.species && Math.abs((a.video_time ?? 0) - detTime) < 4,
+      )
       b.alarm.visible = isAlarm
       if (isAlarm) {
         b.alarm.position.set(0, 1.15, 0)
@@ -330,12 +365,13 @@ export function createOrchardScene(canvas, options = {}) {
   /* ---------- 对外接口 ---------- */
   return {
     /** 注入最新业务状态 */
-    setState({ running, detections, alarms, executing, offline }) {
+    setState({ running, detections, alarms, executing, offline, detTime }) {
       visual.running = !!running
       visual.detections = Array.isArray(detections) ? detections : []
       visual.alarms = Array.isArray(alarms) ? alarms : []
       visual.executing = !!executing
       visual.offline = !!offline
+      visual.detTime = detTime || 0
     },
     /** 暂停/恢复自动环绕 */
     setAutoRotate(on) {

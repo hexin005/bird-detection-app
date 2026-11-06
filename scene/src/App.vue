@@ -61,6 +61,8 @@ function pushStateToScene() {
     alarms: state.alarms.filter((a) => a.status === 'new'),
     executing: executing.value,
     offline: offline.value,
+    // 当前帧的录像时间戳，用于告警精确关联
+    detTime: state.snapshot?.monitor?.frame?.video_time ?? 0,
   })
 }
 
@@ -71,6 +73,8 @@ watch(
     state.alarms.length,
     state.activeCommand && state.activeCommand.id,
     state.scenario,
+    state.snapshot?.monitor?.frame?.frame_id,  // 帧推进时也触发更新
+    state.snapshot?.monitor?.frame?.video_time,
   ],
   pushStateToScene,
   { deep: false },
