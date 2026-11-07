@@ -388,3 +388,6 @@
   font-size: var(--text-2xs);
   line-height: 1;
 }
+/* ===== 3D 视角入口（H5 演示联动） ===== */
+.qh-header__actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.qh-3dbtn { min-height:28px; height:28px; padding:0 11px; border-radius:999px; background:var(--brand-700); color:#f5f7ec; font-size:11px; font-weight:500; letter-spacing:1px; border:none; display:flex; align-items:center; justify-content:center; font-family:var(--font-sans); cursor:pointer; flex-shrink:0; }

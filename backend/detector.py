@@ -147,8 +147,11 @@ class VideoMonitor:
                     path.write_bytes(jpeg.tobytes())
                     created = False
                     for species, values in candidates.items():
+                        # bbox 取自本帧该物种的第一个框，与抓拍图同帧成对保存
+                        first_bbox = values[0].get('bbox') if values else None
                         _, is_new = self.store.alarm(self.current['task_id'], species, len(values),
-                            max(d['confidence'] for d in values), capture, metadata['video_time'], frame_no, config['cooldown'])
+                            max(d['confidence'] for d in values), capture, metadata['video_time'], frame_no, config['cooldown'],
+                            bbox=first_bbox)
                         created = created or is_new
                     if not created:
                         path.unlink(missing_ok=True)

@@ -50,6 +50,7 @@ function go(v: string) { if(v !== 'records') archiveTask.value=''; page.value = 
 function openAlarm(a: Alarm) { fetchedAlarm.value = a; detailId.value = a.id; modal.value = 'mAlarm' }
 function replayAlarm(a: Alarm) { modal.value=''; recordMode.value='videos'; archiveTask.value=a.task_id; archiveTime.value=a.video_time; archiveNonce.value++; go('records') }
 function settings() { if (s.value) Object.assign(preferences, s.value.settings); modal.value = 'mSet' }
+function openScene() { if (typeof window !== 'undefined') window.open('/scene/', '_blank') }
 function handle() { selectedAlarm.value = detailId.value; modal.value = 'mConfirm' }
 async function execute() { await store.command(duration.value, selectedAlarm.value); modal.value = ''; selectedAlarm.value = null; notify('已提交至模拟执行器') }
 async function inspectEvent(e: Event) {
@@ -118,7 +119,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
             <view class="qh-header__row"><text class="qh-appname">青禾示范果园</text><text class="qh-mvp">MVP</text></view>
             <text class="qh-site">东区 · 01 号监控点</text>
           </view>
-          <button class="qh-iconbtn" @click="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#44523E" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#44523E" stroke-width="1.5"/></svg></button>
+          <view class="qh-header__actions"><button class="qh-3dbtn" @click="openScene"><text>3D 视角</text></button><button class="qh-iconbtn" @click="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#44523E" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#44523E" stroke-width="1.5"/></svg></button></view>
         </view>
 
         <view class="qh-conn"><view class="qh-conn__left"><view class="qh-conn__dot"/><text>{{ store.connection }}</text></view><text class="qh-conn__src">{{ s ? '数据来自果园服务' : '等待同步' }}</text></view>

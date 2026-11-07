@@ -27,7 +27,7 @@ class Store:
           CREATE TABLE IF NOT EXISTS alarms (
             id TEXT PRIMARY KEY, task_id TEXT, site TEXT, species TEXT, count INTEGER,
             confidence REAL, at REAL, last_seen REAL, hits INTEGER, status TEXT,
-            snapshot TEXT, video_time REAL, frame_id INTEGER);
+            snapshot TEXT, video_time REAL, frame_id INTEGER, bbox TEXT);
           CREATE TABLE IF NOT EXISTS commands (
             id TEXT PRIMARY KEY, request_id TEXT UNIQUE, alarm_id TEXT REFERENCES alarms(id),
             user_id INTEGER, duration INTEGER, scenario TEXT, status TEXT,
@@ -47,6 +47,8 @@ class Store:
                 self.db.execute(f'ALTER TABLE tasks ADD COLUMN {name} {kind}')
         if 'last_video_time' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
             self.db.execute('ALTER TABLE alarms ADD COLUMN last_video_time REAL')
+        if 'bbox' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
+            self.db.execute('ALTER TABLE alarms ADD COLUMN bbox TEXT')
         self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
@@ -111,7 +113,7 @@ class Store:
             db.execute('UPDATE settings SET value=? WHERE id=1', (json.dumps(config),))
         return config
 
-    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None, video_clock=False):
+    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None, video_clock=False, bbox=None):
         now = now if now is not None else time.time()
         with self.tx() as db:
             old = db.execute('SELECT * FROM alarms WHERE task_id=? AND species=? ORDER BY last_seen DESC LIMIT 1', (task_id, species)).fetchone()
@@ -121,8 +123,10 @@ class Store:
                 db.execute('UPDATE alarms SET last_seen=?,last_video_time=?,hits=hits+1 WHERE id=?', (now, video_time, old['id']))
                 return old['id'], False
             aid = 'A' + secrets.token_hex(5)
-            db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time))
+            # bbox 记录的是"本条告警抓拍帧"里的检测框，保证 snapshot 图与框始终成对
+            bbox_json = json.dumps(bbox) if bbox else None
+            db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time,bbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time, bbox_json))
             self.event(db, 'detection', aid, f'检测到{species}，画面中 {count} 只')
             return aid, True
 

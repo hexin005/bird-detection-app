@@ -12,6 +12,10 @@
  */
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import {
   PALETTE,
   createGround,
@@ -23,6 +27,7 @@ import {
   createAlarmMarker,
   mulberry32,
 } from './orchard.js'
+import { loadCaptureTexture } from './capture.js'
 
 const MAX_BIRDS = 6
 
@@ -61,6 +66,14 @@ export function createOrchardScene(canvas, options = {}) {
   controls.autoRotateSpeed = 0.28
   controls.enablePan = false
   controls.update()
+
+  // 后期辉光：检测框 / 声波环 / 指示灯等高亮荧绿元素产生泛光，科技感更强。
+  // 阈值 0.78 只让荧绿 #d3e856（亮度≈0.85）级别的高亮泛光，天空与果树不受影响。
+  const composer = new EffectComposer(renderer)
+  composer.addPass(new RenderPass(scene, camera))
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1440, 900), 0.9, 0.45, 0.78)
+  composer.addPass(bloomPass)
+  composer.addPass(new OutputPass())
 
   /* ---------- 光照 ---------- */
   const hemi = new THREE.HemisphereLight(0xdceaf2, 0x4a5535, 1.15)
@@ -221,6 +234,7 @@ export function createOrchardScene(canvas, options = {}) {
     const w = parent.clientWidth || window.innerWidth
     const h = parent.clientHeight || window.innerHeight
     renderer.setSize(w, h, false)
+    composer.setSize(w, h)
     camera.aspect = w / Math.max(h, 1)
     camera.updateProjectionMatrix()
   }
@@ -263,19 +277,27 @@ export function createOrchardScene(canvas, options = {}) {
    * 检测结束后鸟不立即飞走，而是留在场景作为"待驱离目标"。
    * 每次驱离成功按概率驱散一部分，可能需要 2~3 次才能清空。
    */
-  const occupants = []   // 当前留在场景里的鸟 { species, confidence, bbox, scared }
-  let lastDetKey = ''    // 用于识别"新的检测帧"
+  const occupants = []   // 当前留在场景里的鸟 { species, confidence, bbox, scared, snap }
+  let lastDetKey = ''    // 当前采纳的物种签名，识别"新的检测帧"
+  let noRespawn = false  // 驱离清空后置位：本轮禁止再从旧检测数据复活鸟群
   let scareBoost = 0     // 驱离瞬间的惊飞强度 0~1，随时间衰减
+  let captureCtx = { server: '', ticket: '' }   // 抓拍贴图所需上下文
+  let snapTable = {}     // 物种 -> 抓拍文件名，随时可能更新
 
   /** 从检测结果固化一批「居留鸟」 */
-  function adoptDetections(dets) {
+  function adoptDetections(dets, snapshots) {
+    if (snapshots) snapTable = snapshots
     occupants.length = 0
-    dets.slice(0, MAX_BIRDS).forEach((d) => {
+    dets.slice(0, MAX_BIRDS).forEach((d, i) => {
+      const info = snapTable[d.species] || null
       occupants.push({
         species: d.species || '',
         confidence: d.confidence ?? 0.7,
         bbox: Array.isArray(d.bbox) ? d.bbox.slice() : null,
         scared: false,
+        // 抓拍图与该图自己的 bbox 成对使用（后端同帧保存）
+        snap: info ? info.name : null,
+        snapBbox: info ? info.bbox : null,
       })
     })
   }
@@ -291,21 +313,14 @@ export function createOrchardScene(canvas, options = {}) {
     if (n === 1 && force < 1 && Math.random() < 0.3) removeCount = 0
     removeCount = Math.min(removeCount, n)
     for (let i = 0; i < removeCount; i += 1) occupants.pop()
+    // 全部驱离完毕：本轮不允许再从检测数据"复活"，直到新一轮检测
+    if (occupants.length === 0) noRespawn = true
     return occupants.length
   }
 
   function updateBirds(dt, elapsed) {
-    // ---- 同步居留鸟群与检测数据 ----
-    // 检测进行中：实时跟随检出结果
-    // 检测结束：冻结最后一帧的检出，作为待驱离目标
-    const detKey = visual.detTime + '|' + visual.detections.length
-    if (visual.detections.length && detKey !== lastDetKey) {
-      // 有新检测数据就更新鸟群（无论是否 running）
-      // 这样页面后加载时也能看到上一轮留下的鸟
-      lastDetKey = detKey
-      adoptDetections(visual.detections)
-    }
-    // 注意：running 变 false 时不清空 occupants —— 鸟留在场景等驱离
+    // 居留鸟群的采纳统一在 setState 里完成（含驱离后禁止复活的判断），
+    // 这里只负责按 occupants 渲染。
 
     // 惊飞强度衰减
     scareBoost = Math.max(0, scareBoost - dt * 0.55)
@@ -323,6 +338,12 @@ export function createOrchardScene(canvas, options = {}) {
         } else {
           b.detectBox.visible = false
           b.alarm.visible = false
+          // 只隐藏，不丢弃已加载的贴图（避免反复重载导致一直淡入不完）
+          b.mesh.userData.sprite.visible = false
+          b.mesh.userData.spriteMat.opacity = 0
+          b.waitTex = 0
+          b.mesh.userData.body.material.opacity = 1
+          b.mesh.userData.wings.forEach(({ mesh }) => { mesh.material.opacity = 1 })
         }
       }
       if (!b.active) return
@@ -330,6 +351,46 @@ export function createOrchardScene(canvas, options = {}) {
       const occ = occupants[i]
       const det = occ ? { species: occ.species, confidence: occ.confidence, bbox: occ.bbox } : null
       b.species = occ ? occ.species : ''
+
+      // ---- 真实抓拍贴图：按物种懒加载，取到后贴到 billboard 上 ----
+      if (occ && occ.snap && !b.textureSettled && !b.texLoading) {
+        b.texLoading = true
+        if (captureCtx.server && captureCtx.ticket) {
+          loadCaptureTexture(captureCtx.server, occ.snap, captureCtx.ticket, occ.snapBbox)
+            .then((tex) => {
+              b.texLoading = false
+              if (!tex) return
+              b.textureSettled = true
+              b.mesh.userData.spriteMat.map = tex
+              b.mesh.userData.spriteMat.needsUpdate = true
+              b.waitTex = 0
+            })
+            .catch(() => { b.texLoading = false })
+        } else {
+          b.texLoading = false
+        }
+      }
+      // 贴图就绪后淡入并隐藏低模鸟（保留检测框与告警标记）
+      const sm = b.mesh.userData.spriteMat
+      if (sm.map) {
+        // 首帧就接近满不透明，之后快速到 1（保证任何截帧都能看清照片）
+        b.waitTex = Math.min(1, Math.max(0.95, b.waitTex || 0) + dt * 8)
+        sm.opacity = b.waitTex
+        const sp = b.mesh.userData.sprite
+        sp.visible = true
+        // 尺寸跟随检测框，保证远处也清晰可辨
+        const sw = Math.max(2.4, b.detectBox.scale.x * 1.6)
+        const sh = Math.max(1.7, b.detectBox.scale.y * 1.5)
+        sp.scale.set(sw, sh, 1)
+        // 低模鸟整体渐隐（鸟身 + 双翼），让真实照片更清晰
+        const bodyMat = b.mesh.userData.body.material
+        bodyMat.opacity = Math.max(0, 1 - b.waitTex)
+        bodyMat.transparent = true
+        b.mesh.userData.wings.forEach(({ mesh }) => {
+          mesh.material.opacity = Math.max(0, 1 - b.waitTex)
+          mesh.material.transparent = true
+        })
+      }
 
       // ---- 用 bbox 映射鸟在果园中的位置 ----
       // 画面坐标系：x 左→右（0~960），y 上→下（0~540）
@@ -467,7 +528,7 @@ export function createOrchardScene(canvas, options = {}) {
     controls.update()
     updateBirds(dt, elapsed)
     updateDevices(dt, elapsed)
-    renderer.render(scene, camera)
+    composer.render()
   }
 
   loop()
@@ -476,20 +537,37 @@ export function createOrchardScene(canvas, options = {}) {
   /* ---------- 对外接口 ---------- */
   return {
     /** 注入最新业务状态 */
-    setState({ running, detections, alarms, executing, offline, detTime }) {
+    setState({ running, detections, alarms, executing, offline, detTime, snapshots, server, ticket }) {
       visual.running = !!running
       visual.detections = Array.isArray(detections) ? detections : []
       visual.alarms = Array.isArray(alarms) ? alarms : []
       visual.executing = !!executing
       visual.offline = !!offline
       visual.detTime = detTime || 0
+      if (server) captureCtx.server = server
+      if (ticket) captureCtx.ticket = ticket
+      if (snapshots) snapTable = snapshots
 
-      // 同步登记居留鸟群：有新检测数据立即采纳（不等渲染循环）
-      // 检测结束后 detections 停留在最后一帧，鸟就留在场景等待驱离
-      const detKey = visual.detTime + '|' + visual.detections.length
-      if (visual.detections.length && detKey !== lastDetKey) {
-        lastDetKey = detKey
-        adoptDetections(visual.detections)
+      // 同步登记居留鸟群（仅在为空或物种集合变化时重建，避免贴图反复重置）
+      // noRespawn：本轮鸟群已被人工驱离清空，不再从旧检测数据复活；
+      // 新一轮检测由 clearOccupants() 复位该标志。
+      if (visual.detections.length) {
+        const sig = visual.detections.map((d) => d.species).join(',')
+        const needAdopt = (occupants.length === 0 && !noRespawn) || sig !== lastDetKey
+        if (needAdopt) {
+          lastDetKey = sig
+          noRespawn = false
+          adoptDetections(visual.detections, snapshots)
+        } else {
+          // 已驻留的鸟：补齐可能后到的抓拍图
+          for (const o of occupants) {
+            const info = snapTable[o.species]
+            if (!o.snap && info) {
+              o.snap = info.name
+              o.snapBbox = info.bbox
+            }
+          }
+        }
       }
     },
     /** 暂停/恢复自动环绕 */
@@ -499,10 +577,10 @@ export function createOrchardScene(canvas, options = {}) {
     },
     /**
      * 执行一次驱离，返回剩余鸟数。
-     * 每次驱散约一半，故通常需要 2~3 次才能清空。
+     * force=0：剩最后一只时有 30% 概率抵抗不离开，形成「需多次驱离」的拟真节奏。
      */
     disperse() {
-      return disperse(1)
+      return disperse(0)
     },
     /** 当前留在场景里的鸟数（待驱离目标） */
     occupantCount() {
@@ -512,11 +590,33 @@ export function createOrchardScene(canvas, options = {}) {
     clearOccupants() {
       occupants.length = 0
       lastDetKey = ''
+      noRespawn = false
       scareBoost = 0
     },
     /** 当前惊飞强度 0~1（供 HUD 判断是否在驱离中） */
     panicLevel() {
       return scareBoost
+    },
+    /** 调试：返回贴图加载状态 */
+    debugTextureState() {
+      return {
+        server: captureCtx.server,
+        hasTicket: !!captureCtx.ticket,
+        ticketLen: (captureCtx.ticket || '').length,
+        snapTable,
+        occupants: occupants.map((o) => ({ species: o.species, snap: o.snap, bbox: o.bbox })),
+        birds: birds.map((b) => ({
+          active: b.active,
+          settled: !!b.textureSettled,
+          loading: !!b.texLoading,
+          hasMap: !!b.mesh.userData.spriteMat.map,
+          spriteVisible: b.mesh.userData.sprite.visible,
+          opacity: b.mesh.userData.spriteMat.opacity,
+          scale: b.mesh.userData.sprite.scale.toArray().map((v) => +v.toFixed(2)),
+          bodyOpacity: b.mesh.userData.body.material.opacity,
+        })),
+        captureStats: (typeof window !== 'undefined' && window.__captureStats) || null,
+      }
     },
     /** 重置视角（回到俯瞰全景，并恢复自动环绕） */
     resetView() {
@@ -532,6 +632,7 @@ export function createOrchardScene(canvas, options = {}) {
       cancelAnimationFrame(rafId)
       ro.disconnect()
       controls.dispose()
+      composer.dispose()
       scene.traverse((obj) => {
         if (obj.geometry) obj.geometry.dispose()
         if (obj.material) {

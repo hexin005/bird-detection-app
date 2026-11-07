@@ -72,15 +72,39 @@ watch(
       }
       settledCommandId = c.id
       if (handle) {
+        const before = handle.occupantCount()
         const left = handle.disperse()
         birdCount.value = left
         repelCount.value += 1
+        if (left === 0) {
+          repelFail.value = false
+          flash('鸟群已全部清空')
+        } else if (left === before) {
+          // 本次声波没有驱走任何一只（拟真：单只时有可能抵抗）
+          repelFail.value = true
+          flash('鸟群未离开，建议再次驱离')
+        } else {
+          repelFail.value = false
+          flash(`驱离生效，剩余 ${left} 只`)
+        }
+      } else {
+        flash('驱离完成')
       }
       break
     }
   },
   { deep: false },
 )
+
+/** 驱离操作反馈，2.5 秒后自动消失 */
+const repelMsg = ref('')
+const repelFail = ref(false)   // 本次驱离未驱走任何鸟
+let repelMsgTimer = 0
+function flash(msg) {
+  repelMsg.value = msg
+  clearTimeout(repelMsgTimer)
+  repelMsgTimer = setTimeout(() => { repelMsg.value = '' }, 2500)
+}
 
 const timeText = (at) => {
   if (!at) return ''
@@ -91,6 +115,15 @@ const timeText = (at) => {
 /* ---------- 把业务状态喂给 3D ---------- */
 function pushStateToScene() {
   if (!handle) return
+  // 按物种汇总一张抓拍图 + 该帧 bbox（后端成对保存），供 3D 鸟做真实照片贴图
+  const snapshots = {}
+  for (const a of state.alarms) {
+    if (a.snapshot && !snapshots[a.species]) {
+      let bbox = null
+      try { bbox = typeof a.bbox === 'string' ? JSON.parse(a.bbox) : (a.bbox || null) } catch { bbox = null }
+      snapshots[a.species] = { name: a.snapshot, bbox }
+    }
+  }
   handle.setState({
     running: state.monitorStatus === 'running' || state.monitorStatus === 'starting',
     detections: state.detections,
@@ -99,6 +132,10 @@ function pushStateToScene() {
     offline: offline.value,
     // 当前帧的录像时间戳，用于告警精确关联
     detTime: state.snapshot?.monitor?.frame?.video_time ?? 0,
+    snapshots,
+    server: state.server || defaultServer(),
+    // 抓拍接口用媒体票据鉴权（?ticket=），不是 Bearer token
+    ticket: state.mediaTicket,
   })
   // 同步待驱离鸟数到 HUD
   birdCount.value = handle.occupantCount()
@@ -154,6 +191,8 @@ onMounted(() => {
         ready.value = true
       },
     })
+    // 供自动化验证读取内部状态
+    window.__sceneHandle = handle
   } catch (err) {
     loadProgress.value = 100
     ready.value = true
@@ -162,9 +201,9 @@ onMounted(() => {
   }
 
   serverInput.value = defaultServer() || window.location.origin
-  // 若已有 token（同源共享 localStorage）直接连
-  const savedToken = localStorage.getItem('bird-scene-token')
-  const savedServer = localStorage.getItem('bird-scene-server')
+  // 会话恢复：优先 3D 页自己的凭据；否则复用 H5 端的登录态（一次登录，两端联动）
+  const savedToken = localStorage.getItem('bird-scene-token') || localStorage.getItem('bird-session')
+  const savedServer = localStorage.getItem('bird-scene-server') || localStorage.getItem('bird-server')
   if (savedToken && savedServer) {
     state.token = savedToken
     state.server = savedServer
@@ -244,13 +283,28 @@ async function repel() {
     if (!res.ok) {
       const detail = await res.json().catch(() => ({}))
       state.error = detail.detail || '驱离指令下发失败'
+      flash(state.error)
+    } else {
+      flash('驱离指令已下发')
     }
     // 指令完成后会由 watch(state.commands) 触发 disperse()
   } catch (err) {
     state.error = '驱离请求失败：' + (err.message || err)
+    flash(state.error)
   } finally {
     repelling.value = false
   }
+}
+
+const debugText = ref('')
+// 仅用于开发期诊断贴图链路，可通过 ?debug=1 打开
+const debugMode = typeof window !== 'undefined' && window.location.search.includes('debug=1')
+if (debugMode) {
+  setInterval(() => {
+    if (handle && handle.debugTextureState) {
+      try { debugText.value = JSON.stringify(handle.debugTextureState(), null, 1).slice(0, 900) } catch (e) { debugText.value = 'ERR ' + e.message }
+    }
+  }, 2000)
 }
 
 const autoRotate = ref(true)
@@ -410,6 +464,7 @@ function toggleRotate() {
         </span>
       </div>
       <div style="display: flex; align-items: center; gap: 12px; pointer-events: auto">
+        <div v-if="repelMsg" class="repel-msg" :class="{ 'is-warn': repelFail }">{{ repelMsg }}</div>
         <button
           v-if="birdCount > 0"
           class="hud-action hud-action--repel"
@@ -424,6 +479,7 @@ function toggleRotate() {
     </div>
 
     <div class="hud-note-abs">低多边形可视化 · 数据来自果园服务 · 驱鸟设备为模拟执行器</div>
+    <div v-if="debugText" style="position:absolute;left:8px;top:70px;font:11px monospace;color:#d3e856;background:rgba(0,0,0,.7);padding:6px;border-radius:4px;max-width:520px;white-space:pre-wrap;z-index:60">{{ debugText }}</div>
   </div>
 </template>
 
@@ -592,6 +648,26 @@ function toggleRotate() {
 .hud-action--repel:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* 驱离操作反馈 */
+.repel-msg {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(211, 232, 86, 0.16);
+  border: 1px solid rgba(211, 232, 86, 0.4);
+  color: var(--detect);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+/* 未驱走：告警橙提示 */
+.repel-msg.is-warn {
+  background: rgba(150, 104, 43, 0.6);
+  border-color: rgba(231, 213, 174, 0.5);
+  color: #f5ebd5;
 }
 
 .hud-note-abs {

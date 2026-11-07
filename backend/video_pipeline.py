@@ -136,8 +136,10 @@ class VideoPipeline(VideoMonitor):
                         path.write_bytes(jpeg.tobytes())
                         created = False
                         for species, values in candidates.items():
+                            # bbox 与抓拍图同帧成对保存，供 3D 场景裁剪鸟类特写
+                            first_bbox = values[0].get('bbox') if values else None
                             _, new = self.store.alarm(task_id, species, len(values), max(d['confidence'] for d in values),
-                                capture, timestamp, frame_no, config['cooldown'], video_clock=True)
+                                capture, timestamp, frame_no, config['cooldown'], video_clock=True, bbox=first_bbox)
                             created = created or new
                         if not created:
                             path.unlink(missing_ok=True)

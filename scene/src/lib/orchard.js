@@ -293,6 +293,18 @@ export function createBirdMesh() {
   body.scale.set(1.5, 1, 0.9)
   group.add(body)
 
+  // 真实抓拍 billboard：有贴图时显示，覆盖在低模鸟之上
+  const spriteMat = new THREE.SpriteMaterial({
+    color: 0xffffff,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0,
+  })
+  const sprite = new THREE.Sprite(spriteMat)
+  sprite.scale.set(1.1, 0.72, 1)   // 16:10 左右的卡片比例
+  sprite.visible = false
+  group.add(sprite)
+
   // 双翼：薄三角片，播动时旋转
   const wingMat = new THREE.MeshLambertMaterial({
     color: 0x3d4a35,
@@ -309,7 +321,7 @@ export function createBirdMesh() {
     wings.push({ mesh: wing, dir })
   }
 
-  group.userData = { wings }
+  group.userData = { wings, body, sprite, spriteMat }
   return group
 }
 
