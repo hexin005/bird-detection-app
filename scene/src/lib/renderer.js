@@ -356,7 +356,13 @@ export function createOrchardScene(canvas, options = {}) {
       if (occ && occ.snap && !b.textureSettled && !b.texLoading) {
         b.texLoading = true
         if (captureCtx.server && captureCtx.ticket) {
-          loadCaptureTexture(captureCtx.server, occ.snap, captureCtx.ticket, occ.snapBbox)
+          loadCaptureTexture(
+            captureCtx.server,
+            occ.snap,
+            captureCtx.ticket,
+            occ.snapBbox,
+            { title: occ.species, sub: Math.round((occ.confidence || 0) * 100) + '%' },
+          )
             .then((tex) => {
               b.texLoading = false
               if (!tex) return

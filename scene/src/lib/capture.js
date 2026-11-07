@@ -17,7 +17,7 @@ const failed = new Set()     // 加载失败的，避免反复重试
 /**
  * 从 ImageData 按区域裁剪并输出正方形纹理
  */
-function cropToTexture(img, box) {
+function cropToTexture(img, box, label) {
   const { width: iw, height: ih } = img
   let sx = 0
   let sy = 0
@@ -66,6 +66,21 @@ function cropToTexture(img, box) {
   const cy = sy + (sh - side) / 2
   ctx.drawImage(img, cx, cy, side, side, 0, 0, OUT, OUT)
 
+  // 物种标签条：照片底部叠加半透明深色条 + 物种名 + 置信度，
+  // 多物种同框时每只鸟一眼可辨
+  if (label && label.title) {
+    const barH = 30
+    ctx.fillStyle = 'rgba(18, 26, 14, 0.78)'
+    ctx.fillRect(0, OUT - barH, OUT, barH)
+    ctx.fillStyle = '#d3e856'
+    ctx.fillRect(10, OUT - barH / 2 - 3, 6, 6)
+    ctx.fillStyle = '#f2f4e8'
+    ctx.font = 'bold 13px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
+    ctx.textBaseline = 'middle'
+    const conf = label.sub ? ' · ' + label.sub : ''
+    ctx.fillText(label.title + conf, 22, OUT - barH / 2 + 1)
+  }
+
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
   tex.minFilter = THREE.LinearFilter
@@ -81,9 +96,10 @@ function cropToTexture(img, box) {
  * @param {string} name    抓拍文件名，如 T1bc13630fa-15.jpg
  * @param {string} ticket  媒体票据 media_ticket
  * @param {number[]|null} box  可选的 bbox
+ * @param {{title?:string, sub?:string}|null} label  物种标签（照片底部）
  */
-export function loadCaptureTexture(server, name, ticket, box = null) {
-  const key = name + '|' + (box ? box.join(',') : 'center')
+export function loadCaptureTexture(server, name, ticket, box = null, label = null) {
+  const key = name + '|' + (box ? box.join(',') : 'center') + '|' + (label ? label.title + label.sub : '')
   if (failed.has(key)) return Promise.resolve(null)
   const hit = cache.get(key)
   if (hit) return hit
@@ -97,7 +113,7 @@ export function loadCaptureTexture(server, name, ticket, box = null) {
       .then((blob) => {
         img.onload = () => {
           try {
-            const tex = cropToTexture(img, box)
+            const tex = cropToTexture(img, box, label)
             if (!tex) { failed.add(key); resolve(null); return }
             // 记录加载成功，便于调试
             if (typeof window !== 'undefined') {
