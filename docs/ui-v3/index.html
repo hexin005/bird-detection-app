@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>青禾 · 果园守护 — UI v3 设计稿</title>
+<style>
+  :root { --brand-700:#34502f; --ink-900:#232b1d; --ink-500:#7c8472; --ink-400:#8a917f; --line:#e9e6d7; --detect:#d3e856; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#e5e3d6; font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; color:var(--ink-900); padding:36px 40px 60px; }
+  h1 { font-family:"Source Han Serif SC","Noto Serif SC","SimSun",serif; font-size:26px; font-weight:700; letter-spacing:1px; }
+  .sub { margin-top:8px; font-size:13px; color:var(--ink-500); }
+  .links { margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; }
+  .links a { text-decoration:none; font-size:12px; font-weight:600; color:var(--brand-700); background:#fff; border:1px solid var(--line); padding:7px 14px; border-radius:999px; }
+  .links a:hover { background:var(--brand-700); color:#f5f7ec; }
+  .grid { margin-top:26px; display:flex; flex-wrap:wrap; gap:34px; align-items:flex-start; }
+  .shot { width:390px; }
+  .shot h2 { font-size:14px; font-weight:700; margin-bottom:10px; color:var(--ink-900); display:flex; align-items:center; gap:7px; }
+  .shot h2 i { width:8px; height:8px; border-radius:2px; background:var(--detect); }
+  .frame { border-radius:34px; overflow:hidden; box-shadow:0 24px 70px rgba(31,47,38,.28), 0 0 0 8px #232b1d, 0 0 0 10px #3a4530; background:#f3f1e7; }
+  .frame iframe { width:390px; height:844px; border:0; display:block; background:#f3f1e7; }
+  .note { margin-top:10px; font-size:11px; color:var(--ink-400); line-height:1.7; }
+</style></head>
+<body>
+  <h1>青禾 · 果园守护 — UI v3 设计稿</h1>
+  <div class="sub">两张设计稿元素结合后的五屏高保真原型 · 配色 / 字体 / 组件与现有实现同源（纸面·田园笔记）</div>
+  <div class="links">
+    <a href="login.html" target="_blank">登录页</a>
+    <a href="home.html" target="_blank">监控首页</a>
+    <a href="alarms.html" target="_blank">告警中心</a>
+    <a href="control.html" target="_blank">远程控制</a>
+    <a href="archive.html" target="_blank">鸟类档案</a>
+    <a href="../../" target="_blank">打开现有 H5 应用 →</a>
+  </div>
+
+  <div class="grid">
+    <div class="shot"><h2><i/>登录 · 山水插画 + 浮卡表单</h2>
+      <div class="frame"><iframe src="login.html"></iframe></div>
+      <p class="note">新增：hero 插画、品牌副标题、浮卡表单、设备连接状态</p></div>
+    <div class="shot"><h2><i/>监控首页 · LIVE 控制条 + 渐变统计 + 趋势图</h2>
+      <div class="frame"><iframe src="home.html"></iframe></div>
+      <p class="note">新增：地点/天气 chip、检测框上置标签、视频控制条、渐变统计卡、24h 趋势图、最近告警卡</p></div>
+    <div class="shot"><h2><i/>告警中心 · 筛选 chips + 语义化告警</h2>
+      <div class="frame"><iframe src="alarms.html"></iframe></div>
+      <p class="note">新增：分类筛选（带计数）、告警类型图标、守护天数横幅</p></div>
+    <div class="shot"><h2><i/>远程控制 · 设备圆环 + 开关列表</h2>
+      <div class="frame"><iframe src="control.html"></iframe></div>
+      <p class="note">保留：驱离方式三选一、执行时长；新增：设备插画圆环、声波/红外开关、定时模式</p></div>
+    <div class="shot"><h2><i/>鸟类档案 · 左列表 + 右播放器</h2>
+      <div class="frame"><iframe src="archive.html"></iframe></div>
+      <p class="note">新增：左右分栏布局，真实抓拍图与物种数据</p></div>
+  </div>
+</body></html>

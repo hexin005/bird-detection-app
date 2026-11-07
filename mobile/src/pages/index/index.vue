@@ -52,7 +52,17 @@ function replayAlarm(a: Alarm) { modal.value=''; recordMode.value='videos'; arch
 function settings() { if (s.value) Object.assign(preferences, s.value.settings); modal.value = 'mSet' }
 function openScene() { if (typeof window !== 'undefined') window.open('/scene/', '_blank') }
 function handle() { selectedAlarm.value = detailId.value; modal.value = 'mConfirm' }
-async function execute() { await store.command(duration.value, selectedAlarm.value); modal.value = ''; selectedAlarm.value = null; notify('已提交至模拟执行器') }
+async function execute() { await store.command(duration.value, selectedAlarm.value, mode.value); modal.value = ''; selectedAlarm.value = null; notify('已提交至模拟执行器') }
+
+/* 驱离方式：声学 / 红外 / 双模联动（随指令下发，3D 场景同步点亮对应设备） */
+type RepelMode = 'acoustic' | 'infrared' | 'both'
+const mode = ref<RepelMode>('both')
+const modeMeta: Record<RepelMode, { name: string; device: string; code: string; desc: string }> = {
+  acoustic: { name: '声学驱鸟器 01', device: '声学驱鸟器 01', code: '东区果园 · ACOUSTIC 01', desc: '设备将以声波方式驱离鸟类，定时结束后自动停止。' },
+  infrared: { name: '红外驱鸟器 02', device: '红外驱鸟器 02', code: '东区果园 · INFRARED 02', desc: '设备将以红外脉冲方式驱离鸟类，定时结束后自动停止。' },
+  both: { name: '双模驱离系统', device: '声学 01 + 红外 02', code: '东区果园 · DUAL-MODE', desc: '声波与红外脉冲将同时执行，双模联动驱离鸟类，定时结束后自动停止。' },
+}
+const activeMode = computed(() => modeMeta[mode.value])
 async function inspectEvent(e: Event) {
   const isAlarm = e.ref_id.startsWith('A')
   if (!(isAlarm ? s.value?.alarms : s.value?.commands)?.find(x => x.id === e.ref_id)) {
@@ -202,14 +212,21 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
             <view class="qh-orbit__dot"/>
           </view>
           <view class="qh-devicerow">
-            <text class="qh-devicename">声学驱鸟器 01</text>
+            <text class="qh-devicename">{{ activeMode.name }}</text>
             <view class="qh-pill"><view class="qh-pill__dot"/><text class="qh-pill__text">{{ offline ? '离线' : '在线' }}</text></view>
           </view>
-          <text class="qh-devicecode">东区果园 · ACOUSTIC 01</text>
+          <text class="qh-devicecode">{{ activeMode.code }}</text>
           <view v-if="selectedAlarm" class="qh-linkstrip">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M5.5 7.5a3 3 0 004.2 0l1.8-1.8a3 3 0 00-4.2-4.2L6.2 2.6M7.5 5.5a3 3 0 00-4.2 0L1.5 7.3a3 3 0 004.2 4.2l1.1-1.1" stroke="#96682B" stroke-width="1.4" stroke-linecap="round"/></svg>
             <text class="qh-linkstrip__text">关联告警 {{ selectedAlarm }}</text>
             <text class="qh-linkstrip__cancel" @click="selectedAlarm = null">取消关联</text>
+          </view>
+        </view>
+
+        <view class="qh-durcard">
+          <view class="qh-durcard__top"><text class="qh-durcard__label">驱离方式</text><text class="qh-durcard__note">红外与声学可双模联动</text></view>
+          <view class="qh-duropts">
+            <view v-for="m in [{ id:'acoustic', name:'声波' }, { id:'infrared', name:'红外' }, { id:'both', name:'双模联动' }]" :key="m.id" class="qh-duropt" :class="{ 'is-selected': mode === m.id }" @click="mode = m.id as RepelMode">{{ m.name }}</view>
           </view>
         </view>
 
@@ -354,11 +371,11 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 8v4h3l4 3.5v-11L6 8H3z" fill="#96682B"/><path d="M13 7a4.5 4.5 0 010 6M15.5 5a8 8 0 010 10" stroke="#96682B" stroke-width="1.5" stroke-linecap="round"/></svg>
         </view>
         <text class="qh-dialog__title">确认执行驱离？</text>
-        <text class="qh-dialog__desc">设备将以声学方式驱离鸟类，定时结束后自动停止。</text>
+        <text class="qh-dialog__desc">{{ activeMode.desc }}</text>
         <view class="qh-confinfo">
           <view class="qh-confinfo__row"><text class="qh-confinfo__label">执行时长</text><text class="qh-confinfo__value">{{ duration }} 秒 · 定时结束</text></view>
           <view class="qh-confinfo__row"><text class="qh-confinfo__label">关联事件</text><text class="qh-confinfo__value">{{ selectedAlarm || '手动操作' }}</text></view>
-          <view class="qh-confinfo__row"><text class="qh-confinfo__label">执行设备</text><text class="qh-confinfo__value">声学驱鸟器 01 · {{ offline ? '离线' : '在线' }}</text></view>
+          <view class="qh-confinfo__row"><text class="qh-confinfo__label">执行设备</text><text class="qh-confinfo__value">{{ activeMode.device }} · {{ offline ? '离线' : '在线' }}</text></view>
         </view>
         <view class="qh-btnrow">
           <button class="qh-btn qh-btn--half qh-btn--ghost-danger" @click="modal = ''">取消</button>
@@ -378,7 +395,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         </view>
         <view class="qh-tl">
           <view class="qh-tl__item"><view class="qh-tl__dot qh-tl__dot--confirm"/><view class="qh-tl__info"><view class="qh-tl__head"><text class="qh-tl__title">人工确认</text><text class="qh-tl__time">{{ time(command.at) }}</text></view><text class="qh-tl__msg">确认了下发一次 {{ command.duration }} 秒驱离操作</text></view></view>
-          <view class="qh-tl__item"><view class="qh-tl__dot" :class="command.started_at ? 'qh-tl__dot--running' : 'qh-tl__dot--confirm'"/><view class="qh-tl__info"><view class="qh-tl__head"><text class="qh-tl__title">{{ command.started_at ? '开始执行' : '尚未执行' }}</text><text v-if="command.started_at" class="qh-tl__time">{{ time(command.started_at) }}</text></view><text class="qh-tl__msg">声学驱鸟器 01 · 时长 {{ command.duration }} 秒 · 定时结束</text></view></view>
+          <view class="qh-tl__item"><view class="qh-tl__dot" :class="command.started_at ? 'qh-tl__dot--running' : 'qh-tl__dot--confirm'"/><view class="qh-tl__info"><view class="qh-tl__head"><text class="qh-tl__title">{{ command.started_at ? '开始执行' : '尚未执行' }}</text><text v-if="command.started_at" class="qh-tl__time">{{ time(command.started_at) }}</text></view><text class="qh-tl__msg">{{ command.mode === 'infrared' ? '红外驱鸟器 02' : command.mode === 'both' ? '双模驱离系统（声学+红外）' : '声学驱鸟器 01' }} · 时长 {{ command.duration }} 秒 · 定时结束</text></view></view>
           <view class="qh-tl__item"><view class="qh-tl__dot" :class="command.status === 'completed' ? 'qh-tl__dot--done' : command.status === 'failed' ? 'qh-tl__dot--confirm' : 'qh-tl__dot--running'"/><view class="qh-tl__info"><view class="qh-tl__head"><text class="qh-tl__title">{{ names(command.status) }}</text><text v-if="command.ended_at" class="qh-tl__time">{{ time(command.ended_at) }}</text></view><text class="qh-tl__msg">{{ command.message }}</text></view></view>
         </view>
         <text class="qh-svcinfo">{{ command.status === 'completed' ? '此记录只证明模拟指令完成，不代表真实驱鸟成功' : '未完成的操作不会将告警标记为已处理' }}</text>

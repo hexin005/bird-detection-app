@@ -8,22 +8,22 @@ import * as THREE from 'three'
 
 /* ---------- 调色板（与 tokens.css 对应） ---------- */
 export const PALETTE = {
-  sky: 0x8fa7b8,
-  skyTop: 0x6d8ba3,
-  fog: 0xb8c4c9,
-  ground: 0x6d7f4a,
-  groundDark: 0x55663a,
-  path: 0x9a9270,
-  trunk: 0x5a4a35,
-  trunkDark: 0x463a29,
-  leafA: 0x4f7d3a,
-  leafB: 0x5f8f42,
-  leafC: 0x6d9d4c,
-  leafD: 0x476f34,
-  fruit: 0xc4562f,
-  metal: 0x8d9491,
-  metalDark: 0x5e6663,
-  wood: 0x6b5842,
+  sky: 0xc3d9d4,
+  skyTop: 0x9fbeb8,
+  fog: 0xd7dfcf,
+  ground: 0x849765,
+  groundDark: 0x6c8050,
+  path: 0xb49b73,
+  trunk: 0x6b5138,
+  trunkDark: 0x4c3c2b,
+  leafA: 0x587542,
+  leafB: 0x718d4c,
+  leafC: 0x8da457,
+  leafD: 0x496b3c,
+  fruit: 0xd27641,
+  metal: 0x9ca79e,
+  metalDark: 0x4d5b52,
+  wood: 0x786047,
   detect: 0xd3e856,
   alarm: 0xe0a03a,
   bird: 0x2f3a2a,
@@ -55,7 +55,7 @@ export function createTree(rand, scale = 1) {
   const crownCount = 3 + Math.floor(rand() * 3)
   for (let i = 0; i < crownCount; i += 1) {
     const radius = (0.85 + rand() * 0.55) * scale
-    const geo = new THREE.IcosahedronGeometry(radius, 0)
+    const geo = new THREE.SphereGeometry(radius, 8, 6)
     const mat = new THREE.MeshLambertMaterial({
       color: leafColors[Math.floor(rand() * leafColors.length)],
       flatShading: true,
@@ -69,6 +69,7 @@ export function createTree(rand, scale = 1) {
       Math.sin(angle) * spread,
     )
     crown.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI)
+    crown.scale.set(1.08, 0.88, 1.02)
     crown.castShadow = true
     crown.receiveShadow = true
     group.add(crown)
@@ -103,9 +104,9 @@ export function createGround(rand) {
     const x = pos.getX(i)
     const y = pos.getY(i)
     const dist = Math.sqrt(x * x + y * y)
-    // 边缘抬起，中间平坦（视觉上像一块坡地）
-    const lift = Math.pow(Math.min(dist / (size * 0.5), 1), 2.2) * 1.8
-    const noise = Math.sin(x * 0.35) * Math.cos(y * 0.31) * 0.18
+    // 围栏内保持平整，地形起伏从果园外缘开始，避免角柱被地面吞没。
+    const lift = Math.pow(Math.min(Math.max((dist - 21.5) / 8.5, 0), 1), 2.2) * 1.8
+    const noise = Math.sin(x * 0.35) * Math.cos(y * 0.31) * (dist < 21.5 ? 0.008 : 0.12)
     pos.setZ(i, lift + noise)
   }
   geo.computeVertexNormals()
@@ -119,26 +120,42 @@ export function createGround(rand) {
   ground.receiveShadow = true
   group.add(ground)
 
-  // 深色补丁：随机小块，打破单调
-  for (let i = 0; i < 14; i += 1) {
-    const patchGeo = new THREE.CircleGeometry(1.2 + rand() * 2.2, 6)
-    const patchMat = new THREE.MeshLambertMaterial({
-      color: PALETTE.groundDark,
-      flatShading: true,
-    })
-    const patch = new THREE.Mesh(patchGeo, patchMat)
-    patch.rotation.x = -Math.PI / 2
-    patch.position.set((rand() - 0.5) * 34, 0.02, (rand() - 0.5) * 34)
-    patch.receiveShadow = true
-    group.add(patch)
+  // 果树下的耕作带让种植行列可读，草地与土壤形成柔和层次。
+  const bedMat = new THREE.MeshLambertMaterial({ color: 0x9b8966, flatShading: true })
+  const irrigationMat = new THREE.MeshLambertMaterial({ color: 0x52694b, flatShading: true })
+  for (const z of [-11.4, -5.6, 0.2, 6.0]) {
+    const bed = new THREE.Mesh(new THREE.PlaneGeometry(27.5, 3.5), bedMat)
+    bed.rotation.x = -Math.PI / 2
+    bed.position.set(0, 0.024, z)
+    bed.receiveShadow = true
+    group.add(bed)
+
+    // 细滴灌管沿树行铺设，作为果园场景的真实设施细节。
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 27, 6), irrigationMat)
+    pipe.rotation.z = Math.PI / 2
+    pipe.position.set(0, 0.075, z + 1.18)
+    group.add(pipe)
+  }
+
+  // 少量草丛集中在空地边缘，避免装饰遮住树木、设备和鸟类目标。
+  const grassMat = new THREE.MeshLambertMaterial({ color: 0x718951, flatShading: true })
+  for (let i = 0; i < 18; i += 1) {
+    const x = (rand() - 0.5) * 34
+    const z = (rand() - 0.5) * 34
+    if ([-11.4, -5.6, 0.2, 6.0].some((rowZ) => Math.abs(z - rowZ) < 2.2) || Math.abs(x) < 2.8) continue
+    const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.16 + rand() * 0.12, 0.48 + rand() * 0.26, 4), grassMat)
+    tuft.position.set(x, 0.27, z)
+    tuft.rotation.y = rand() * Math.PI
+    tuft.castShadow = true
+    group.add(tuft)
   }
 
   // 中央土路
-  const roadGeo = new THREE.PlaneGeometry(3.2, 26, 1, 8)
+  const roadGeo = new THREE.PlaneGeometry(3.8, 34, 1, 8)
   const roadMat = new THREE.MeshLambertMaterial({ color: PALETTE.path, flatShading: true })
   const road = new THREE.Mesh(roadGeo, roadMat)
   road.rotation.x = -Math.PI / 2
-  road.position.set(0, 0.03, 2)
+  road.position.set(0, 0.035, 2)
   road.receiveShadow = true
   group.add(road)
 
@@ -174,27 +191,30 @@ export function createCamera() {
   arm.castShadow = true
   group.add(arm)
 
+  // 云台组：球机/镜头/指示灯/视野锥挂在云台上，可独立旋转反复扫掠果园
+  const head = new THREE.Group()
+  head.position.set(0.86, 5.0, 0)
+
   // 球机外壳
   const housingGeo = new THREE.IcosahedronGeometry(0.32, 0)
   const housing = new THREE.Mesh(housingGeo, darkMat)
-  housing.position.set(0.86, 5.0, 0)
   housing.castShadow = true
-  group.add(housing)
+  head.add(housing)
 
   // 镜头
   const lensGeo = new THREE.CylinderGeometry(0.14, 0.17, 0.22, 10)
   const lensMat = new THREE.MeshLambertMaterial({ color: 0x1a2018 })
   const lens = new THREE.Mesh(lensGeo, lensMat)
   lens.rotation.z = Math.PI / 2
-  lens.position.set(1.1, 4.95, 0)
-  group.add(lens)
+  lens.position.set(0.24, -0.05, 0)
+  head.add(lens)
 
   // 工作指示灯（运行时改色）
   const ledGeo = new THREE.SphereGeometry(0.055, 8, 8)
   const ledMat = new THREE.MeshBasicMaterial({ color: 0x445244 })
   const led = new THREE.Mesh(ledGeo, ledMat)
-  led.position.set(1.02, 5.22, 0)
-  group.add(led)
+  led.position.set(0.16, 0.22, 0)
+  head.add(led)
 
   // 视野锥（检测范围可视化，平时低透明度）
   const coneGeo = new THREE.ConeGeometry(4.2, 9, 16, 1, true)
@@ -207,10 +227,12 @@ export function createCamera() {
   })
   const cone = new THREE.Mesh(coneGeo, coneMat)
   cone.rotation.z = Math.PI / 2
-  cone.position.set(5.2, 4.2, 0)
-  group.add(cone)
+  cone.position.set(4.34, -0.8, 0)
+  head.add(cone)
 
-  group.userData = { led, cone, coneMat }
+  group.add(head)
+
+  group.userData = { led, cone, coneMat, head }
   return group
 }
 
@@ -242,6 +264,18 @@ export function createDeterrent() {
   box.position.y = 3.5
   box.castShadow = true
   group.add(box)
+
+  // 设备底部加实体控制面板，果农到位后会在这里执行触控操作。
+  const controlHousing = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.48, 0.24), darkMat)
+  controlHousing.position.set(0.18, 1.3, 0)
+  controlHousing.castShadow = true
+  group.add(controlHousing)
+  const controlScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035, 0.24, 0.16),
+    new THREE.MeshBasicMaterial({ color: 0x35534b }),
+  )
+  controlScreen.position.set(0.35, 1.32, 0)
+  group.add(controlScreen)
 
   // 喇叭 ×2（左右各一）
   const hornMat = new THREE.MeshLambertMaterial({ color: PALETTE.metal, flatShading: true })
@@ -279,7 +313,7 @@ export function createDeterrent() {
     waves.push({ mesh: ring, mat: ringMat, phase: i / 3 })
   }
 
-  group.userData = { led, ledMat, waves, metalMat }
+  group.userData = { led, ledMat, waves, metalMat, controlScreen }
   return group
 }
 
@@ -373,4 +407,318 @@ export function mulberry32(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+/* ---------- 栅栏（围网，南侧留大门缺口） ---------- */
+export function createFence() {
+  const g = new THREE.Group()
+  const postMat = new THREE.MeshLambertMaterial({ color: PALETTE.trunk, flatShading: true })
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x8a7458, flatShading: true })
+  const R = 16
+  const step = 2.9
+  const fenceTop = 2.15
+  const postGeo = new THREE.CylinderGeometry(0.055, 0.075, fenceTop, 6)
+
+  const addPost = (x, z) => {
+    const p = new THREE.Mesh(postGeo, postMat)
+    p.position.set(x, fenceTop / 2, z)
+    p.castShadow = true
+    g.add(p)
+  }
+  const addRail = (x, z, len, along) => {
+    for (const y of [0.55, 1.45]) {
+      const r = new THREE.Mesh(
+        new THREE.BoxGeometry(along === 'x' ? len : 0.05, 0.06, along === 'x' ? 0.05 : len),
+        railMat,
+      )
+      r.position.set(x, y, z)
+      r.castShadow = true
+      g.add(r)
+    }
+  }
+
+  for (let x = -R; x <= R + 0.01; x += step) {
+    addPost(x, -R)
+    if (Math.abs(x) > 2.2) addPost(x, R)   // 南侧留大门缺口
+  }
+  for (let z = -R + step; z <= R - step + 0.01; z += step) {
+    addPost(-R, z)
+    addPost(R, z)
+  }
+  addRail(0, -R, 2 * R, 'x')
+  addRail(-9.1, R, 13.8, 'x')   // 南侧只留 4.4 单位宽的正门
+  addRail(9.1, R, 13.8, 'x')
+  addRail(-R, 0, 2 * R, 'z')
+  addRail(R, 0, 2 * R, 'z')
+  return g
+}
+
+/* ---------- 大门（门柱 + 果园招牌） ---------- */
+function makeSignTexture(text) {
+  const c = document.createElement('canvas')
+  c.width = 512
+  c.height = 72
+  const x = c.getContext('2d')
+  x.fillStyle = '#2c4429'
+  x.fillRect(0, 0, 512, 72)
+  x.fillStyle = '#d3e856'
+  x.fillRect(20, 22, 10, 10)
+  x.fillRect(482, 22, 10, 10)
+  x.fillStyle = '#f5f7ec'
+  x.font = 'bold 40px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
+  x.textAlign = 'center'
+  x.textBaseline = 'middle'
+  x.fillText(text, 256, 40)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
+export function createGate() {
+  const g = new THREE.Group()
+  const pillarMat = new THREE.MeshLambertMaterial({ color: 0x54503f, flatShading: true })
+  for (const x of [-2.4, 2.4]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.7, 0.55), pillarMat)
+    p.position.set(x, 0.85, 0)
+    p.castShadow = true
+    g.add(p)
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.14, 0.78), pillarMat)
+    cap.position.set(x, 1.77, 0)
+    g.add(cap)
+  }
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(4.4, 0.74, 0.12),
+    new THREE.MeshLambertMaterial({ color: 0x34502f, flatShading: true }),
+  )
+  board.position.set(0, 1.66, 0)
+  board.castShadow = true
+  g.add(board)
+  const signMat = new THREE.MeshBasicMaterial({ map: makeSignTexture('青禾示范果园') })
+  for (const side of [1, -1]) {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.15, 0.58), signMat)
+    sign.position.set(0, 1.66, side * 0.065)
+    if (side < 0) sign.rotation.y = Math.PI
+    g.add(sign)
+  }
+  return g
+}
+
+/* ---------- 农户房子（门柱旁的住户） ---------- */
+export function createHouse() {
+  const g = new THREE.Group()
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0xece5d2, flatShading: true })
+  const roofMat = new THREE.MeshLambertMaterial({ color: 0x8a5a3e, flatShading: true })
+  const woodMat = new THREE.MeshLambertMaterial({ color: PALETTE.trunk, flatShading: true })
+  const glassMat = new THREE.MeshLambertMaterial({ color: 0xb9d2e2, flatShading: true })
+  const pathMat = new THREE.MeshLambertMaterial({ color: PALETTE.path, flatShading: true })
+
+  const wall = (width, height, depth, x, y, z) => {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMat)
+    panel.position.set(x, y, z)
+    panel.castShadow = true
+    panel.receiveShadow = true
+    g.add(panel)
+  }
+  // 分片墙体给正门留出真实开口，果农可以从室内走出来。
+  wall(0.18, 2.5, 3.4, -2.11, 1.25, 0)
+  wall(0.18, 2.5, 3.4, 2.11, 1.25, 0)
+  wall(4.4, 2.5, 0.18, 0, 1.25, -1.61)
+  wall(0.825, 2.5, 0.18, -1.7875, 1.25, 1.61)
+  wall(2.625, 2.5, 0.18, 0.8875, 1.25, 1.61)
+  wall(0.95, 0.85, 0.18, -0.9, 2.075, 1.61)
+
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.75, 1.55, 4), roofMat)
+  roof.rotation.y = Math.PI / 4
+  roof.position.y = 3.28
+  roof.castShadow = true
+  g.add(roof)
+
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.16, 0.16), woodMat)
+  lintel.position.set(-0.9, 1.72, 1.76)
+  g.add(lintel)
+  for (const x of [-1.43, -0.37]) {
+    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.72, 0.16), woodMat)
+    jamb.position.set(x, 0.86, 1.76)
+    g.add(jamb)
+  }
+
+  for (const wx of [0.95, 1.95]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.68, 0.035), glassMat)
+    win.position.set(wx, 1.5, 1.72)
+    g.add(win)
+    for (const y of [1.08, 1.92]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.08, 0.08), woodMat)
+      rail.position.set(wx, y, 1.77)
+      g.add(rail)
+    }
+    for (const x of [wx - 0.42, wx + 0.42]) {
+      const stile = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.84, 0.08), woodMat)
+      stile.position.set(x, 1.5, 1.77)
+      g.add(stile)
+    }
+    const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.68, 0.08), woodMat)
+    mullion.position.set(wx, 1.5, 1.77)
+    g.add(mullion)
+  }
+
+  const chim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.95, 0.42), roofMat)
+  chim.position.set(1.2, 3.5, -0.7)
+  g.add(chim)
+
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.16, 0.9), pathMat)
+  step.position.set(-0.9, 0.08, 2.35)
+  g.add(step)
+
+  // 门前短廊与台阶共轴，房屋转向时入口仍保持明确。
+  const porch = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.12, 1.25), pathMat)
+  porch.position.set(-0.9, 0.025, 2.9)
+  g.add(porch)
+
+  return g
+}
+
+/* ---------- 红外驱鸟器（脉冲束流，与声学联动） ---------- */
+export function createInfrared() {
+  const g = new THREE.Group()
+  const metalMat = new THREE.MeshLambertMaterial({ color: PALETTE.metal, flatShading: true })
+  const darkMat = new THREE.MeshLambertMaterial({ color: PALETTE.metalDark, flatShading: true })
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 3.1, 8), metalMat)
+  pole.position.y = 1.55
+  pole.castShadow = true
+  g.add(pole)
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.44, 0.2, 8), darkMat)
+  base.position.y = 0.1
+  base.castShadow = true
+  g.add(base)
+
+  const controlBox = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.18), darkMat)
+  controlBox.position.set(0, 1.25, -0.28)
+  controlBox.castShadow = true
+  g.add(controlBox)
+  const controlScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 0.26, 0.035),
+    new THREE.MeshBasicMaterial({ color: 0x3e4a46 }),
+  )
+  controlScreen.position.set(0, 1.28, -0.39)
+  g.add(controlScreen)
+
+  const head = new THREE.Group()
+  head.position.y = 3.0
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.52, 0.36), darkMat)
+  body.castShadow = true
+  head.add(body)
+
+  // 红外发射环（红色，与直线束流同色）
+  const lens = new THREE.Mesh(
+    new THREE.TorusGeometry(0.13, 0.035, 8, 16),
+    new THREE.MeshBasicMaterial({ color: 0xf04438 }),
+  )
+  lens.rotation.y = Math.PI / 2
+  lens.position.set(0.2, 0, 0)
+  head.add(lens)
+
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff756b }),
+  )
+  core.position.set(0.22, 0, 0)
+  head.add(core)
+
+  const led = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x56753f }),
+  )
+  led.position.set(0, 0.34, 0)
+  head.add(led)
+
+  // 直线红外束由渲染器逐帧瞄准当前鸟类目标。
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 1, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xf04438,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  )
+  beam.position.set(0, -10, 0)
+  head.add(beam)
+
+  g.add(head)
+
+  g.userData = { led, beam, beamMat: beam.material, head, controlScreen }
+  return g
+}
+
+/* ---------- 果农角色：低多边形人物，供检测/驱离流程驱动 ---------- */
+export function createFarmer({ shirt = 0x5d8050, hat = 0xc7a76c } = {}) {
+  const g = new THREE.Group()
+  const skin = new THREE.MeshLambertMaterial({ color: 0xc98d67, flatShading: true })
+  const shirtMat = new THREE.MeshLambertMaterial({ color: shirt, flatShading: true })
+  const pantsMat = new THREE.MeshLambertMaterial({ color: 0x42566a, flatShading: true })
+  const hatMat = new THREE.MeshLambertMaterial({ color: hat, flatShading: true })
+  const bootMat = new THREE.MeshLambertMaterial({ color: 0x493c2e, flatShading: true })
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 0.62, 7), shirtMat)
+  torso.position.y = 1.08
+  torso.castShadow = true
+  g.add(torso)
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), skin)
+  head.position.set(0, 1.57, 0.02)
+  head.castShadow = true
+  g.add(head)
+
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.055, 10), hatMat)
+  brim.position.y = 1.76
+  g.add(brim)
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, 0.2, 8), hatMat)
+  crown.position.y = 1.88
+  g.add(crown)
+
+  const arms = []
+  const legs = []
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group()
+    arm.position.set(side * 0.23, 1.31, 0)
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.48, 6), shirtMat)
+    sleeve.position.y = -0.22
+    sleeve.rotation.z = side * -0.12
+    sleeve.castShadow = true
+    arm.add(sleeve)
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 5), skin)
+    hand.position.set(side * -0.025, -0.48, 0.015)
+    arm.add(hand)
+    g.add(arm)
+    arms.push(arm)
+
+    const leg = new THREE.Group()
+    leg.position.set(side * 0.11, 0.78, 0)
+    const trouser = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.46, 6), pantsMat)
+    trouser.position.y = -0.22
+    leg.add(trouser)
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.26), bootMat)
+    boot.position.set(0, -0.48, 0.045)
+    leg.add(boot)
+    g.add(leg)
+    legs.push(leg)
+  }
+
+  const exclamation = new THREE.Group()
+  const red = new THREE.MeshBasicMaterial({ color: 0xe8453c })
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.25, 8), red)
+  stem.position.y = 0.15
+  exclamation.add(stem)
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), red)
+  dot.position.y = -0.04
+  exclamation.add(dot)
+  exclamation.position.y = 2.42
+  exclamation.visible = false
+  g.add(exclamation)
+
+  g.userData = { arms, legs, exclamation }
+  return g
 }

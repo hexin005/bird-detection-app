@@ -29,6 +29,8 @@ class Command(BaseModel):
     request_id: str = Field(min_length=8, max_length=100, pattern=r'^[a-zA-Z0-9_-]+$')
     alarm_id: Optional[str] = None
     duration: Literal[3, 5, 8] = 3
+    mode: Literal['acoustic', 'infrared', 'both'] = 'both'
+    automatic: bool = False
 
 
 class Preferences(BaseModel):
@@ -215,7 +217,7 @@ def create_app(settings=None):
 
     @app.post('/api/commands')
     def command(body: Command, user=Depends(auth)):
-        return store.start_command(body.request_id, body.alarm_id, body.duration, user[1])
+        return store.start_command(body.request_id, body.alarm_id, body.duration, user[1], body.mode, body.automatic)
 
     @app.post('/api/commands/{command_id}/stop')
     def stop_command(command_id: str, user=Depends(auth)):

@@ -110,15 +110,15 @@ export const useOrchard = defineStore('orchard', () => {
   async function mutate(path: string, method: 'POST' | 'PUT' = 'POST', data?: object) {
     const result = await request(path, method, data); await sync(); return result
   }
-  async function command(duration: number, alarm_id: string | null) {
-    const signature = JSON.stringify({ duration, alarm_id })
+  async function command(duration: number, alarm_id: string | null, mode: 'acoustic' | 'infrared' | 'both' = 'both') {
+    const signature = JSON.stringify({ duration, alarm_id, mode })
     let saved = uni.getStorageSync('bird-command-retry') as { signature: string; request_id: string } | undefined
     if (!saved || saved.signature !== signature) {
       saved = { signature, request_id: `req_${Date.now()}_${Math.random().toString(36).slice(2)}` }
       uni.setStorageSync('bird-command-retry', saved)
     }
     try {
-      const result = await request<Command>('/commands', 'POST', { duration, alarm_id, request_id: saved.request_id })
+      const result = await request<Command>('/commands', 'POST', { duration, alarm_id, request_id: saved.request_id, mode })
       uni.removeStorageSync('bird-command-retry'); await sync(); return result
     } catch (e) {
       if ((e as ApiError).status) uni.removeStorageSync('bird-command-retry')

@@ -1,5 +1,5 @@
 export type Alarm = { id: string; task_id: string; species: string; count: number; confidence: number; at: number; last_seen: number; hits: number; status: string; snapshot: string; video_time: number; frame_id: number; site: string }
-export type Command = { id: string; alarm_id: string | null; duration: number; scenario: string; status: string; at: number; started_at: number | null; ended_at: number | null; message: string }
+export type Command = { id: string; alarm_id: string | null; duration: number; scenario: string; status: string; at: number; started_at: number | null; ended_at: number | null; message: string; mode?: 'acoustic' | 'infrared' | 'both' }
 export type Event = { id: number; kind: string; ref_id: string; at: number; message: string }
 export type Frame = { key: string; frame_id: number; video_time: number; duration: number; at: number; count: number; inference_ms: number; detections: { species: string; class_name: string; confidence: number; bbox: number[] }[] }
 export type Preferences = { scenario: 'normal' | 'offline' | 'timeout'; confidence: number; consecutive: number; cooldown: number }

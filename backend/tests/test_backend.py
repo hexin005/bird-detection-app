@@ -50,6 +50,15 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(Conflict):
             self.store.start_command('other-request', None, 3, 1)
 
+    def test_command_records_selected_mode_and_automatic_source(self):
+        c = self.store.start_command('automatic-001', None, 3, 1, 'infrared', True)
+        self.assertEqual(c['mode'], 'infrared')
+        self.assertEqual(c['automatic'], 1)
+        event = self.store.rows("SELECT * FROM events WHERE ref_id=?", (c['id'],))[0]
+        self.assertIn('自动策略触发', event['message'])
+        with self.assertRaises(Conflict):
+            self.store.start_command('automatic-001', None, 3, 1, 'acoustic', True)
+
     def test_offline_does_not_queue_or_replay(self):
         self.store.configure({'scenario': 'offline'})
         with self.assertRaises(Conflict):
@@ -155,6 +164,14 @@ class ApiTests(unittest.TestCase):
         cursor = state['events'][0]['id']
         older = self.client.get('/api/history?kind=events&before='+str(cursor), headers=self.headers).json()['items']
         self.assertTrue(all(e['id'] < cursor for e in older))
+
+    def test_api_accepts_automatic_infrared_command(self):
+        response = self.client.post('/api/commands', json={
+            'request_id': 'automatic-001', 'duration': 3, 'mode': 'infrared', 'automatic': True,
+        }, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mode'], 'infrared')
+        self.assertEqual(response.json()['automatic'], 1)
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #10160e;
+  background: #d7dfcf;
   font-family: var(--font-sans);
   color: var(--ink-900);
   -webkit-font-smoothing: antialiased;
@@ -52,7 +52,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-6);
-  background: linear-gradient(to bottom, rgba(16, 22, 14, 0.72), transparent);
+  background: linear-gradient(to bottom, rgba(243, 241, 231, 0.92), rgba(243, 241, 231, 0));
   pointer-events: none;
   z-index: 10;
 }
@@ -73,7 +73,7 @@ body {
   font-family: var(--font-serif);
   font-size: var(--text-2xl);
   font-weight: 700;
-  color: #f2f4e8;
+  color: var(--brand-900);
   letter-spacing: 1px;
   line-height: 1.2;
 }
@@ -81,9 +81,9 @@ body {
 .hud-brand__tag {
   padding: 3px 7px;
   border-radius: var(--radius-xs);
-  background: rgba(211, 232, 86, 0.16);
-  border: 1px solid rgba(211, 232, 86, 0.34);
-  color: var(--detect);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(52, 80, 47, 0.16);
+  color: var(--brand-700);
   font-family: var(--font-num);
   font-size: var(--text-2xs);
   font-weight: 600;
@@ -92,7 +92,7 @@ body {
 
 .hud-brand__site {
   font-size: var(--text-sm);
-  color: rgba(242, 244, 232, 0.62);
+  color: var(--ink-700);
 }
 
 /* 右上角状态徽标组 */
@@ -112,9 +112,9 @@ body {
   font-weight: 500;
   line-height: 1;
   height: 22px;
-  background: rgba(35, 43, 29, 0.55);
-  border: 1px solid rgba(242, 244, 232, 0.16);
-  color: #dfe4d3;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(52, 80, 47, 0.12);
+  color: var(--ink-700);
   backdrop-filter: blur(8px);
   white-space: nowrap;
 }
@@ -128,9 +128,9 @@ body {
 }
 
 .hud-badge.is-live {
-  background: rgba(52, 80, 47, 0.8);
-  border-color: rgba(211, 232, 86, 0.4);
-  color: #f2f4e8;
+  background: var(--brand-700);
+  border-color: var(--brand-700);
+  color: #fff;
 }
 .hud-badge.is-live .hud-badge__dot {
   background: var(--detect);
@@ -138,9 +138,9 @@ body {
 }
 .hud-badge.is-ended .hud-badge__dot { background: var(--brand-300); }
 .hud-badge.is-warn {
-  background: rgba(150, 104, 43, 0.55);
-  border-color: rgba(231, 213, 174, 0.4);
-  color: #f5ebd5;
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+  color: var(--warn-fg);
 }
 .hud-badge.is-warn .hud-badge__dot { background: #e7d5ae; }
 
@@ -319,7 +319,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-6);
-  background: linear-gradient(to top, rgba(16, 22, 14, 0.7), transparent);
+  background: linear-gradient(to top, rgba(243, 241, 231, 0.96), rgba(243, 241, 231, 0));
   pointer-events: none;
   z-index: 10;
 }
@@ -335,7 +335,7 @@ body {
   align-items: center;
   gap: 5px;
   font-size: var(--text-xs);
-  color: rgba(242, 244, 232, 0.72);
+  color: var(--ink-700);
 }
 .hud-legend__swatch {
   width: 10px;
@@ -363,7 +363,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-5);
-  background: #10160e;
+  background: var(--surface-canvas);
   z-index: 40;
   transition: opacity 0.5s ease;
 }
@@ -387,14 +387,14 @@ body {
 }
 .hud-loading__text {
   font-size: var(--text-md);
-  color: rgba(242, 244, 232, 0.7);
+  color: var(--ink-700);
   letter-spacing: 2px;
 }
 .hud-loading__bar {
   width: 180px;
   height: 3px;
   border-radius: 2px;
-  background: rgba(242, 244, 232, 0.14);
+  background: var(--line-strong);
   overflow: hidden;
 }
 .hud-loading__fill {

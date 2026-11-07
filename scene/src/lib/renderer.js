@@ -22,6 +22,11 @@ import {
   createTree,
   createCamera,
   createDeterrent,
+  createInfrared,
+  createFence,
+  createGate,
+  createHouse,
+  createFarmer,
   createBirdMesh,
   createDetectBox,
   createAlarmMarker,
@@ -32,7 +37,7 @@ import { loadCaptureTexture } from './capture.js'
 const MAX_BIRDS = 6
 
 export function createOrchardScene(canvas, options = {}) {
-  const { onReady } = options
+  const { onReady, onCrewAlertReady, onCrewArrived } = options
 
   /* ---------- 基础三件套 ---------- */
   const renderer = new THREE.WebGLRenderer({
@@ -42,45 +47,47 @@ export function createOrchardScene(canvas, options = {}) {
     powerPreference: 'high-performance',
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.08
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(PALETTE.sky)
-  scene.fog = new THREE.Fog(PALETTE.fog, 34, 74)
+  scene.fog = new THREE.Fog(PALETTE.fog, 44, 96)
 
   const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 260)
   // 正对果园中心，带一定俯视角度，让果树、摄像头、驱鸟器都进画面
-  camera.position.set(15, 13.5, 17)
-  camera.lookAt(0, 1.8, 0)
+  camera.position.set(26, 24, 37)
+  camera.lookAt(0, 1.45, 0)
 
   const controls = new OrbitControls(camera, canvas)
-  controls.target.set(0, 1.8, 0)
+  controls.target.set(0, 1.45, 0)
   controls.enableDamping = true
   controls.dampingFactor = 0.06
   controls.minDistance = 9
-  controls.maxDistance = 46
+  controls.maxDistance = 58
   controls.maxPolarAngle = Math.PI * 0.475
   controls.minPolarAngle = Math.PI * 0.12
   controls.autoRotate = true
-  controls.autoRotateSpeed = 0.28
+  controls.autoRotateSpeed = 0.18
   controls.enablePan = false
   controls.update()
 
-  // 后期辉光：检测框 / 声波环 / 指示灯等高亮荧绿元素产生泛光，科技感更强。
-  // 阈值 0.78 只让荧绿 #d3e856（亮度≈0.85）级别的高亮泛光，天空与果树不受影响。
+  // 克制的辉光只托起检测框和驱鸟设备指示灯，保留果园材质与鸟体细节。
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1440, 900), 0.9, 0.45, 0.78)
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1440, 900), 0.32, 0.32, 0.9)
   composer.addPass(bloomPass)
   composer.addPass(new OutputPass())
 
   /* ---------- 光照 ---------- */
-  const hemi = new THREE.HemisphereLight(0xdceaf2, 0x4a5535, 1.15)
+  const hemi = new THREE.HemisphereLight(0xeaf3df, 0x64704d, 1.35)
   scene.add(hemi)
 
-  const sun = new THREE.DirectionalLight(0xfff2d8, 1.75)
-  sun.position.set(16, 22, 12)
+  const sun = new THREE.DirectionalLight(0xffdfae, 2.15)
+  sun.position.set(-18, 26, 16)
   sun.castShadow = true
   sun.shadow.mapSize.set(1024, 1024)
   sun.shadow.camera.near = 1
@@ -92,8 +99,8 @@ export function createOrchardScene(canvas, options = {}) {
   sun.shadow.bias = -0.0012
   scene.add(sun)
 
-  const fill = new THREE.DirectionalLight(0xb9d4e0, 0.35)
-  fill.position.set(-14, 10, -12)
+  const fill = new THREE.DirectionalLight(0xd8e9dc, 0.48)
+  fill.position.set(14, 12, -16)
   scene.add(fill)
 
   /* ---------- 天地 ---------- */
@@ -113,12 +120,12 @@ export function createOrchardScene(canvas, options = {}) {
   }
 
   // 主果园：行列种植
-  const rows = 3
+  const rows = 4
   const cols = 4
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const x = (c - (cols - 1) / 2) * 6.4 + (rand() - 0.5) * 1.1
-      const z = (r - (rows - 1) / 2) * 6.8 - 4.5 + (rand() - 0.5) * 1.1
+      const x = (c - (cols - 1) / 2) * 6.1 + (rand() - 0.5) * 0.8
+      const z = (r - (rows - 1) / 2) * 5.8 - 2.7 + (rand() - 0.5) * 0.8
       if (!tryPlace(x, z, 3.6)) continue
       const tree = createTree(rand, 1 + rand() * 0.35)
       tree.position.set(x, 0, z)
@@ -151,6 +158,65 @@ export function createOrchardScene(canvas, options = {}) {
   const deterrent = createDeterrent()
   deterrent.position.set(11.5, 0, -2)
   scene.add(deterrent)
+
+  // 红外驱鸟器（东南角，与声学联动）
+  const infrared = createInfrared()
+  infrared.position.set(8.6, 0, 8.6)
+  infrared.rotation.y = Math.PI * 3 / 4   // 束流朝果园中心
+  scene.add(infrared)
+
+  /* ---------- 围栏与门户 ---------- */
+  scene.add(createFence())
+
+  // 大门（南侧正对土路）
+  const gate = createGate()
+  gate.position.set(0, 0, 16)
+  scene.add(gate)
+
+  // 农户房子（大门旁）
+  const house = createHouse()
+  house.position.set(-4, 0, 20.6)
+  let houseHeading = Math.PI * 0.8
+  for (let i = 0; i < 8; i += 1) {
+    house.rotation.y = houseHeading
+    house.updateMatrixWorld(true)
+    const entry = house.localToWorld(new THREE.Vector3(-0.9, 0, 1.76))
+    houseHeading = Math.atan2(gate.position.x - entry.x, gate.position.z - entry.z)
+  }
+  house.rotation.y = houseHeading // 让门口正对果园大门中心
+  scene.add(house)
+  house.updateMatrixWorld(true)
+  const houseInterior = (x) => house.localToWorld(new THREE.Vector3(x, 0, 0.25)).toArray()
+  const houseDoorInside = house.localToWorld(new THREE.Vector3(-0.9, 0, 1.42))
+  const houseDoorOutside = house.localToWorld(new THREE.Vector3(-0.9, 0, 2.2))
+
+  /* ---------- 果农协作组：待命在房屋内，发现鸟后经大门进入果园 ---------- */
+  const crew = [
+    { name: '巡园果农', role: 'inspect', home: houseInterior(-0.45), muster: [-0.82, 0, 14.15], task: [-6.1, 0, -2.3], lookAt: [-4.2, 0, -2.3], shirt: 0x668452, hat: 0xc6a66d },
+    { name: '红外设备员', role: 'infrared', home: houseInterior(0.15), muster: [0, 0, 14.15], task: [8.0, 0, 9.2], lookAt: [8.35, 0, 8.85], shirt: 0x4f7e86, hat: 0xb58e59 },
+    { name: '声波设备员', role: 'acoustic', home: houseInterior(0.75), muster: [0.82, 0, 14.15], task: [11.15, 0, -2], lookAt: [11.8, 0, -2], shirt: 0xa56b48, hat: 0xd1b171 },
+  ]
+  crew.forEach((person) => {
+    person.mesh = createFarmer({ shirt: person.shirt, hat: person.hat })
+    person.mesh.position.set(...person.home)
+    person.mesh.visible = false
+    scene.add(person.mesh)
+    person.trail = new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineDashedMaterial({
+        color: 0x59decf,
+        transparent: true,
+        opacity: 0.76,
+        dashSize: 0.48,
+        gapSize: 0.26,
+        depthWrite: false,
+      }),
+    )
+    person.trail.visible = false
+    person.trail.renderOrder = 2
+    person.trail.frustumCulled = false
+    scene.add(person.trail)
+  })
 
   // 设备标签锚点（供 HUD 定位，预留）
   const markers = {
@@ -257,6 +323,147 @@ export function createOrchardScene(canvas, options = {}) {
     executing: false,
     offline: false,
     detTime: 0,
+    repelMode: 'both',   // acoustic | infrared | both：驱离方式，决定点亮哪些设备动效
+    crewPhase: 'home',
+  }
+
+  const crewMotion = { phase: '', started: 0, duration: 0, paths: [], alertReadySent: false, arrivalSent: false }
+  const worldUp = new THREE.Vector3(0, 1, 0)
+
+  function makeCrewRoute(person, phase) {
+    const start = person.mesh.position.clone()
+    if (phase === 'alert') {
+      if (!person.mesh.visible) start.set(...person.home)
+      return [
+        start,
+        houseDoorInside.clone(),
+        houseDoorOutside.clone(), // 从正门离开房屋
+        new THREE.Vector3(3.4, 0, 18.35), // 沿围栏外侧走向大门
+        new THREE.Vector3(0, 0, 18.35),
+        new THREE.Vector3(person.muster[0], 0, 16.05), // 从唯一大门进入
+        new THREE.Vector3(...person.muster),
+      ]
+    }
+    if (phase === 'working') {
+      const enabled = person.role === 'inspect'
+        || person.role === 'infrared' && visual.repelMode !== 'acoustic'
+        || person.role === 'acoustic' && visual.repelMode !== 'infrared'
+      if (!enabled) return [start]
+      const lane = person.role === 'inspect'
+        ? [new THREE.Vector3(-1.5, 0, 10.5), new THREE.Vector3(-3.8, 0, 5.6)]
+        : person.role === 'infrared'
+          ? [new THREE.Vector3(2.3, 0, 11.4), new THREE.Vector3(5.1, 0, 9.1)]
+          : [new THREE.Vector3(3.1, 0, 12.2), new THREE.Vector3(8.5, 0, 7.1)]
+      return [start, ...lane, new THREE.Vector3(...person.task)]
+    }
+    if (phase === 'returning') {
+      return [
+        start,
+        new THREE.Vector3(...person.muster),
+        new THREE.Vector3(person.muster[0], 0, 16.05),
+        new THREE.Vector3(0, 0, 18.35),
+        new THREE.Vector3(3.4, 0, 18.35),
+        houseDoorOutside.clone(),
+        houseDoorInside.clone(),
+        new THREE.Vector3(...person.home),
+      ]
+    }
+    return [start]
+  }
+
+  function routePoint(points, progress) {
+    if (!points || points.length < 2) return points?.[0]?.clone() || new THREE.Vector3()
+    const lengths = []
+    let total = 0
+    for (let i = 1; i < points.length; i += 1) {
+      const length = points[i - 1].distanceTo(points[i])
+      lengths.push(length)
+      total += length
+    }
+    let remaining = total * progress
+    for (let i = 0; i < lengths.length; i += 1) {
+      if (remaining <= lengths[i] || i === lengths.length - 1) {
+        return points[i].clone().lerp(points[i + 1], lengths[i] ? Math.min(remaining / lengths[i], 1) : 1)
+      }
+      remaining -= lengths[i]
+    }
+    return points[points.length - 1].clone()
+  }
+
+  function beginCrewPhase(phase, elapsed) {
+    crewMotion.phase = phase
+    crewMotion.started = elapsed
+    crewMotion.duration = phase === 'alert' ? 4.2 : phase === 'working' ? 3.4 : phase === 'returning' ? 5.4 : 0
+    crewMotion.paths = []
+    crewMotion.alertReadySent = false
+    crewMotion.arrivalSent = false
+    crew.forEach((person) => {
+      const isHome = phase === 'home'
+      person.mesh.visible = !isHome
+      person.mesh.userData.exclamation.visible = phase === 'alert'
+      if (phase === 'alert' && !person.mesh.visible) person.mesh.position.set(...person.home)
+      const path = makeCrewRoute(person, phase)
+      crewMotion.paths.push(path)
+      if (phase === 'working' && path.length > 1) {
+        person.trail.geometry.dispose()
+        person.trail.geometry = new THREE.BufferGeometry().setFromPoints(path.map((point) => point.clone().setY(0.12)))
+        person.trail.computeLineDistances()
+      }
+      person.trail.visible = ['working', 'positioned', 'actuating', 'waiting'].includes(phase)
+    })
+  }
+
+  function updateCrew(elapsed) {
+    if (crewMotion.phase !== visual.crewPhase) beginCrewPhase(visual.crewPhase, elapsed)
+    const moving = crewMotion.duration > 0 && elapsed - crewMotion.started < crewMotion.duration
+    const raw = crewMotion.duration ? Math.min((elapsed - crewMotion.started) / crewMotion.duration, 1) : 1
+    const progress = raw * raw * (3 - 2 * raw)
+    crew.forEach((person, index) => {
+      const mesh = person.mesh
+      if (!mesh.visible) return
+      const path = crewMotion.paths[index]
+      const previous = mesh.position.clone()
+      if (moving && path?.length > 1) mesh.position.copy(routePoint(path, progress))
+      if (moving && path?.length > 1) {
+        const dx = mesh.position.x - previous.x
+        const dz = mesh.position.z - previous.z
+        if (Math.abs(dx) + Math.abs(dz) > 0.0001) mesh.rotation.y = Math.atan2(dx, dz)
+      }
+      const walk = moving && path?.length > 1
+      const gait = Math.sin(elapsed * 10 + index * 1.7)
+      mesh.position.y = (walk ? Math.abs(gait) * 0.055 : 0)
+      person.trail.material.dashOffset = -elapsed * 0.2
+      if (visual.crewPhase === 'working' && !moving && person.lookAt) {
+        mesh.rotation.y = Math.atan2(person.lookAt[0] - mesh.position.x, person.lookAt[2] - mesh.position.z)
+      }
+      mesh.userData.legs.forEach((leg, legIndex) => {
+        leg.rotation.x = walk ? (legIndex === 0 ? 1 : -1) * gait * 0.48 : 0
+      })
+      mesh.userData.arms.forEach((arm, armIndex) => {
+        if (walk) {
+          arm.rotation.x = (armIndex === 0 ? -1 : 1) * gait * 0.32
+          arm.rotation.z = 0
+        } else if (visual.crewPhase === 'actuating') {
+          const inspectorMotion = person.role === 'inspect' && armIndex === 0
+          arm.rotation.x = inspectorMotion ? -0.45 - Math.sin(elapsed * 3.4) * 0.2 : armIndex === 1 ? -1.18 - Math.sin(elapsed * 4) * 0.08 : 0.08
+          arm.rotation.z = inspectorMotion ? 0.18 : armIndex === 1 ? -0.14 : 0.08
+        } else {
+          arm.rotation.x = 0
+          arm.rotation.z = 0
+        }
+      })
+      const marker = mesh.userData.exclamation
+      if (marker.visible) marker.position.y = 2.42 + Math.sin(elapsed * 4.5 + index) * 0.08
+      if (visual.crewPhase === 'returning' && !moving) mesh.visible = false
+    })
+    if (visual.crewPhase === 'alert' && !moving && !crewMotion.alertReadySent) {
+      crewMotion.alertReadySent = true
+      if (onCrewAlertReady) onCrewAlertReady()
+    }
+    if (visual.crewPhase === 'working' && !moving && !crewMotion.arrivalSent) {
+      crewMotion.arrivalSent = true
+      if (onCrewArrived) onCrewArrived()
+    }
   }
 
   /* ---------- 相机控制 ---------- */
@@ -482,14 +689,17 @@ export function createOrchardScene(canvas, options = {}) {
       led.material.color.setHex(0x56753f)
       coneMat.opacity = 0.028
     }
-    // 球机缓慢左右巡航
-    camRig.rotation.y = -Math.PI / 3.1 + Math.sin(elapsed * 0.24) * 0.16
+    // 云台反复扫掠果园（巡逻式监测），底座朝向固定
+    camRig.rotation.y = -Math.PI / 3.1
+    camRig.userData.head.rotation.y = Math.sin(elapsed * 0.22) * 1.05
 
-    // 驱鸟器声波
-    const { led: dled, waves } = deterrent.userData
-    dled.material.color.setHex(visual.executing ? 0xd3e856 : (visual.offline ? 0x9c5546 : 0x56753f))
+    // 驱鸟器声波：方式含声学（acoustic/both）时才点亮
+    const { led: dled, waves, controlScreen: acousticScreen } = deterrent.userData
+    const wavesOn = visual.executing && visual.repelMode !== 'infrared'
+    dled.material.color.setHex(wavesOn ? 0xd3e856 : (visual.offline ? 0x9c5546 : 0x56753f))
+    acousticScreen.material.color.setHex(wavesOn ? 0x66f5c7 : 0x35534b)
     waves.forEach(({ mesh, mat, phase }) => {
-      if (!visual.executing) {
+      if (!wavesOn) {
         mat.opacity = 0
         return
       }
@@ -497,6 +707,28 @@ export function createOrchardScene(canvas, options = {}) {
       mesh.scale.setScalar(0.8 + t * 5.2)
       mat.opacity = (1 - t) * 0.55
     })
+
+    // 红外驱鸟器：方式含红外（infrared/both）时才点亮束流
+    const ir = infrared.userData
+    ir.controlScreen.material.color.setHex(visual.executing && visual.repelMode !== 'acoustic' ? 0xff524f : 0x3e4a46)
+    const targetBird = birds.find((bird) => bird.active)
+    const beamOn = visual.executing && !visual.offline && visual.repelMode !== 'acoustic' && !!targetBird
+    ir.led.material.color.setHex(beamOn ? 0xffb066 : (visual.offline ? 0x9c5546 : 0x56753f))
+    if (beamOn) {
+      ir.head.updateWorldMatrix(true, false)
+      const origin = new THREE.Vector3(0.22, 0, 0)
+      const target = ir.head.worldToLocal(targetBird.mesh.position.clone())
+      const direction = target.sub(origin)
+      const distance = direction.length()
+      ir.beam.position.copy(origin).addScaledVector(direction, 0.5)
+      ir.beam.quaternion.setFromUnitVectors(worldUp, direction.normalize())
+      ir.beam.scale.set(1, distance, 1)
+      ir.beam.visible = true
+      ir.beamMat.opacity = 0.82 + Math.sin(elapsed * 5.5) * 0.12
+    } else {
+      ir.beam.visible = false
+      ir.beamMat.opacity = 0
+    }
 
     // 立体扫描：监测中扫描幕布扫过 + 圆环扩散 + 点阵呼吸
     if (visual.running) {
@@ -533,6 +765,7 @@ export function createOrchardScene(canvas, options = {}) {
     // 不再自动操控相机，视角完全由用户掌握
     controls.update()
     updateBirds(dt, elapsed)
+    updateCrew(elapsed)
     updateDevices(dt, elapsed)
     composer.render()
   }
@@ -543,13 +776,15 @@ export function createOrchardScene(canvas, options = {}) {
   /* ---------- 对外接口 ---------- */
   return {
     /** 注入最新业务状态 */
-    setState({ running, detections, alarms, executing, offline, detTime, snapshots, server, ticket }) {
+    setState({ running, detections, alarms, executing, offline, detTime, snapshots, server, ticket, repelMode, crewPhase }) {
       visual.running = !!running
       visual.detections = Array.isArray(detections) ? detections : []
       visual.alarms = Array.isArray(alarms) ? alarms : []
       visual.executing = !!executing
       visual.offline = !!offline
       visual.detTime = detTime || 0
+      if (repelMode) visual.repelMode = repelMode
+      if (crewPhase) visual.crewPhase = crewPhase
       if (server) captureCtx.server = server
       if (ticket) captureCtx.ticket = ticket
       if (snapshots) snapTable = snapshots
@@ -592,6 +827,10 @@ export function createOrchardScene(canvas, options = {}) {
     occupantCount() {
       return occupants.length
     },
+    /** 供开发验证读取果农演示状态，不参与业务数据持久化。 */
+    crewState() {
+      return { phase: crewMotion.phase, people: crew.map((person) => ({ name: person.name, visible: person.mesh.visible, position: person.mesh.position.toArray(), alert: person.mesh.userData.exclamation.visible })) }
+    },
     /** 清空居留鸟群（重新开始检测时调用） */
     clearOccupants() {
       occupants.length = 0
@@ -628,8 +867,15 @@ export function createOrchardScene(canvas, options = {}) {
     resetView() {
       userAutoRotate = true
       controls.autoRotate = true
-      camera.position.set(15, 13.5, 17)
+      camera.position.set(26, 24, 37)
       controls.target.set(0, 1.8, 0)
+      controls.update()
+    },
+    /** 聚焦某个点（演示用：聚焦大门 / 设备等） */
+    focusPoint(x, y, z, dist = 12) {
+      controls.autoRotate = false
+      camera.position.set(x, y + dist * 0.55, z + dist * 0.82)
+      controls.target.set(x, y, z)
       controls.update()
     },
     resize,

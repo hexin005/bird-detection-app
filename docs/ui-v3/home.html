@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css">
+<title>监控 · 青禾果园守护</title></head>
+<body>
+<div class="phone">
+  <div class="content">
+    <div class="brand-bg">
+      <svg class="hill" width="200" height="150" viewBox="0 0 200 150" fill="none">
+        <path d="M0 120 Q60 40 130 96 T200 84 L200 0 L0 0 Z" fill="#d3e0be"/>
+        <path d="M40 110 Q110 60 200 104 L200 0 L40 0 Z" fill="#c3d4ab"/>
+        <circle cx="150" cy="34" r="16" fill="#fff" opacity=".5"/>
+      </svg>
+      <div class="brandrow">
+        <div class="logomark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21c-4.5-1.6-7-5.2-7-9.4C5 7 8.4 3.6 12.6 3.2c.3 4.6-.7 13-9.6 13.4" stroke="#f5f7ec" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 21c3.8-1.4 6-4.4 6-8" stroke="#d3e856" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <span class="brandname">青禾 · 果园守护</span>
+        <div class="gear"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#44523E" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#44523E" stroke-width="1.5"/></svg></div>
+      </div>
+      <div class="locrow">
+        <span class="locchip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z" stroke="#34502f" stroke-width="1.6"/><circle cx="12" cy="10" r="2.4" stroke="#34502f" stroke-width="1.6"/></svg>
+          东区果园
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#34502f" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <span class="livechip"><i></i><span style="white-space:nowrap">实时连接</span></span>
+        <span class="livechip" style="color:var(--warn-fg)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="#96682b" stroke-width="1.6"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7" stroke="#96682b" stroke-width="1.6" stroke-linecap="round"/></svg>
+          26°C 晴
+        </span>
+      </div>
+    </div>
+
+    <!-- LIVE 视频卡 -->
+    <div class="livecard">
+      <img class="photo" src="../../.runtime/captures/T9311ae2050-15.jpg" alt="">
+      <span class="livebadge"><i></i>LIVE</span>
+      <div class="expand"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>
+      <div class="dbox" style="left:56%;top:24%;width:30%;height:52%">
+        <span class="tag">鸟类 0.93</span>
+      </div>
+      <div class="vctrl">
+        <div class="pp"><svg width="10" height="12" viewBox="0 0 10 12" fill="none"><rect width="3.4" height="12" rx="1.2" fill="#fff"/><rect x="6.6" width="3.4" height="12" rx="1.2" fill="#fff"/></svg></div>
+        <span class="mon">正在监测 <i></i></span>
+        <div class="pbar"><i></i><b></b></div>
+        <span class="vtime">00:12 / 00:30</span>
+      </div>
+    </div>
+
+    <!-- 渐变统计卡 -->
+    <div class="statrow">
+      <div class="gstat green">
+        <div class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="9.6" r="1.7" fill="currentColor"/><path d="M4.5 17.5l4.6-4.4 3.2 3 3.4-3.4 3.8 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <span class="lb">今日识别</span>
+        <span class="nm">128 <small>↑ 12%</small></span>
+      </div>
+      <div class="gstat amber">
+        <div class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3.6L21 19H3L12 3.6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.6" r="1" fill="currentColor"/></svg></div>
+        <span class="lb">待处理告警</span>
+        <span class="nm">3 <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      </div>
+      <div class="gstat green">
+        <div class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.6v5.2c0 4.6-3 8.4-7 10.2-4-1.8-7-5.6-7-10.2V5.6L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11.6l2.2 2.2 4-4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <span class="lb">今日巡护</span>
+        <span class="nm">2 <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      </div>
+    </div>
+
+    <!-- 鸟类活动趋势 -->
+    <div class="card">
+      <div class="cardtitle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19V5" stroke="#7b9b63" stroke-width="1.6" stroke-linecap="round"/><path d="M4 15c3-6 6 2 9-4s5-4 7-6" stroke="#4f6b3f" stroke-width="1.6" stroke-linecap="round"/></svg>
+        鸟类活动趋势
+        <span class="more"></span>
+        <span class="trendsel" style="margin-left:auto">近 24 小时 <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#6d7f6c" stroke-width="2" stroke-linecap="round"/></svg></span>
+      </div>
+      <div class="trend">
+        <svg width="100%" height="104" viewBox="0 0 330 104" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="ar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#9ec247" stop-opacity=".5"/><stop offset="1" stop-color="#9ec247" stop-opacity=".04"/>
+            </linearGradient>
+          </defs>
+          <g stroke="#e9e6d7" stroke-width="1">
+            <line x1="0" y1="14" x2="330" y2="14"/><line x1="0" y1="42" x2="330" y2="42"/><line x1="0" y1="70" x2="330" y2="70"/><line x1="0" y1="98" x2="330" y2="98"/>
+          </g>
+          <path d="M0 78 C24 70 36 48 60 52 S96 82 120 74 150 30 176 38 208 66 232 58 268 24 296 34 318 52 330 46 L330 104 L0 104 Z" fill="url(#ar)"/>
+          <path d="M0 78 C24 70 36 48 60 52 S96 82 120 74 150 30 176 38 208 66 232 58 268 24 296 34 318 52 330 46" fill="none" stroke="#4f6b3f" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="176" cy="38" r="3.4" fill="#34502f"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-num);font-size:9px;color:var(--ink-300);margin-top:4px">
+          <span>6时</span><span>9时</span><span>12时</span><span>15时</span><span>18时</span><span>21时</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最近告警 -->
+    <div class="card">
+      <div class="cardtitle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3.4a6 6 0 016 6v3.4l1.6 2.8a.9.9 0 01-.8 1.4H5.2a.9.9 0 01-.8-1.4L6 12.8V9.4a6 6 0 016-6z" stroke="#e0a03a" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 19.6a2.2 2.2 0 004 0" stroke="#e0a03a" stroke-width="1.6" stroke-linecap="round"/></svg>
+        最近告警
+        <span class="more">查看全部 <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="#8a917f" stroke-width="2" stroke-linecap="round"/></svg></span>
+      </div>
+      <div class="alarmrow">
+        <div class="athumb">
+          <img src="../../.runtime/captures/T1bc13630fa-15.jpg" alt="">
+          <span class="warn">!</span>
+        </div>
+        <div class="ainfo">
+          <div class="t">园区出现鸟类活动</div>
+          <div class="m">东区果园 · 11-07 00:27</div>
+        </div>
+        <span class="statuspill">待处理</span>
+      </div>
+    </div>
+    <div style="height:12px"></div>
+
+    <!-- 底部导航（我们既有胶囊风格） -->
+    <div class="tabbar">
+      <div class="tab on">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.5V20h12V9.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 20v-5h4v5" stroke="currentColor" stroke-width="1.7"/></svg>
+        监控
+      </div>
+      <div class="tab">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3.4a6 6 0 016 6v3.4l1.6 2.8a.9.9 0 01-.8 1.4H5.2a.9.9 0 01-.8-1.4L6 12.8V9.4a6 6 0 016-6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 19.6a2.2 2.2 0 004 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        告警 <span class="dotnum">59</span>
+      </div>
+      <div class="tab">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.4V12l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        控制
+      </div>
+      <div class="tab">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.2A2.2 2.2 0 015.7 5h4l2 2.4h6.6a2.2 2.2 0 012.2 2.2v8.2a2.2 2.2 0 01-2.2 2.2H5.7a2.2 2.2 0 01-2.2-2.2V7.2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        记录
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

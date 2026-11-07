@@ -31,7 +31,7 @@ class Store:
           CREATE TABLE IF NOT EXISTS commands (
             id TEXT PRIMARY KEY, request_id TEXT UNIQUE, alarm_id TEXT REFERENCES alarms(id),
             user_id INTEGER, duration INTEGER, scenario TEXT, status TEXT,
-            at REAL, started_at REAL, ended_at REAL, message TEXT);
+            at REAL, started_at REAL, ended_at REAL, message TEXT, mode TEXT, automatic INTEGER DEFAULT 0);
           CREATE UNIQUE INDEX IF NOT EXISTS one_active_command ON commands((1))
             WHERE status IN ('pending','running');
           CREATE TABLE IF NOT EXISTS events (
@@ -49,6 +49,10 @@ class Store:
             self.db.execute('ALTER TABLE alarms ADD COLUMN last_video_time REAL')
         if 'bbox' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
             self.db.execute('ALTER TABLE alarms ADD COLUMN bbox TEXT')
+        if 'mode' not in {r[1] for r in self.db.execute('PRAGMA table_info(commands)')}:
+            self.db.execute("ALTER TABLE commands ADD COLUMN mode TEXT DEFAULT 'both'")
+        if 'automatic' not in {r[1] for r in self.db.execute('PRAGMA table_info(commands)')}:
+            self.db.execute('ALTER TABLE commands ADD COLUMN automatic INTEGER DEFAULT 0')
         self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
@@ -137,13 +141,15 @@ class Store:
                 raise Conflict('告警已被处理或不存在，请刷新')
             self.event(db, 'ignored', alarm_id, '人工忽略本次告警')
 
-    def start_command(self, request_id, alarm_id, duration, user_id):
+    def start_command(self, request_id, alarm_id, duration, user_id, mode='both', automatic=False):
         if duration not in (3, 5, 8):
             raise Conflict('执行时长必须为 3、5 或 8 秒')
+        if mode not in ('acoustic', 'infrared', 'both'):
+            raise Conflict('驱离方式必须是 acoustic、infrared 或 both')
         with self.tx() as db:
             old = db.execute('SELECT * FROM commands WHERE request_id=?', (request_id,)).fetchone()
             if old:
-                if (old['alarm_id'], old['duration'], old['user_id']) != (alarm_id, duration, user_id):
+                if (old['alarm_id'], old['duration'], old['user_id'], old['mode'], bool(old['automatic'])) != (alarm_id, duration, user_id, mode, bool(automatic)):
                     raise Conflict('重复请求的内容不一致')
                 return dict(old)
             config = json.loads(db.execute('SELECT value FROM settings WHERE id=1').fetchone()[0])
@@ -157,9 +163,10 @@ class Store:
                     raise Conflict('关联告警已被处理或不存在')
                 db.execute("UPDATE alarms SET status='processing' WHERE id=?", (alarm_id,))
             cid = 'C' + secrets.token_hex(5)
-            db.execute('INSERT INTO commands VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                       (cid, request_id, alarm_id, user_id, duration, config['scenario'], 'pending', time.time(), None, None, '等待模拟设备接收'))
-            self.event(db, 'command', cid, '人工确认，指令已入队（模拟设备）')
+            db.execute('INSERT INTO commands(id,request_id,alarm_id,user_id,duration,scenario,status,at,started_at,ended_at,message,mode,automatic) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (cid, request_id, alarm_id, user_id, duration, config['scenario'], 'pending', time.time(), None, None, '等待模拟设备接收', mode, int(bool(automatic))))
+            source = '自动策略触发' if automatic else '人工确认'
+            self.event(db, 'command', cid, f'{source}，指令已入队（模拟设备）')
             return dict(db.execute('SELECT * FROM commands WHERE id=?', (cid,)).fetchone())
 
     def _finish(self, db, command, status, message):
