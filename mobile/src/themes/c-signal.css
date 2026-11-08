@@ -1,0 +1,52 @@
+/* ==========================================================================
+   主题 C · 鸟情信号站 — 公共预警信号台
+   象牙白 + 信号红/黄;告警挂牌(打孔+摇摆),跑马灯播报,驱离=升牌。
+   ========================================================================== */
+:root[data-theme="signal"],
+[data-theme="signal"] page,
+[data-theme="signal"] {
+  --surface-canvas: #f2f1ea;
+  --surface-card: #fbfaf4;
+  --surface-raised: #fbfaf4;
+  --surface-sunken: #ecebe2;
+  --surface-muted: #f1f0e6;
+  --accent: #d3212c;
+  --accent-fg: #ffffff;
+  --warn-bg: #d3212c;
+  --warn-fg: #ffffff;
+  --warn-line: #d3212c;
+  --success-fg: #191919;
+  --hazard: repeating-linear-gradient(-45deg, #f5c400 0 10px, #191919 10px 20px);
+  --video-filter: grayscale(1) contrast(1.15);
+  --scanline: rgba(25, 25, 25, 0.35);
+  --shadow-ink: rgba(25, 25, 25, 0.3);
+  --shadow-btn: 3px 3px 0 rgba(25, 25, 25, 0.3);
+  --shadow-float: 4px 4px 0 rgba(25, 25, 25, 0.3);
+  --shell-1: #e4e2d6;
+  --shell-2: #262624;
+}
+
+/* ---- 信号站专属修饰 ---- */
+/* 主按钮 = "升起驱离信号":黑底黄字 */
+[data-theme="signal"] .qh-btn--primary { background:#191919; color:#f5c400; box-shadow:3px 3px 0 rgba(25,25,25,.3); }
+[data-theme="signal"] .qh-btn--primary:active { box-shadow:1px 1px 0 rgba(25,25,25,.3); }
+[data-theme="signal"] .qh-3dbtn { background:#191919; color:#f5c400; border-color:#191919; }
+[data-theme="signal"] .qh-menubar__ttl { background:#191919; color:#f5c400; letter-spacing:2px; }
+/* 告警卡挂牌化:顶部打孔 + 轻微摇摆 */
+[data-theme="signal"] .qh-alarmcard { position:relative; padding-top:16px; background:#fbfaf4; transform-origin:50% -14px; animation:qhSway 5s ease-in-out infinite; }
+[data-theme="signal"] .qh-alarmcard::before { content:''; position:absolute; left:50%; top:4px; transform:translateX(-50%);
+  width:9px; height:9px; border-radius:50%; background:#f2f1ea; border:2px solid #191919; }
+[data-theme="signal"] .qh-mask .qh-alarmcard { animation:none; }
+/* 主导航栏黑底黄字 */
+[data-theme="signal"] .qh-menubar { background:#191919; color:#f2f1ea; }
+[data-theme="signal"] .qh-menubar__item { color:#9a9a92; }
+[data-theme="signal"] .qh-menubar__right .time { color:#f2f1ea; }
+/* 分段/选项选中 = 红色挂牌 */
+[data-theme="signal"] .qh-seg__item.is-active { background:#d3212c; }
+[data-theme="signal"] .qh-duropt.is-selected { background:#d3212c; border-color:#d3212c; }
+[data-theme="signal"] .qh-tab.is-active { background:#191919; color:#f5c400; }
+[data-theme="signal"] .qh-tab.is-active .qh-tab__badge { background:#f5c400; color:#191919; }
+/* 升降控制条顶部警示纹(挂在设备卡上沿) */
+[data-theme="signal"] .qh-devicecard { position:relative; padding-top:22px; }
+[data-theme="signal"] .qh-devicecard::before { content:''; position:absolute; left:-2px; right:-2px; top:-2px; height:10px;
+  background:repeating-linear-gradient(-45deg, #f5c400 0 12px, #191919 12px 24px); border-bottom:2px solid #191919; }

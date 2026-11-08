@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 「我的」+ 多主题 预览组</title>
+<style>
+body{background:#191919;color:#eee;font-family:"Microsoft YaHei",sans-serif;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.8}
+h1{font-size:22px;letter-spacing:2px}
+h3{margin:24px 0 8px}
+a{color:#8fd3e8}
+li{margin:8px 0}
+</style></head><body>
+<h1>ui-z · 「我的」tab + 多主题切换 + 账号体系(预览组)</h1>
+<p>基调 = 当前已实施的 B 主题(1-bit)。确认后实施:四套主题可切换、「我的」tab、登录注册体系与数据分析。</p>
+<h3>页面</h3>
+<ul>
+  <li><a href="me-home.html">我的 — 用户信息(头像/用户名/邮箱)· 主题入口 · 数据分析 · 账号安全</a></li>
+  <li><a href="me-themes.html">主题 — 4 套风格大视图卡(A 塔台 / B 1-bit 当前 / C 信号站 / D 像素果园)</a></li>
+  <li><a href="me-analytics.html">数据分析 — 趋势折线 / 鸟种 TOP5 / 24h 热力 / 处理构成 / 驱离执行</a></li>
+  <li><a href="me-login.html">登录 — 邮箱或用户名 + 密码(支持忘记密码入口)</a></li>
+  <li><a href="me-register.html">注册 — 邮箱 + 验证码 + 密码二次确认</a></li>
+  <li><a href="me-forgot.html">找回密码 — 邮箱验证码 + 设置新密码</a></li>
+</ul>
+<h3>实施前需你确认的三个技术点</h3>
+<ul>
+  <li><b>主题实现深度</b>:四套主题按「token 级换肤 + 关键布局修饰」实现(如塔台的翻牌行、信号站的挂牌、像素的对话框),最大限度还原各方案气质;逐像素复刻四套完整布局成本极高。</li>
+  <li><b>验证码 / 邮件</b>:局域网 MVP 建议「演示模式」(验证码打印在服务端控制台并 toast 提示),预留 SMTP 配置,接入真实邮箱只改配置。</li>
+  <li><b>头像上传</b>:H5 摄像头能力在局域网 http 下受浏览器限制(仅 localhost 可用);预览按「拍照入口保留 + 本地图片为主路径」设计。</li>
+</ul>
+</body></html>

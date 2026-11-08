@@ -1,105 +1,68 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import { useOrchard } from '../store'
 import VideoPlayer from './VideoPlayer.vue'
-const store = useOrchard()
-const selected = ref<{id:string;name:string;duration:number} | null>(null)
-const uploading = ref(false), percent = ref(0), error = ref('')
-let picker: HTMLInputElement | null = null
-const m = computed(() => store.state?.monitor)
-const running = computed(() => ['starting','running','stopping'].includes(m.value?.status || ''))
-const task = computed(() => m.value?.task_id)
-const sameVideo = computed(() => !selected.value || !m.value?.video_id || selected.value.id===m.value.video_id)
-const path = computed(() => sameVideo.value && task.value && (m.value?.stream_ready || m.value?.result_ready) ? `media/${task.value}/${m.value.result_ready ? 'result.mp4' : 'index.m3u8'}` : '')
+import { useWorkspace } from './host/useWorkspace'
 
-function choose() {
-  const input = document.createElement('input'); input.type = 'file'; input.accept = '.mp4,.mov,.avi,.webm,.mkv,video/*'
-  picker?.remove(); picker = input; input.style.display = 'none'; document.body.appendChild(input)
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    if (file.size > 500*1024*1024) { error.value = '请选择 500 MB 以内的视频'; return }
-    uploading.value = true; percent.value = 0; error.value = ''
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', store.server + '/api/videos'); xhr.timeout = 300000
-    xhr.setRequestHeader('Authorization','Bearer '+store.token)
-    xhr.setRequestHeader('X-Filename',encodeURIComponent(file.name))
-    xhr.setRequestHeader('Content-Type','application/octet-stream')
-    xhr.upload.onprogress = event => { if (event.lengthComputable) percent.value = Math.round(event.loaded/event.total*100) }
-    xhr.onload = () => { uploading.value = false; try { const result = JSON.parse(xhr.responseText); if (xhr.status!==200) throw new Error(result.detail); selected.value = result } catch(e) { error.value = (e as Error).message || '上传失败' } }
-    xhr.onerror = xhr.ontimeout = () => { uploading.value = false; error.value = '上传中断，请检查网络后重试' }
-    xhr.send(file)
-  }
-  input.click()
-}
-async function start() {
-  store.busy = true; error.value = ''
-  try { await store.mutate('/monitor/start','POST',{video_id:selected.value?.id || null}) }
-  catch(e) { error.value = (e as Error).message }
-  finally { store.busy = false }
-}
-async function stop() { try { await store.mutate('/monitor/stop') } catch(e) { error.value=(e as Error).message } }
-onMounted(async () => { try { const result = await store.request<{items:{id:string;name:string;duration:number}[]}>('/videos'); selected.value = result.items[0] || null } catch { /* connection banner reports outages */ } })
-onBeforeUnmount(() => { picker?.remove() })
+const store = useOrchard()
+// 状态与动作来自共享工作区控制器:主题壳切换时上传/选中/错误不丢失
+const ws = useWorkspace(store)
+onMounted(() => { void ws.init().catch(() => { /* 连接横幅负责展示故障 */ }) })
+onBeforeUnmount(() => ws.destroyPicker())
 </script>
 <template>
-  <view class="qh-window">
-    <view class="qh-tbar"><view class="qh-tbar__box">×</view><text class="qh-tbar__t">监测 — CAM-01 (东区)</text></view>
-    <view class="qh-window__bd">
-      <VideoPlayer v-if="path" :path="path" :autoplay="running"/>
-      <view v-else class="qh-video">
-        <text class="qh-video__tag qh-video__tag--tl">录像演示 · YOLOv8</text>
-        <view class="qh-scanline"/>
-        <view class="qh-detect-box" style="left:50%;top:32%;width:34%;height:46%;opacity:.25"/>
-        <text class="qh-video__tag qh-video__tag--bl">{{ running ? '正在准备检测视频…' : '导入视频，开始一次鸟类巡护' }}</text>
-      </view>
-
-      <view class="qh-srcrow">
-        <view class="qh-srcrow__info">
-          <text class="qh-srcrow__name">{{ selected?.name || '服务器演示录像' }}</text>
-          <text class="qh-srcrow__dur">{{ selected ? `时长 ${selected.duration.toFixed(1)} 秒` : '支持 MP4 / MOV / AVI / WebM，最大 500 MB' }}</text>
-        </view>
-        <button class="qh-btn qh-btn--secondary" :disabled="running || uploading || store.busy" @click="choose">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="9" height="10" rx="2" stroke="#111111" stroke-width="1.5"/><path d="M10.5 6.5l4-2.5v8l-4-2.5" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/></svg>选择视频
-        </button>
-      </view>
-
-      <!-- 上传进度 -->
-      <view v-if="uploading" class="qh-upload">
-        <view class="qh-upload__top">
-          <text class="qh-upload__label">{{ percent === 100 ? '上传完成，正在校验…' : '正在上传' }}</text>
-          <text class="qh-upload__pct">{{ percent }}%</text>
-        </view>
-        <view class="qh-progress"><view class="qh-progress__bar" :style="{ width: percent + '%' }"/></view>
-      </view>
-
-      <view v-if="error" class="qh-card" style="background:var(--danger-bg);border-color:var(--danger-line)">
-        <text style="font-size:var(--text-xs);color:var(--danger-fg)">{{ error }}</text>
-      </view>
-
-      <button class="qh-btn qh-btn--primary" :disabled="uploading || store.busy || m?.status === 'stopping'" @click="running ? stop() : start()">
-        <svg v-if="!running" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 2.2v9.6c0 .8.9 1.3 1.6.9l7.3-4.8c.6-.4.6-1.4 0-1.8L5.1 1.3c-.7-.4-1.6.1-1.6.9z" fill="#f4f4f0"/></svg>
-        {{ running ? '停止分析' : '开始检测' }}
-      </button>
-
-      <!-- 检测进度 -->
-      <view v-if="running" class="qh-upload">
-        <view class="qh-upload__top">
-          <text class="qh-upload__label">{{ m?.message || '正在分析录像' }}</text>
-          <text class="qh-upload__pct">{{ Math.floor(m?.progress || 0) }}%</text>
-        </view>
-        <view class="qh-progress"><view class="qh-progress__bar" :style="{ width: (m?.progress || 0) + '%' }"/></view>
-      </view>
-
-      <view v-if="sameVideo && m?.result_ready && task" class="qh-archive">
-        <text class="qh-archive__text">本次结果已归档，可在记录中回看</text>
-        <text class="qh-link">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v7M3.5 5.8l3 3 3-3M1.8 11h9.4" stroke="#111111" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <a :href="store.media(`media/${task}/result.mp4`)+'&download=true'" style="color:inherit">下载结果视频</a>
-        </text>
-      </view>
-
-      <text class="qh-hint" style="display:block;text-align:left">{{ sameVideo ? (m?.message || '') : '视频已就绪，点击开始检测' }}</text>
-    </view>
+  <VideoPlayer v-if="ws.path.value" :path="ws.path.value" :autoplay="ws.running.value" />
+  <view v-else class="qh-video">
+    <text class="qh-video__tag qh-video__tag--tl">录像演示 · YOLOv8</text>
+    <view class="qh-scanline"/>
+    <view class="qh-detect-box" style="left:50%;top:32%;width:34%;height:46%;opacity:.25"/>
+    <text class="qh-video__tag qh-video__tag--bl">{{ ws.running.value ? '正在准备检测视频…' : '导入视频，开始一次鸟类巡护' }}</text>
   </view>
+
+  <view class="qh-srcrow">
+    <view class="qh-srcrow__info">
+      <text class="qh-srcrow__name">{{ ws.selected.value?.name || '服务器演示录像' }}</text>
+      <text class="qh-srcrow__dur">{{ ws.selected.value ? `时长 ${ws.selected.value.duration.toFixed(1)} 秒` : '支持 MP4 / MOV / AVI / WebM，最大 500 MB' }}</text>
+    </view>
+    <button class="qh-btn qh-btn--secondary" :disabled="ws.running.value || ws.uploading.value || store.busy" @click="ws.choose">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="9" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 6.5l4-2.5v8l-4-2.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>选择视频
+    </button>
+  </view>
+
+  <!-- 上传进度 -->
+  <view v-if="ws.uploading.value" class="qh-upload">
+    <view class="qh-upload__top">
+      <text class="qh-upload__label">{{ ws.percent.value === 100 ? '上传完成，正在校验…' : '正在上传' }}</text>
+      <text class="qh-upload__pct">{{ ws.percent.value }}%</text>
+    </view>
+    <view class="qh-progress"><view class="qh-progress__bar" :style="{ width: ws.percent.value + '%' }"/></view>
+  </view>
+
+  <view v-if="ws.error.value" class="qh-card" style="background:var(--danger-bg);border-color:var(--danger-line)">
+    <text style="font-size:var(--text-xs);color:var(--danger-fg)">{{ ws.error.value }}</text>
+  </view>
+
+  <button class="qh-btn qh-btn--primary" :disabled="ws.uploading.value || store.busy || ws.monitor.value?.status === 'stopping'" @click="ws.running.value ? ws.stop() : ws.start()">
+    <svg v-if="!ws.running.value" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 2.2v9.6c0 .8.9 1.3 1.6.9l7.3-4.8c.6-.4.6-1.4 0-1.8L5.1 1.3c-.7-.4-1.6.1-1.6.9z" fill="currentColor"/></svg>
+    {{ ws.running.value ? '停止分析' : '开始检测' }}
+  </button>
+
+  <!-- 检测进度 -->
+  <view v-if="ws.running.value" class="qh-upload">
+    <view class="qh-upload__top">
+      <text class="qh-upload__label">{{ ws.monitor.value?.message || '正在分析录像' }}</text>
+      <text class="qh-upload__pct">{{ Math.floor(ws.monitor.value?.progress || 0) }}%</text>
+    </view>
+    <view class="qh-progress"><view class="qh-progress__bar" :style="{ width: (ws.monitor.value?.progress || 0) + '%' }"/></view>
+  </view>
+
+  <view v-if="ws.sameVideo.value && ws.monitor.value?.result_ready && ws.monitor.value?.task_id" class="qh-archive">
+    <text class="qh-archive__text">本次结果已归档，可在记录中回看</text>
+    <text class="qh-link">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v7M3.5 5.8l3 3 3-3M1.8 11h9.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a :href="store.media(`media/${ws.monitor.value!.task_id}/result.mp4`)+'&download=true'" style="color:inherit">下载结果视频</a>
+    </text>
+  </view>
+
+  <text class="qh-hint" style="display:block;text-align:left">{{ ws.sameVideo.value ? (ws.monitor.value?.message || '') : '视频已就绪，点击开始检测' }}</text>
 </template>

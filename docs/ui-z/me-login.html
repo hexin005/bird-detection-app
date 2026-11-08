@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 登录 — 预览</title>
+<style>
+:root{ --ink:#111; --paper:#f4f4f0;
+  --dither-light:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--dither-light);box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+.menubar{height:26px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px;font-weight:700;flex-shrink:0}
+.menubar .ttl{background:var(--ink);color:var(--paper);padding:1px 8px}
+.menubar .right{margin-left:auto}
+.content{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.win{background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.tbar{height:24px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:2px solid var(--ink);background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px)}
+.tbar .t{background:var(--ink);color:var(--paper);padding:1px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.bd{padding:12px}
+.sub{font-size:10px;color:#6f6f68;line-height:1.7}
+.chip{display:inline-block;background:var(--ink);color:var(--paper);font-size:9px;font-weight:700;padding:1px 6px}
+.tabs{display:flex;border:2px solid var(--ink);background:var(--paper)}
+.tabs span{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:700;letter-spacing:3px;color:#55554f}
+.tabs span + span{border-left:2px solid var(--ink)}
+.tabs .on{background:var(--ink);color:var(--paper)}
+.lbl{font-size:11px;font-weight:700;color:#55554f;letter-spacing:1px;margin:10px 0 5px}
+.inp{display:flex;align-items:center;min-height:44px;padding:0 12px;background:var(--paper);border:2px solid var(--ink);font-size:13px}
+.inp i{font-style:normal;color:#a9a9a2}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;font-size:14px;font-weight:700;letter-spacing:2px;border:2px solid var(--ink);background:var(--paper);box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.btn.pri{background:var(--ink);color:var(--paper);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.link{font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer}
+.brand{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 0 6px}
+.brand .mk{width:64px;height:64px;background:var(--ink);border:2px solid var(--ink);box-shadow:4px 4px 0 rgba(17,17,17,.85);display:flex;align-items:center;justify-content:center}
+</style></head><body>
+<div class="phone">
+  <div class="menubar">
+    <svg width="16" height="13" viewBox="0 0 16 13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">果园守护</span><span style="color:#55554f">System 1.0</span>
+    <span class="right mono">9:41</span>
+  </div>
+  <div class="content">
+
+    <div class="brand">
+      <div class="mk"><svg width="30" height="34" viewBox="0 0 30 34" fill="none"><path d="M15 32V14" stroke="#f4f4f0" stroke-width="2" stroke-linecap="round"/><path d="M15 20C15 12 9 7 2 6c1 8 5.5 13 13 14z" stroke="#f4f4f0" stroke-width="2" stroke-linejoin="round"/><path d="M15 16c0-7 5.5-11.5 13-12.5-1 8-5.5 12.5-13 12.5z" stroke="#f4f4f0" stroke-width="2" stroke-linejoin="round"/></svg></div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:2px">登录果园</div>
+    </div>
+
+    <div class="tabs"><span class="on">登 录</span><span>注 册</span></div>
+
+    <div class="win">
+      <div class="tbar"><span class="t">账号登录</span></div>
+      <div class="bd">
+        <div class="lbl">邮箱 / 用户名</div>
+        <div class="inp"><i>zhou@orchard.local</i></div>
+        <div class="lbl">密码</div>
+        <div class="inp"><i>••••••••••</i></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="link">忘记密码?</span></div>
+        <div class="btn pri" style="margin-top:10px">登录并进入果园</div>
+      </div>
+    </div>
+
+    <div class="win">
+      <div class="bd" style="padding:9px 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="sub" style="margin:0">服务地址(局域网)</span>
+          <span class="mono" style="font-size:10px;font-weight:700">http://192.168.1.10:8008</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub" style="text-align:center;margin-top:auto;padding-bottom:6px">没有账号?切换到「注册」,邮箱 + 验证码即可加入</div>
+  </div>
+</div>
+</body></html>

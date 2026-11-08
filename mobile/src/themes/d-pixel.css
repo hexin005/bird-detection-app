@@ -1,0 +1,65 @@
+/* ==========================================================================
+   主题 D · 像素果园 — 16-bit 掌机牧场
+   草绿场景 + 米白窗口 + NES 黑对话框;告警是"野生鸟类出现!"。
+   检测视频/抓拍/头像保持清晰;仅装饰缩略做像素化。
+   ========================================================================== */
+:root[data-theme="pixel"],
+[data-theme="pixel"] page,
+[data-theme="pixel"] {
+  --surface-canvas: #6ea24e;
+  --surface-card: #f4f1e4;
+  --surface-raised: #fbf8ec;
+  --surface-sunken: #e6e3cf;
+  --surface-muted: #edeadd;
+  --surface-video: #10130c;
+  --surface-mask: rgba(16, 19, 12, 0.45);
+  --ink-900: #10130c;
+  --ink-800: #10130c;
+  --ink-700: #10130c;
+  --ink-600: #4a5a3e;
+  --ink-500: #4a5a3e;
+  --ink-400: #6b7a5e;
+  --ink-300: #8a9678;
+  --ink-200: #a9b598;
+  --ink-100: #c4cdb2;
+  --accent: #10130c;
+  --accent-fg: #f8d94a;
+  --warn-bg: #d3452e;
+  --warn-fg: #ffffff;
+  --warn-line: #d3452e;
+  --danger-fg: #a92f1d;
+  --success-fg: #2f5e23;
+  --dither-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%239fc27f'/%3E%3Crect width='3' height='3' fill='%238bb36d'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%238bb36d'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --dither-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23242c1c'/%3E%3Crect width='3' height='3' fill='%23303a26'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23303a26'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --stripe: repeating-linear-gradient(180deg, #10130c 0 2px, #f4f1e4 2px 4px);
+  --shadow-ink: rgba(16, 19, 12, 0.55);
+  --video-filter: saturate(1.12) contrast(1.06); /* 像素果园保留清晰彩色画面 */
+  --scanline: rgba(16, 19, 12, 0.35);
+  --shell-1: #2b2620;
+  --shell-2: #4a4238;
+  --shadow-btn: 3px 3px 0 rgba(16, 19, 12, 0.55);
+}
+
+/* ---- 像素专属修饰:NES 对话框 + 粗像素边 ---- */
+[data-theme="pixel"] .qh-window,
+[data-theme="pixel"] .qh-card,
+[data-theme="pixel"] .qh-stat,
+[data-theme="pixel"] .qh-durcard,
+[data-theme="pixel"] .qh-devicecard,
+[data-theme="pixel"] .qh-devicebar,
+[data-theme="pixel"] .qh-folder { border-width:3px; }
+/* 告警卡 = 野生宝可梦式对话框(黑底白粗边) */
+[data-theme="pixel"] .qh-alarmcard { background:#10130c; border:3px solid #f4f1e4; box-shadow:0 0 0 3px #10130c, 0 5px 0 rgba(0,0,0,.35); padding:10px; }
+[data-theme="pixel"] .qh-alarmcard__title { color:#f4f1e4; }
+[data-theme="pixel"] .qh-alarmcard__meta, [data-theme="pixel"] .qh-alarmcard__stat { color:#8fa06a; }
+[data-theme="pixel"] .qh-alarmcard__bottom .qh-link { color:#8fe08f; }
+[data-theme="pixel"] .qh-dialog { border-width:3px; box-shadow:0 0 0 3px #10130c, 4px 4px 0 rgba(0,0,0,.4); }
+[data-theme="pixel"] .qh-sheet { border-width:3px; }
+[data-theme="pixel"] .qh-page-title { text-shadow:2px 2px 0 rgba(16,19,12,.18); }
+/* 装饰缩略像素化(检测视频/抓拍弹窗/头像不处理) */
+[data-theme="pixel"] .qh-thumb image, [data-theme="pixel"] .qh-thumb uni-image { image-rendering:pixelated; filter:saturate(1.35) contrast(1.12); }
+[data-theme="pixel"] .qh-menubar__ttl { background:#10130c; color:#f8d94a; }
+[data-theme="pixel"] .qh-tab.is-active { background:#10130c; color:#f8d94a; }
+[data-theme="pixel"] .qh-tab.is-active .qh-tab__badge { background:#f8d94a; color:#10130c; }
+[data-theme="pixel"] .qh-tbar { border-bottom-width:3px; }
+[data-theme="pixel"] .qh-tbar__t { background:#10130c; color:#f8d94a; }

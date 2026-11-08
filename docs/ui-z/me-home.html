@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 我的 — 预览</title>
+<style>
+/* ui-z 预览共用基座:1-bit 基调(当前主题 B),页面间用链接互通 */
+:root{
+  --ink:#111111; --paper:#f4f4f0; --g1:#c8c8c2; --g2:#a9a9a2;
+  --dither-light:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;display:flex;flex-direction:column;
+  background:var(--dither-light);box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+.menubar{height:26px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px;font-weight:700;flex-shrink:0}
+.menubar .ttl{background:var(--ink);color:var(--paper);padding:1px 8px;letter-spacing:1px}
+.menubar .it{color:#55554f}
+.menubar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.content{flex:1;min-height:0;overflow-y:auto;padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px}
+.win{background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.tbar{height:24px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:2px solid var(--ink);
+  background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px)}
+.tbar .t{background:var(--ink);color:var(--paper);padding:1px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.tbar .x{position:absolute;left:6px;top:4px;width:14px;height:14px;background:var(--paper);border:2px solid var(--ink);font-size:9px;line-height:11px;text-align:center;font-weight:700}
+.bd{padding:10px}
+.row{display:flex;align-items:center;gap:10px;cursor:pointer}
+.grow{flex:1;min-width:0}
+.h1{font-size:18px;font-weight:700;letter-spacing:1px}
+.h2{font-size:13px;font-weight:700;color:var(--ink)}
+.sub{font-size:10px;color:#6f6f68}
+.chip{display:inline-block;background:var(--ink);color:var(--paper);font-size:9px;font-weight:700;padding:1px 6px;letter-spacing:1px}
+.chip.gray{background:#e4e4de;color:#55554f;border:1px solid #a9a9a2}
+.arrow{color:#a9a9a2;font-weight:700}
+.dock{height:34px;background:var(--paper);border-top:2px solid var(--ink);display:flex;flex-shrink:0}
+.dock span{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;letter-spacing:2px;color:#55554f}
+.dock span + span{border-left:2px solid var(--ink)}
+.dock .on{background:var(--ink);color:var(--paper)}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;border:2px solid var(--ink);background:var(--paper);font-size:14px;font-weight:700;letter-spacing:2px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.btn.pri{background:var(--ink);color:var(--paper);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+</style></head><body>
+<div class="phone">
+  <div class="menubar">
+    <svg width="16" height="13" viewBox="0 0 16 13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">果园守护</span><span class="it">文件</span><span class="it">监测</span><span class="it">告警</span><span class="it">特效</span>
+    <span class="right mono">9:41</span>
+  </div>
+  <div class="content">
+
+    <!-- 用户信息卡 -->
+    <div class="win">
+      <div class="tbar"><span class="x">×</span><span class="t">果园守护人</span></div>
+      <div class="bd">
+        <div class="row">
+          <div style="position:relative;width:64px;height:64px;flex-shrink:0;border:2px solid var(--ink);background:var(--dither-light);background-size:6px 6px;overflow:hidden">
+            <!-- 头像占位(点击可换) -->
+            <div style="position:absolute;right:0;bottom:0;width:22px;height:20px;background:var(--ink);display:flex;align-items:center;justify-content:center">
+              <svg width="12" height="12" viewBox="0 0 16 16"><rect x="2" y="5" width="9" height="7" fill="#f4f4f0"/><path d="M11 8l4-2.5v5L11 8z" fill="#f4f4f0"/></svg>
+            </div>
+          </div>
+          <div class="grow">
+            <div class="h1">果园老周 <span class="chip">已守护 365 天</span></div>
+            <div class="sub mono" style="margin-top:4px">zhou@orchard.local</div>
+            <div class="sub" style="margin-top:2px">用户名仅在本应用内显示 · 点头像可更换</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <div class="btn" style="min-height:36px;font-size:12px;letter-spacing:1px"><svg width="13" height="13" viewBox="0 0 16 16"><rect x="1" y="4" width="11" height="9" fill="none" stroke="#111" stroke-width="1.6"/><path d="M12 8l4-2.5v5L12 8z" fill="#111"/><rect x="5" y="2" width="4" height="2" fill="#111"/></svg>拍照</div>
+          <div class="btn" style="min-height:36px;font-size:12px;letter-spacing:1px"><svg width="13" height="13" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="none" stroke="#111" stroke-width="1.6"/><path d="M3 12l4-5 3 3 2-2 3 4z" fill="#111"/><circle cx="11" cy="6" r="1.5" fill="#111"/></svg>本地图片</div>
+          <div class="btn" style="min-height:36px;font-size:12px;letter-spacing:1px"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M2 12l1-3 7-7 2 2-7 7-3 1z" fill="none" stroke="#111" stroke-width="1.6"/><path d="M9 3l2 2" stroke="#111" stroke-width="1.6"/></svg>改名</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主题入口 -->
+    <div class="win">
+      <div class="tbar"><span class="t">主题 · THEME</span></div>
+      <div class="bd row" style="gap:8px">
+        <div class="grow">
+          <div class="h2">果园守护 1.0 <span class="chip">使用中</span></div>
+          <div class="sub" style="margin-top:3px">1984 · 1-bit Mac — 另有塔台/信号站/像素共 4 套,大图预览一键切换</div>
+        </div>
+        <span class="arrow">›</span>
+      </div>
+    </div>
+
+    <!-- 数据分析入口 -->
+    <div class="win">
+      <div class="tbar"><span class="t">数据分析</span></div>
+      <div class="bd row">
+        <div class="grow">
+          <div class="h2">我的果园观测报表</div>
+          <div class="sub" style="margin-top:3px">近 7 天检测 714 次 · 告警 89 条 · 驱离 52 次</div>
+        </div>
+        <svg width="72" height="26" viewBox="0 0 72 26"><polyline points="2,20 13,14 24,17 35,8 46,12 57,4 70,10" fill="none" stroke="#111" stroke-width="2"/><rect x="0" y="24" width="72" height="2" fill="#111"/></svg>
+        <span class="arrow">›</span>
+      </div>
+    </div>
+
+    <!-- 账号安全 -->
+    <div class="win">
+      <div class="tbar"><span class="t">账号安全</span></div>
+      <div class="bd" style="display:flex;flex-direction:column;gap:0">
+        <div class="row" style="padding:8px 0;border-bottom:1px solid var(--ink)">
+          <div class="grow"><div class="h2">修改密码</div><div class="sub" style="margin-top:2px">已登录状态下直接修改</div></div><span class="arrow">›</span>
+        </div>
+        <div class="row" style="padding:8px 0 2px">
+          <div class="grow"><div class="h2">忘记密码 / 邮箱找回</div><div class="sub" style="margin-top:2px">通过注册邮箱接收验证码重置</div></div><span class="arrow">›</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn pri">退出登录</div>
+    <div class="sub mono" style="text-align:center;letter-spacing:1px">System 1.0 · 青禾果园守护 · MVP</div>
+  </div>
+
+  <div class="dock">
+    <span>机坪</span><span>告警</span><span>控制</span><span>档案</span><span class="on">我的</span>
+  </div>
+</div>
+</body></html>

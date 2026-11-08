@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 数据分析 — 预览</title>
+<style>
+:root{ --ink:#111; --paper:#f4f4f0;
+  --dither-light:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --dither-dark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23111'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23111'/%3E%3C/svg%3E") 0 0/6px 6px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--dither-light);box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+.menubar{height:26px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px;font-weight:700;flex-shrink:0}
+.menubar .ttl{background:var(--ink);color:var(--paper);padding:1px 8px}
+.content{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.win{background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.tbar{height:24px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:2px solid var(--ink);background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px)}
+.tbar .t{background:var(--ink);color:var(--paper);padding:1px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.tbar .r{position:absolute;right:8px;font-size:9px;color:#55554f;letter-spacing:1px}
+.bd{padding:10px}
+.h2{font-size:13px;font-weight:700}
+.sub{font-size:10px;color:#6f6f68}
+.chip{display:inline-block;background:var(--ink);color:var(--paper);font-size:9px;font-weight:700;padding:1px 6px}
+.chip.gray{background:#e4e4de;color:#55554f;border:1px solid #a9a9a2}
+.range{display:flex;gap:6px;margin-bottom:10px}
+.range span{flex:1;text-align:center;font-size:11px;font-weight:700;padding:6px 0;border:2px solid var(--ink);background:var(--paper);box-shadow:2px 2px 0 var(--ink)}
+.range .on{background:var(--ink);color:var(--paper);transform:translate(2px,2px);box-shadow:none}
+.legend{display:flex;gap:10px;margin-top:6px;font-size:9px;color:#55554f}
+.legend i{display:inline-block;width:9px;height:9px;border:1.5px solid var(--ink);margin-right:3px;vertical-align:-1px}
+/* 折线图 */
+.line-chart{position:relative;height:110px;border-bottom:2px solid var(--ink);border-left:2px solid var(--ink);margin-top:8px}
+.line-chart .grid{position:absolute;left:0;right:0;border-top:1px solid #c8c8c2}
+.line-chart svg{position:absolute;left:0;top:0}
+.line-chart .pt{position:absolute;transform:translate(-50%,-100%);font-family:"Courier New";font-size:9px;font-weight:700}
+.xlab{display:flex;justify-content:space-between;font-family:"Courier New";font-size:9px;font-weight:700;color:#55554f;margin-top:4px}
+/* 横条 */
+.bars{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.bar{display:flex;align-items:center;gap:8px;font-size:11px}
+.bar .nm{width:76px;font-weight:700}
+.bar .tr{flex:1;height:14px;border:2px solid var(--ink);background:var(--paper);position:relative}
+.bar .fl{position:absolute;left:0;top:0;bottom:0;background:var(--ink)}
+.bar .fl.d{background:var(--dither-dark);background-size:6px 6px}
+.bar .v{width:36px;text-align:right;font-family:"Courier New";font-size:11px;font-weight:700}
+/* 24h 热力 */
+.heat{display:flex;gap:2px;margin-top:8px}
+.heat i{flex:1;height:26px;border:1px solid var(--ink)}
+.heat i.l0{background:var(--paper)}
+.heat i.l1{background:var(--dither-light);background-size:4px 4px}
+.heat i.l2{background:var(--dither-dark);background-size:6px 6px}
+.heat i.l3{background:var(--ink)}
+.heat-x{display:flex;justify-content:space-between;font-family:"Courier New";font-size:8px;color:#55554f;margin-top:3px}
+.peak{font-size:10px;font-weight:700;margin-top:6px}
+/* 分段占比 */
+.seg{display:flex;height:22px;border:2px solid var(--ink);margin-top:8px}
+.seg i{height:100%}
+.seg .s1{background:var(--ink)}
+.seg .s2{background:var(--dither-dark);background-size:6px 6px}
+.seg .s3{background:var(--paper)}
+/* 大数字 */
+.bignums{display:flex;gap:8px;margin-top:8px}
+.bignums div{flex:1;border:2px solid var(--ink);padding:8px 0;text-align:center}
+.bignums b{display:block;font-family:"Courier New";font-size:20px;font-weight:700}
+.bignums span{font-size:9px;color:#55554f;letter-spacing:1px}
+.rate{height:14px;border:2px solid var(--ink);margin-top:8px;position:relative}
+.rate i{position:absolute;left:0;top:0;bottom:0;width:92%;background:var(--ink)}
+.rate b{position:absolute;right:6px;top:-1px;font-family:"Courier New";font-size:10px;background:var(--paper);padding:0 3px}
+</style></head><body>
+<div class="phone">
+  <div class="menubar">
+    <svg width="16" height="13" viewBox="0 0 16 13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">数据分析</span><span style="color:#55554f">东区 · 01 号监控点</span>
+  </div>
+  <div class="content">
+
+    <!-- 时间范围 -->
+    <div class="win"><div class="bd" style="padding:10px">
+      <div class="range"><span class="on">今日</span><span>近 7 天</span><span>近 30 天</span></div>
+      <div class="bignums" style="margin-top:0">
+        <div><b>108</b><span>检测事件</span></div>
+        <div><b>89</b><span>累计告警</span></div>
+        <div><b>52</b><span>驱离执行</span></div>
+      </div>
+    </div></div>
+
+    <!-- 检测趋势 -->
+    <div class="win">
+      <div class="tbar"><span class="t">检测趋势 · 近 7 天</span><span class="r mono">UNIT: 次/日</span></div>
+      <div class="bd">
+        <div class="line-chart">
+          <div class="grid" style="top:0"></div><div class="grid" style="top:33%"></div><div class="grid" style="top:66%"></div>
+          <svg width="336" height="108" viewBox="0 0 336 108">
+            <polyline points="24,86 70,68 116,80 162,44 208,60 254,26 300,50" fill="none" stroke="#111" stroke-width="2.5"/>
+            <g fill="#111"><rect x="21" y="83" width="6" height="6"/><rect x="67" y="65" width="6" height="6"/><rect x="113" y="77" width="6" height="6"/><rect x="159" y="41" width="6" height="6"/><rect x="205" y="57" width="6" height="6"/><rect x="251" y="23" width="6" height="6"/><rect x="297" y="47" width="6" height="6"/></g>
+          </svg>
+          <span class="pt" style="left:24px;top:86px">86</span><span class="pt" style="left:70px;top:68px">102</span><span class="pt" style="left:116px;top:80px">74</span><span class="pt" style="left:162px;top:44px">118</span><span class="pt" style="left:208px;top:60px">95</span><span class="pt" style="left:254px;top:26px">131</span><span class="pt" style="left:300px;top:50px">108</span>
+        </div>
+        <div class="xlab"><span>11-02</span><span>11-03</span><span>11-04</span><span>11-05</span><span>11-06</span><span>11-07</span><span>今日</span></div>
+      </div>
+    </div>
+
+    <!-- 鸟种分布 -->
+    <div class="win">
+      <div class="tbar"><span class="t">鸟种分布 · TOP 5</span><span class="r mono">7D</span></div>
+      <div class="bd">
+        <div class="bars">
+          <div class="bar"><span class="nm">珠颈斑鸠</span><div class="tr"><div class="fl" style="width:100%"></div></div><span class="v">43</span></div>
+          <div class="bar"><span class="nm">白喉红臀鹎</span><div class="tr"><div class="fl" style="width:54%"></div></div><span class="v">23</span></div>
+          <div class="bar"><span class="nm">丝光椋鸟</span><div class="tr"><div class="fl d" style="width:19%"></div></div><span class="v">8</span></div>
+          <div class="bar"><span class="nm">红嘴蓝鹊</span><div class="tr"><div class="fl d" style="width:19%"></div></div><span class="v">8</span></div>
+          <div class="bar"><span class="nm">黑领椋鸟</span><div class="tr"><div class="fl d" style="width:16%"></div></div><span class="v">7</span></div>
+        </div>
+        <div class="sub" style="margin-top:7px">累计识别 <b class="mono">6</b> 种 · 检出置信度均值 <b class="mono">72%</b></div>
+      </div>
+    </div>
+
+    <!-- 24h 活动热力 -->
+    <div class="win">
+      <div class="tbar"><span class="t">时段活动 · 24H</span><span class="r mono">7D AGGREGATED</span></div>
+      <div class="bd">
+        <div class="heat">
+          <i class="l0"></i><i class="l0"></i><i class="l0"></i><i class="l0"></i><i class="l0"></i><i class="l1"></i><i class="l2"></i>
+          <i class="l3"></i><i class="l3"></i><i class="l2"></i><i class="l1"></i><i class="l1"></i><i class="l1"></i><i class="l1"></i>
+          <i class="l0"></i><i class="l1"></i><i class="l1"></i><i class="l2"></i><i class="l2"></i><i class="l3"></i><i class="l2"></i>
+          <i class="l1"></i><i class="l1"></i><i class="l0"></i>
+        </div>
+        <div class="heat-x"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+        <div class="peak">晨峰 07–09 时 · 昏峰 18–20 时 — 建议双模待机 06:00–08:00 / 17:00–20:00</div>
+      </div>
+    </div>
+
+    <!-- 告警处理占比 -->
+    <div class="win">
+      <div class="tbar"><span class="t">告警处理构成</span><span class="r mono">TOTAL 89</span></div>
+      <div class="bd">
+        <div class="seg"><i class="s1" style="width:61%"></i><i class="s2" style="width:36%"></i><i class="s3" style="width:3%"></i></div>
+        <div class="legend">
+          <span><i style="background:#111"></i>已处理 54</span>
+          <span><i style="background:var(--dither-dark);background-size:4px 4px"></i>已忽略 32</span>
+          <span><i style="background:#f4f4f0"></i>待处理 3</span>
+        </div>
+        <div class="sub" style="margin-top:7px">平均处理时长 <b class="mono">11 分 26 秒</b> · 忽略多为麻雀群等非目标鸟种</div>
+      </div>
+    </div>
+
+    <!-- 驱离执行 -->
+    <div class="win">
+      <div class="tbar"><span class="t">驱离执行 · 模拟执行器</span><span class="r mono">7D</span></div>
+      <div class="bd">
+        <div class="bignums" style="margin-top:0">
+          <div><b>52</b><span>执行次数</span></div>
+          <div><b>48</b><span>完成</span></div>
+          <div><b>8s</b><span>平均响应</span></div>
+        </div>
+        <div class="rate"><i></i><b>完成率 92%</b></div>
+        <div class="sub" style="margin-top:7px">超时 4 次均自动恢复,未产生误标记;双模联动占 <b class="mono">71%</b></div>
+      </div>
+    </div>
+
+    <div class="sub" style="text-align:center;padding-bottom:4px">图表将随主题联动换肤 · 数据来自果园服务实时统计</div>
+  </div>
+</div>
+</body></html>

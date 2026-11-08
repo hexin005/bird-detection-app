@@ -1,0 +1,202 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useOrchard } from '../store'
+import type { Me } from '../types'
+import { THEMES, normalizeTheme } from '../theme'
+import ChangePassword from './ChangePassword.vue'
+
+const emit = defineEmits<{ nav: [page: 'themes' | 'analytics'], forgot: [] }>()
+const store = useOrchard()
+const me = ref<Me | null>(null)
+const error = ref('')
+const uploading = ref(false), percent = ref(0)
+const renameSheet = ref(false), renameValue = ref('')
+const changeSheet = ref(false)
+const currentTheme = computed(() => normalizeTheme(me.value?.theme))
+const themeMeta = computed(() => THEMES.find(t => t.id === currentTheme.value))
+const avatarSrc = computed(() => me.value?.avatar ? store.server + me.value.avatar + '?ticket=' + encodeURIComponent(store.state?.media_ticket || '') : '')
+const notify = (m: string) => uni.showToast({ title: m, icon: 'none', duration: 3000 })
+
+async function load() {
+  error.value = ''
+  try { me.value = await store.request<Me>('/me') } catch (e) { error.value = (e as Error).message }
+}
+onMounted(load)
+defineExpose({ load })
+
+function pickAvatar() {
+  // #ifdef H5
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp'
+  input.style.display = 'none'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    input.remove()
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { notify('头像不能超过 2 MB'); return }
+    uploading.value = true; percent.value = 0
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', store.server + '/api/avatar')
+    xhr.timeout = 30000
+    xhr.setRequestHeader('Authorization', 'Bearer ' + store.token)
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.upload.onprogress = e => { if (e.lengthComputable) percent.value = Math.round(e.loaded / e.total * 100) }
+    xhr.onload = () => {
+      uploading.value = false
+      try {
+        const result = JSON.parse(xhr.responseText)
+        if (xhr.status !== 200) throw new Error(result.detail)
+        notify('头像已更新')
+        void load()
+      } catch (err) { notify((err as Error).message || '上传失败') }
+    }
+    xhr.onerror = xhr.ontimeout = () => { uploading.value = false; notify('上传中断，请重试') }
+    xhr.send(file)
+  }
+  document.body.appendChild(input)
+  input.click()
+  // #endif
+}
+
+function openRename() {
+  renameValue.value = me.value?.display_name || ''
+  renameSheet.value = true
+}
+async function saveRename() {
+  const name = renameValue.value.trim()
+  if (!name) { notify('昵称不能为空'); return }
+  try {
+    await store.mutate('/me', 'PUT', { display_name: name })
+    renameSheet.value = false
+    notify('昵称已更新')
+    void load()
+  } catch (e) { notify((e as Error).message) }
+}
+
+function forgotPassword() {
+  if (!me.value?.email) { notify('当前账号未绑定邮箱，暂无法使用邮箱找回'); return }
+  emit('forgot')
+}
+
+async function logout() {
+  try { await store.logout() } catch { /* 本地会话照常清除 */ }
+}
+
+function onPasswordChanged() {
+  changeSheet.value = false
+}
+</script>
+
+<template>
+  <view class="qh-header">
+    <view class="qh-header__brand">
+      <text class="qh-page-title">我的</text>
+      <text class="qh-page-subtitle">账号 · 主题 · 观测报表</text>
+    </view>
+  </view>
+
+  <!-- 用户信息卡 -->
+  <view class="qh-window">
+    <view class="qh-tbar"><view class="qh-tbar__box">×</view><text class="qh-tbar__t">果园守护人</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-card">
+        <view class="qh-me-avatar" @click="pickAvatar">
+          <image v-if="avatarSrc" :src="avatarSrc" mode="aspectFill" />
+          <text v-else style="font-size:10px;color:var(--ink-400)">无头像</text>
+          <view class="qh-me-cam">
+            <svg width="12" height="12" viewBox="0 0 16 16"><rect x="1" y="4" width="11" height="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8l4-2.5v5L12 8z" fill="currentColor"/><rect x="5" y="2" width="4" height="2" fill="currentColor"/></svg>
+          </view>
+        </view>
+        <view style="flex:1;min-width:0">
+          <view class="qh-me-name">
+            <text>{{ me?.display_name || me?.username || '…' }}</text>
+            <text v-if="me?.username" class="qh-mvp">{{ me.username }}</text>
+          </view>
+          <text class="qh-me-mail">{{ me?.email || '未绑定邮箱' }}</text>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">点头像可更换 · 昵称仅在本应用内显示</text>
+        </view>
+      </view>
+      <view class="qh-me-actions">
+        <button class="qh-btn qh-btn--secondary" style="flex:1" :disabled="uploading" @click="pickAvatar">
+          <svg width="13" height="13" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12l4-5 3 3 2-2 3 4z" fill="currentColor"/><circle cx="11" cy="6" r="1.5" fill="currentColor"/></svg>本地图片
+        </button>
+        <button class="qh-btn qh-btn--secondary" style="flex:1" @click="openRename">
+          <svg width="13" height="13" viewBox="0 0 16 16"><path d="M2 12l1-3 7-7 2 2-7 7-3 1z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3l2 2" stroke="currentColor" stroke-width="1.6"/></svg>改名
+        </button>
+      </view>
+      <view v-if="uploading" class="qh-upload" style="margin-top:8px">
+        <view class="qh-upload__top"><text class="qh-upload__label">{{ percent === 100 ? '处理中…' : '正在上传头像' }}</text><text class="qh-upload__pct">{{ percent }}%</text></view>
+        <view class="qh-progress"><view class="qh-progress__bar" :style="{ width: percent + '%' }" /></view>
+      </view>
+      <text v-if="error" class="qh-note" style="display:block;text-align:left;margin-top:6px">{{ error }}</text>
+    </view>
+  </view>
+
+  <!-- 主题入口 -->
+  <view class="qh-window" style="cursor:pointer" @click="emit('nav', 'themes')">
+    <view class="qh-tbar"><text class="qh-tbar__t">主题 · THEME</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-row">
+        <view style="flex:1;min-width:0">
+          <view class="qh-alarmcard__title">{{ themeMeta?.label || '果园守护 1.0' }} <text class="qh-mvp">使用中</text></view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">共 4 套风格，大图预览一键切换，数据不受影响</text>
+        </view>
+        <text class="qh-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 数据分析入口 -->
+  <view class="qh-window" style="cursor:pointer" @click="emit('nav', 'analytics')">
+    <view class="qh-tbar"><text class="qh-tbar__t">数据分析</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-row">
+        <view style="flex:1;min-width:0">
+          <view class="qh-alarmcard__title">果园数据分析</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">趋势 · 鸟种 · 时段 · 处理构成 · 驱离执行</text>
+        </view>
+        <svg class="qh-spark" width="72" height="26" viewBox="0 0 72 26"><polyline points="2,20 13,14 24,17 35,8 46,12 57,4 70,10" fill="none" stroke="currentColor" stroke-width="2"/><rect x="0" y="24" width="72" height="2" fill="currentColor"/></svg>
+        <text class="qh-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 账号安全 -->
+  <view class="qh-window">
+    <view class="qh-tbar"><text class="qh-tbar__t">账号安全</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-row" style="cursor:pointer" @click="changeSheet = true">
+        <view style="flex:1">
+          <view class="qh-alarmcard__title">修改密码</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">修改后需用新密码重新登录</text>
+        </view>
+        <text class="qh-chevron">›</text>
+      </view>
+      <view class="qh-me-row" style="cursor:pointer" @click="forgotPassword">
+        <view style="flex:1">
+          <view class="qh-alarmcard__title">忘记密码 / 邮箱找回</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">{{ me?.email ? '退出登录，通过注册邮箱验证码重置' : '当前账号未绑定邮箱' }}</text>
+        </view>
+        <text class="qh-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <button class="qh-btn qh-btn--primary" @click="logout">退出登录</button>
+  <text class="qh-svcinfo">System 1.0 · 青禾果园守护 · 数据来自果园服务</text>
+
+  <!-- 改名抽屉 -->
+  <view v-if="renameSheet" class="qh-mask qh-mask--bottom is-open" @click.self="renameSheet = false">
+    <view class="qh-sheet">
+      <view class="qh-sheet__titlerow">
+        <text class="qh-sheet__title">修改昵称</text>
+        <view class="qh-iconbtn--sm" @click="renameSheet = false"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></view>
+      </view>
+      <view class="qh-input"><input v-model="renameValue" type="text" placeholder="输入新的昵称" maxlength="32" /></view>
+      <button class="qh-btn qh-btn--primary" @click="saveRename">保存</button>
+    </view>
+  </view>
+
+  <!-- 修改密码抽屉 -->
+  <ChangePassword v-if="changeSheet" @done="onPasswordChanged" @close="changeSheet = false" />
+</template>

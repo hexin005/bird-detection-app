@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 主题 — 预览</title>
+<style>
+:root{ --ink:#111; --paper:#f4f4f0;
+  --dither-light:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--dither-light);box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+.menubar{height:26px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px;font-weight:700;flex-shrink:0}
+.menubar .ttl{background:var(--ink);color:var(--paper);padding:1px 8px}
+.menubar .it{color:#55554f}.menubar .right{margin-left:auto}
+.content{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.win{background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.tbar{height:24px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:2px solid var(--ink);background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px)}
+.tbar .t{background:var(--ink);color:var(--paper);padding:1px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.tbar .x{position:absolute;left:6px;top:4px;width:14px;height:14px;background:var(--paper);border:2px solid var(--ink);font-size:9px;line-height:11px;text-align:center;font-weight:700}
+.sub{font-size:10px;color:#6f6f68}
+.chip{display:inline-block;background:var(--ink);color:var(--paper);font-size:9px;font-weight:700;padding:1px 6px;letter-spacing:1px}
+.chip.use{background:var(--paper);color:var(--ink);border:1.5px solid var(--ink)}
+/* 主题大卡 */
+.card{cursor:pointer}
+.card .shot{height:150px;position:relative;overflow:hidden;border-bottom:2px solid var(--ink)}
+.card .nm{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 2px;font-size:15px;font-weight:700;letter-spacing:1px}
+.card .ds{padding:0 10px 10px;font-size:10px;color:#6f6f68;line-height:1.6}
+.btnrow{padding:0 10px 10px;display:flex;gap:8px}
+.btn{flex:1;display:flex;align-items:center;justify-content:center;min-height:34px;border:2px solid var(--ink);background:var(--paper);font-size:12px;font-weight:700;letter-spacing:2px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.btn.pri{background:var(--ink);color:var(--paper)}
+.btn.ghost{box-shadow:none;border-color:#a9a9a2;color:#55554f}
+/* —— 缩略示意(纯 CSS 手绘) —— */
+/* A 果园塔台:深板岩 + 琥珀翻牌行 */
+.shot.a{background:#0c0f14;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.shot.a .h{display:flex;justify-content:space-between;align-items:center}
+.shot.a .h b{color:#e9e9e4;font-size:11px;letter-spacing:2px}
+.shot.a .h span{font-family:"Courier New";font-size:9px;color:#8a6a1e;border:1px solid #8a6a1e;padding:1px 5px}
+.shot.a .flap{height:18px;display:flex;gap:3px}
+.shot.a .f{flex:1;background:linear-gradient(180deg,#20262f 0 47%,#12161c 53%);color:#ffb400;font-family:"Courier New";font-size:10px;font-weight:700;text-align:center;line-height:17px;position:relative}
+.shot.a .f::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#000}
+.shot.a .f.hot{color:#ff4b3e}
+.shot.a .cl{margin-top:2px;height:20px;background:#ffb400;color:#161307;font-size:10px;font-weight:700;letter-spacing:2px;display:flex;align-items:center;justify-content:center}
+/* B 1-bit:窗口叠窗口 */
+.shot.b{background:var(--dither-light);background-size:6px 6px;padding:10px 12px}
+.shot.b .w{background:#f4f4f0;border:2px solid #111;box-shadow:2px 2px 0 #111}
+.shot.b .tb{height:14px;background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px);border-bottom:2px solid #111;display:flex;align-items:center;justify-content:center}
+.shot.b .tb i{background:#111;color:#f4f4f0;font-style:normal;font-size:8px;padding:0 6px;font-weight:700}
+.shot.b .w1{width:82%}.shot.b .w2{width:70%;margin:-4px 0 0 auto}
+.shot.b .bd2{padding:5px;display:flex;gap:4px}
+.shot.b .v{width:44px;height:24px;background:#111;position:relative}
+.shot.b .v::after{content:'';position:absolute;left:20%;top:18%;width:52%;height:60%;border:1px dashed #f4f4f0}
+.shot.b .ln{flex:1;height:7px;background:#111;margin:3px 0}
+.shot.b .ln.o{background:var(--dither-light);background-size:4px 4px;border:1px solid #111}
+/* C 信号站:白底 + 黄条 + 红牌 */
+.shot.c{background:#f2f1ea;padding:0 0 8px}
+.shot.c .tick{height:12px;background:#f5c400;border-top:2px solid #111;border-bottom:2px solid #111}
+.shot.c .mast{position:relative;height:96px}
+.shot.c .rail{position:absolute;left:10px;right:10px;top:8px;height:4px;background:#111}
+.shot.c .plate{position:absolute;left:16px;top:20px;width:74px;height:64px;background:#d3212c;border:2px solid #111;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:3px 3px 0 rgba(17,17,17,.28)}
+.shot.c .plate b{font-size:26px;line-height:1}
+.shot.c .plate i{font-style:normal;font-size:7px;letter-spacing:1px}
+.shot.c .lv{position:absolute;right:12px;top:24px;width:70px}
+.shot.c .lv i{display:block;height:14px;border:2px solid #111;margin-bottom:4px}
+.shot.c .lv i.y{background:#f5c400}.shot.c .lv i.o{background:#e07a18}.shot.c .lv i.r{background:#d3212c;box-shadow:2px 2px 0 #111}
+.shot.c .tags{display:flex;gap:5px;padding:0 12px}
+.shot.c .tags i{flex:1;height:26px;background:#fbfaf4;border:2px solid #111;font-style:normal;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.shot.c .tags i.hot{background:#d3212c;color:#fff}
+/* D 像素果园:绿场 + 树 + 对话框 */
+.shot.d{background:#6ea24e}
+.shot.d .sky{height:34px;background:#7cc6de;position:relative}
+.shot.d .sky i{position:absolute;width:18px;height:6px;background:#fff;top:8px;left:22px;box-shadow:26px 4px 0 #fff}
+.shot.d .field{position:relative;height:64px;background:#6ea24e}
+.shot.d .tree{position:absolute;left:26px;top:10px;width:30px;height:16px;background:#3c6129;box-shadow:8px -6px 0 #4f7a36,0 16px 0 0 #6b4a2f,10px 16px 0 0 #6b4a2f,5px 16px 0 0 #6b4a2f,15px 16px 0 0 #6b4a2f}
+.shot.d .tree.t2{left:190px;top:4px;width:26px}
+.shot.d .bird{position:absolute;left:120px;top:26px;width:18px;height:14px;background:#c9b6a9;box-shadow:-6px 2px 0 #8b8278,3px 6px 0 #a89f96,8px 0 0 0 #c9b6a9,10px 1px 0 #23201c}
+.shot.d .dlg{position:absolute;left:12px;right:12px;bottom:6px;background:#10130c;border:3px solid #f4f1e4;box-shadow:0 0 0 3px #10130c;padding:5px 8px;color:#f4f1e4;font-size:9px;font-weight:700}
+.shot.d .dlg b{color:#8fe08f}
+.shot.d .dlg i{color:#f8d94a;font-style:normal}
+</style></head><body>
+<div class="phone">
+  <div class="menubar">
+    <svg width="16" height="13" viewBox="0 0 16 13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">主题</span><span class="it">大图预览 · 点击即换</span>
+    <span class="right mono">9:41</span>
+  </div>
+  <div class="content">
+
+    <!-- A 果园塔台 -->
+    <div class="win card">
+      <div class="shot a">
+        <div class="h"><b>果园塔台</b><span class="mono">QINGHE TWR</span></div>
+        <div class="flap"><div class="f hot">03</div><div class="f">1·2·8</div><div class="f">52</div><div class="f">RUN</div></div>
+        <div class="flap"><div class="f">BRD-1114</div><div class="f" style="flex:2.2">珠颈斑鸠 ×2</div><div class="f">09:41</div><div class="f hot">NEW</div></div>
+        <div class="flap"><div class="f">BRD-1097</div><div class="f" style="flex:2.2">白喉红臀鹎 ×2</div><div class="f">08:12</div><div class="f">EXEC</div></div>
+        <div class="cl">▸ CLEARANCE · 双模 5 秒 · 确认放行</div>
+      </div>
+      <div class="nm">A · 果园塔台 <span class="chip mono">AMBER</span></div>
+      <div class="ds">1970s 机场翻牌航显板 — 鸟情即航班,驱离即放行许可。板岩深底 + 琥珀翻牌,监控页是 LIVE 机坪画面。</div>
+      <div class="btnrow"><div class="btn">应用主题</div></div>
+    </div>
+
+    <!-- B 果园守护 1.0(当前) -->
+    <div class="win card">
+      <div class="shot b">
+        <div class="w w1"><div class="tb"><i>监测 — CAM-01</i></div><div class="bd2"><div class="v"></div><div style="flex:1"><div class="ln"></div><div class="ln o"></div><div class="ln o"></div></div></div></div>
+        <div class="w w2"><div class="tb"><i>今日鸟情</i></div><div class="bd2"><div style="flex:1"><div class="ln" style="margin-top:2px"></div><div class="ln o"></div></div></div></div>
+      </div>
+      <div class="nm">B · 果园守护 1.0 <span class="chip use">使用中</span></div>
+      <div class="ds">1984 首代 Macintosh — 纯黑白 1-bit、条纹窗口、硬偏移阴影。你正在使用的主题。</div>
+      <div class="btnrow"><div class="btn ghost">当前主题</div></div>
+    </div>
+
+    <!-- C 鸟情信号站 -->
+    <div class="win card">
+      <div class="shot c">
+        <div class="tick"></div>
+        <div class="mast">
+          <div class="rail"></div>
+          <div class="plate"><b>3</b><i>鸟情密集</i></div>
+          <div class="lv"><i class="y"></i><i class="o"></i><i class="r"></i></div>
+        </div>
+        <div class="tags"><i class="hot">待处理 3</i><i>执行中 1</i><i>已处理</i></div>
+      </div>
+      <div class="nm">C · 鸟情信号站 <span class="chip mono">SIGNAL</span></div>
+      <div class="ds">气象预警信号台 — 告警是挂牌,驱离是升牌;顶部跑马灯滚动播报鸟情。</div>
+      <div class="btnrow"><div class="btn">应用主题</div></div>
+    </div>
+
+    <!-- D 像素果园 -->
+    <div class="win card">
+      <div class="shot d">
+        <div class="sky"><i></i></div>
+        <div class="field">
+          <div class="tree"></div><div class="tree t2"></div><div class="bird"></div>
+          <div class="dlg">野生的<b>珠颈斑鸠 ×2</b> 出现了!置信度 <i>93%</i> ▶</div>
+        </div>
+      </div>
+      <div class="nm">D · 像素果园 <span class="chip mono">16-BIT</span></div>
+      <div class="ds">16-bit 掌机牧场物语 — 告警是"野生鸟类出现!"对话框,驱离道具即用即走。</div>
+      <div class="btnrow"><div class="btn">应用主题</div></div>
+    </div>
+
+    <div class="sub" style="text-align:center;padding-bottom:4px">切换即时生效 · 仅改变外观,监测数据与设备配置不受影响</div>
+  </div>
+</div>
+</body></html>

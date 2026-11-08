@@ -10,7 +10,7 @@
 
 page,
 :root {
-  background: #f4f4f0;
+  background: var(--surface-canvas);
   color: var(--ink-900);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -105,11 +105,11 @@ uni-image {
 uni-toast > div,
 uni-toast .uni-toast,
 uni-toast .uni-sample-toast {
-  background: #f4f4f0 !important;
-  border: 2px solid #111111 !important;
+  background: var(--surface-card) !important;
+  border: 2px solid var(--ink-900) !important;
   border-radius: 0 !important;
-  box-shadow: 3px 3px 0 #111111 !important;
-  color: #111111 !important;
+  box-shadow: 3px 3px 0 var(--shadow-ink) !important;
+  color: var(--ink-900) !important;
   font-family: var(--font-sans) !important;
 }
 uni-toast * {
@@ -120,7 +120,7 @@ uni-toast .uni-sample-toast .uni-toast__content,
 uni-toast .uni-simple-toast__text,
 uni-toast > div > div,
 uni-toast p {
-  color: #111111 !important;
+  color: var(--ink-900) !important;
   font-family: var(--font-sans) !important;
 }
 
@@ -145,7 +145,7 @@ uni-page-body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #f4f4f0;
+  background: var(--surface-canvas);
 }
 
 /* 桌面端：让手机壳在视口内水平垂直居中 */
@@ -175,8 +175,8 @@ uni-page-body {
   display: flex;
   flex-direction: column;
   box-shadow:
-    0 0 0 8px #d6d6d0,
-    0 0 0 10px #2a2a26,
+    0 0 0 8px var(--shell-1),
+    0 0 0 10px var(--shell-2),
     0 30px 70px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
   box-sizing: border-box;
@@ -201,7 +201,7 @@ uni-page-body {
   display: flex;
   align-items: center;
   background: var(--surface-card);
-  border-bottom: 2px solid #111111;
+  border-bottom: 2px solid var(--ink-900);
   padding: 0 12px;
   padding-top: env(safe-area-inset-top);
 }
@@ -248,7 +248,7 @@ uni-page-body {
   gap: var(--section-gap);
   padding-bottom: var(--space-6);
   scrollbar-width: thin;
-  scrollbar-color: #111111 transparent;
+  scrollbar-color: var(--ink-900) transparent;
 }
 
 /* 内容区子元素不允许被压缩：超出时滚动，而不是压扁卡片/视频 */
@@ -263,8 +263,8 @@ uni-page-body {
   background: transparent;
 }
 .page__content::-webkit-scrollbar-thumb {
-  background: #111111;
-  border: 2px solid #f4f4f0;
+  background: var(--ink-900);
+  border: 2px solid var(--surface-card);
   border-radius: 0;
 }
 

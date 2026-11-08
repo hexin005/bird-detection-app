@@ -68,8 +68,8 @@ onMounted(() => { void load() })
       <text class="qh-page-subtitle">待人工确认后，才会执行驱离</text>
     </view>
     <button class="qh-iconbtn" :class="{ 'is-open': open }" @click="toggle">
-      <svg v-if="!open" width="22" height="20" viewBox="0 0 22 20" fill="none"><path d="M2 5h18M5 10h12M8 15h6" stroke="#111111" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5" stroke="#111111" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg v-if="!open" width="22" height="20" viewBox="0 0 22 20" fill="none"><path d="M2 5h18M5 10h12M8 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
   </view>
 

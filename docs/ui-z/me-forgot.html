@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ui-z · 找回密码 — 预览</title>
+<style>
+:root{ --ink:#111; --paper:#f4f4f0;
+  --dither-light:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--dither-light);box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+.menubar{height:26px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px;font-weight:700;flex-shrink:0}
+.menubar .ttl{background:var(--ink);color:var(--paper);padding:1px 8px}
+.menubar .right{margin-left:auto}
+.content{flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.win{background:var(--paper);border:2px solid var(--ink);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.tbar{height:24px;display:flex;align-items:center;justify-content:center;position:relative;border-bottom:2px solid var(--ink);background:repeating-linear-gradient(180deg,#111 0 1px,#f4f4f0 1px 3px)}
+.tbar .t{background:var(--ink);color:var(--paper);padding:1px 10px;font-size:12px;font-weight:700;letter-spacing:1px}
+.tbar .x{position:absolute;left:6px;top:4px;width:14px;height:14px;background:var(--paper);border:2px solid var(--ink);font-size:9px;line-height:11px;text-align:center;font-weight:700}
+.bd{padding:12px}
+.sub{font-size:10px;color:#6f6f68;line-height:1.7}
+.lbl{font-size:11px;font-weight:700;color:#55554f;letter-spacing:1px;margin:10px 0 5px}
+.inp{display:flex;align-items:center;min-height:44px;padding:0 12px;background:var(--paper);border:2px solid var(--ink);font-size:13px}
+.inp i{font-style:normal;color:#a9a9a2}
+.inp .ph{margin-left:auto;font-family:"Courier New";font-weight:700;font-size:11px;color:#a9a9a2;white-space:nowrap}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;font-size:14px;font-weight:700;letter-spacing:2px;border:2px solid var(--ink);background:var(--paper);box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.btn.pri{background:var(--ink);color:var(--paper);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.link{font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer}
+.steps{display:flex;gap:6px;margin-top:2px}
+.steps span{flex:1;text-align:center;font-size:10px;font-weight:700;padding:5px 0;border:2px solid #a9a9a2;color:#a9a9a2}
+.steps .on{border-color:var(--ink);color:var(--paper);background:var(--ink)}
+</style></head><body>
+<div class="phone">
+  <div class="menubar">
+    <svg width="16" height="13" viewBox="0 0 16 13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">果园守护</span><span style="color:#55554f">找回密码</span>
+    <span class="right mono">9:41</span>
+  </div>
+  <div class="content">
+
+    <div class="win">
+      <div class="tbar"><span class="x">×</span><span class="t">邮箱找回密码</span></div>
+      <div class="bd">
+        <div class="steps"><span class="on">① 验证邮箱</span><span>② 设置新密码</span><span>③ 重新登录</span></div>
+
+        <div class="lbl" style="margin-top:12px">注册邮箱</div>
+        <div class="inp"><i>you@example.com</i></div>
+
+        <div class="lbl">邮箱验证码</div>
+        <div class="inp"><i>6 位数字</i><span class="ph">发送验证码</span></div>
+
+        <div class="btn pri" style="margin-top:14px">下一步 · 设置新密码</div>
+        <div class="sub" style="margin-top:12px">验证码 10 分钟内有效;连续 5 次错误将锁定该邮箱 30 分钟。收不到邮件请检查垃圾箱,或联系果园管理员。</div>
+      </div>
+    </div>
+
+    <div style="text-align:center"><span class="link">返回登录</span></div>
+  </div>
+</div>
+</body></html>

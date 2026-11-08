@@ -3,6 +3,15 @@ export type Command = { id: string; alarm_id: string | null; duration: number; s
 export type Event = { id: number; kind: string; ref_id: string; at: number; message: string }
 export type Frame = { key: string; frame_id: number; video_time: number; duration: number; at: number; count: number; inference_ms: number; detections: { species: string; class_name: string; confidence: number; bbox: number[] }[] }
 export type Preferences = { scenario: 'normal' | 'offline' | 'timeout'; confidence: number; consecutive: number; cooldown: number }
+export type Me = { username: string; display_name: string; email: string | null; avatar: string | null; theme: 'b1bit' | 'tower' | 'signal' | 'pixel' }
+export type Stats = {
+  range_days: number
+  trend: number[]
+  species: { species: string; count: number }[]
+  hourly: number[]
+  breakdown: { new: number; processing: number; handled: number; ignored: number }
+  exec: { total: number; completed: number; failed: number; avg_start_seconds: number | null; avg_done_seconds: number | null; dual_share: number | null }
+}
 export type State = {
   alarms: Alarm[]; commands: Command[]; events: Event[];
   counts: { total: number; pending: number; completed: number }; settings: Preferences;

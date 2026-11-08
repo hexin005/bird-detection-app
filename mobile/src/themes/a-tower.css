@@ -1,0 +1,125 @@
+/* ==========================================================================
+   主题 A · 果园塔台 — 1970s 机场翻牌航显
+   板岩深底 + 琥珀 accent + 信号红;监控是 LIVE 机坪,指标是翻牌格。
+   ========================================================================== */
+:root[data-theme="tower"],
+[data-theme="tower"] page,
+[data-theme="tower"] {
+  /* 色板反转 */
+  --surface-canvas: #0c0f14;
+  --surface-card: #12161d;
+  --surface-raised: #171c24;
+  --surface-sunken: #0f1319;
+  --surface-muted: #171c24;
+  --surface-video: #000000;
+  --surface-mask: rgba(0, 0, 0, 0.55);
+  --dither-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%230f1319'/%3E%3Crect width='3' height='3' fill='%23131820'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23131820'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --dither-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23131820'/%3E%3Crect width='3' height='3' fill='%2320262f'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%2320262f'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --mask-dither: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='3' height='3' fill='rgba(0,0,0,0.5)'/%3E%3Crect x='3' y='3' width='3' height='3' fill='rgba(0,0,0,0.5)'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --ink-900: #e9e9e4;
+  --ink-800: #e9e9e4;
+  --ink-700: #e9e9e4;
+  --ink-600: #9aa3b0;
+  --ink-500: #9aa3b0;
+  --ink-400: #7d8794;
+  --ink-300: #5d6672;
+  --ink-200: #3d4756;
+  --ink-100: #2a313c;
+  --line-strong: #3d4756;
+  --line: #2a313c;
+  --line-soft: #2a313c;
+  --accent: #ffb400;
+  --accent-fg: #161307;
+  --shadow-ink: rgba(0, 0, 0, 0.65);
+  --stripe: repeating-linear-gradient(180deg, #3d4756 0 1px, #12161d 1px 3px);
+  --warn-bg: #ff4b3e;
+  --warn-fg: #160b0a;
+  --warn-line: #ff4b3e;
+  --danger-bg: #12161d;
+  --danger-fg: #ff4b3e;
+  --danger-line: #ff4b3e;
+  --danger-stroke: #ff4b3e;
+  --success-bg: #12161d;
+  --success-fg: #8fb573;
+  --success-line: #3d4756;
+  --info-bg: #12161d;
+  --info-fg: #e9e9e4;
+  --info-line: #3d4756;
+  --neutral-bg: #171c24;
+  --neutral-fg: #7d8794;
+  --neutral-line: #3d4756;
+  --detect-box: #ffb400;
+  --detect-text: #161307;
+  --video-filter: grayscale(1) contrast(1.75) brightness(.85);
+  --scanline: rgba(255, 180, 0, 0.35);
+  --shell-1: #171b22;
+  --shell-2: #000000;
+  --shadow-btn: 3px 3px 0 rgba(0, 0, 0, 0.65);
+  --shadow-float: 4px 4px 0 rgba(0, 0, 0, 0.65);
+  --shadow-focus: 2px 2px 0 rgba(255, 180, 0, 0.4);
+}
+
+/* ---- 塔台专属修饰 ---- */
+[data-theme="tower"] .qh-page-title { letter-spacing:3px; }
+[data-theme="tower"] .qh-stat__num {
+  display:inline-block; align-self:flex-start; padding:1px 8px 2px; background:var(--surface-raised);
+  border:1px solid var(--line-strong); position:relative; color:#ffb400; font-size:15px;
+}
+[data-theme="tower"] .qh-stat__num::after { content:''; position:absolute; left:0; right:0; top:50%; height:1px; background:#000; }
+[data-theme="tower"] .qh-stat__num--warn { color:#ff4b3e; border-bottom:none; }
+[data-theme="tower"] .qh-menubar__ttl { background:#ffb400; color:#161307; letter-spacing:2px; }
+[data-theme="tower"] .qh-menubar__item { color:#7d8794; }
+[data-theme="tower"] .qh-tab { letter-spacing:3px; }
+[data-theme="tower"] .qh-appname { letter-spacing:3px; }
+[data-theme="tower"] .qh-video__tag { color:#ffb400; }
+[data-theme="tower"] .qh-badge { font-family:var(--font-num); letter-spacing:1px; }
+[data-theme="tower"] .qh-me-name { letter-spacing:2px; }
+
+/* ---- 深度修饰:让监控页变成"塔台航显板" ---- */
+/* 1) LIVE 机坪取景框:视频窗口四角琥珀 L 角 */
+[data-theme="tower"] .qh-video::before {
+  content:''; position:absolute; inset:8px; z-index:3; pointer-events:none;
+  background:
+    linear-gradient(#ffb400,#ffb400) left top/14px 2px,
+    linear-gradient(#ffb400,#ffb400) left top/2px 14px,
+    linear-gradient(#ffb400,#ffb400) right top/14px 2px,
+    linear-gradient(#ffb400,#ffb400) right top/2px 14px,
+    linear-gradient(#ffb400,#ffb400) left bottom/14px 2px,
+    linear-gradient(#ffb400,#ffb400) left bottom/2px 14px,
+    linear-gradient(#ffb400,#ffb400) right bottom/14px 2px,
+    linear-gradient(#ffb400,#ffb400) right bottom/2px 14px;
+  background-repeat:no-repeat;
+}
+/* 2) 检测框:琥珀实线 + 辉光(替代黑白蚂蚁线) */
+[data-theme="tower"] .qh-detect-box { border-style:solid; border-color:#ffb400; outline:none; box-shadow:0 0 16px rgba(255,180,0,.4); }
+[data-theme="tower"] .qh-detect-label { background:#ffb400; color:#161307; }
+/* 3) 告警卡 = 航显行:琥珀标题 + 红色班次箭头 + 链接琥珀 */
+[data-theme="tower"] .qh-alarmcard__title { color:#ffb400; letter-spacing:1px; }
+[data-theme="tower"] .qh-alarmcard__title::before { content:'▸ '; color:#ff4b3e; }
+[data-theme="tower"] .qh-alarmcard__bottom .qh-link { color:#ffb400; }
+/* 4) 指标 = 翻牌大数字:独立牌底 + 中缝 + 加大 */
+[data-theme="tower"] .qh-stat { background:#0f1319; gap:6px; }
+[data-theme="tower"] .qh-stat__num { font-size:20px; padding:2px 10px 3px; letter-spacing:2px;
+  background:linear-gradient(180deg,#20262f 0 50%,#12161c 50%); }
+/* 5) 页头塔台灯:监控点名前置红色闪烁灯 + MVP 描边牌 */
+[data-theme="tower"] .qh-appname { color:#ffb400; }
+[data-theme="tower"] .qh-appname::before { content:''; display:inline-block; width:8px; height:8px;
+  background:#ff4b3e; margin-right:8px; animation:qhBlink 1.6s steps(2) infinite; }
+[data-theme="tower"] .qh-mvp { background:transparent; color:#ffb400; border:1px solid #8a6a1e; }
+/* 6) 连接条 / 设备条:塔台状态灯语义(红=链路,琥珀=设备在线) */
+[data-theme="tower"] .qh-conn { background:#0f1319; }
+[data-theme="tower"] .qh-conn__dot { background:#ff4b3e; animation:qhBlink 1.6s steps(2) infinite; }
+[data-theme="tower"] .qh-pill { color:#ffb400; border-color:#8a6a1e; }
+[data-theme="tower"] .qh-pill__dot { background:#ffb400; }
+/* 7) 窗口标题块:琥珀牌(板岩条纹上的琥珀标牌) */
+[data-theme="tower"] .qh-tbar__t,
+[data-theme="tower"] .qh-sheet__title,
+[data-theme="tower"] .qh-dialog__title { background:#ffb400; color:#161307; }
+[data-theme="tower"] .qh-dialog__title { color:#161307; }
+/* 8) 内容区微扫描线:航显 CRT 质感 */
+[data-theme="tower"] .page__content {
+  background-image: repeating-linear-gradient(0deg, rgba(255,180,0,.014) 0 3px, transparent 3px 6px);
+}
+/* 9) dock 频道字母距已由 token;补充 badge 反色 */
+[data-theme="tower"] .qh-tab__badge { background:#ff4b3e; color:#160b0a; }
+[data-theme="tower"] .qh-tab.is-active .qh-tab__badge { background:#12161d; color:#ffb400; }

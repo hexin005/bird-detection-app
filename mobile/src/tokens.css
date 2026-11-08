@@ -51,6 +51,16 @@ page,
   --line-soft: #111111;   /* 分隔(用 1px 细线区分层级) */
   --line-focus: #111111;
 
+  /* ---------- 主题强调与材质(四主题各自重定义;--stripe 嵌套 var 随主题联动) ---------- */
+  --accent: #111111;      /* 主按钮 / 选中 / active 底色 */
+  --accent-fg: #f4f4f0;   /* 强调底上的文字与图标 */
+  --shadow-ink: rgba(17, 17, 17, 0.85); /* 硬阴影墨色 */
+  --stripe: repeating-linear-gradient(180deg, var(--ink-900) 0 1px, var(--surface-card) 1px 3px); /* 窗口标题条纹 */
+  --hazard: repeating-linear-gradient(-45deg, #f5c400 0 10px, var(--ink-900) 10px 20px); /* 警示纹(signal 用) */
+  --scanline: rgba(244, 244, 240, 0.5);
+  --shell-1: #d6d6d0; /* 手机壳 ring 外层 */
+  --shell-2: #2a2a26; /* 手机壳 ring 内层 */
+
   /* ---------- 语义色:黑白等价(状态靠底纹/反白/灰阶区分) ---------- */
   /* 待处理 / 需关注:黑底白字(最高警示) */
   --warn-bg: #111111;

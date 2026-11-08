@@ -1,4 +1,5 @@
 import json
+import re
 import secrets
 import sqlite3
 import threading
@@ -10,6 +11,17 @@ from .security import digest, hash_password, verify_password
 
 class Conflict(Exception):
     pass
+
+
+def normalize_email(email):
+    """邮箱入库统一:去除首尾空白并转小写。"""
+    return email.strip().lower()
+
+
+def display_username(email):
+    """注册用户名生成:邮箱前缀清洗为 [a-z0-9_],冲突时追加 _2/_3…。"""
+    base = re.sub(r'[^a-z0-9_]', '', normalize_email(email).split('@')[0])[:32] or 'user'
+    return base
 
 
 class Store:
@@ -53,10 +65,21 @@ class Store:
             self.db.execute("ALTER TABLE commands ADD COLUMN mode TEXT DEFAULT 'both'")
         if 'automatic' not in {r[1] for r in self.db.execute('PRAGMA table_info(commands)')}:
             self.db.execute('ALTER TABLE commands ADD COLUMN automatic INTEGER DEFAULT 0')
+        # 账号体系扩展:users 加列(旧库走 ALTER,种子账号 email/display_name 保持为空)
+        user_columns = {r[1] for r in self.db.execute('PRAGMA table_info(users)')}
+        for name, kind in [('email', 'TEXT'), ('display_name', 'TEXT'), ('avatar_path', 'TEXT')]:
+            if name not in user_columns:
+                self.db.execute(f'ALTER TABLE users ADD COLUMN {name} {kind}')
+        self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS user_preferences (
+          user_id INTEGER PRIMARY KEY REFERENCES users(id),
+          theme TEXT NOT NULL DEFAULT 'b1bit')''')
         self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
-                db.execute('INSERT INTO users VALUES (1,?,?)', (settings.username, hash_password(settings.password)))
+                # 显式列名:users 已迁移扩展列,按位置插入会失配
+                db.execute('INSERT INTO users (id, username, password) VALUES (1, ?, ?)',
+                           (settings.username, hash_password(settings.password)))
             defaults = {'scenario': 'normal', 'confidence': settings.confidence,
                         'consecutive': settings.consecutive, 'cooldown': settings.cooldown}
             db.execute('INSERT OR IGNORE INTO settings VALUES (1,?)', (json.dumps(defaults),))
@@ -87,8 +110,11 @@ class Store:
                 self._finish(db, c, 'unknown', '服务中断，执行结果未知；不会自动重放')
             db.execute("UPDATE tasks SET status='interrupted',ended_at=?,message='服务重启，需手动重新开始' WHERE status IN ('starting','running','stopping')", (time.time(),))
 
-    def login(self, username, password):
-        users = self.rows('SELECT * FROM users WHERE username=?', (username,))
+    def login(self, identifier, password):
+        """identifier 支持用户名或邮箱(邮箱统一小写匹配)。"""
+        ident = identifier.strip()
+        email = normalize_email(ident) if '@' in ident else '\x00not-an-email'
+        users = self.rows('SELECT * FROM users WHERE username=? OR email=?', (ident, email))
         if not users or not verify_password(password, users[0]['password']):
             return None
         token = secrets.token_urlsafe(32)
@@ -104,6 +130,52 @@ class Store:
     def logout(self, session_id):
         with self.tx() as db:
             db.execute('DELETE FROM sessions WHERE id=?', (session_id,))
+
+    # ---- 账号体系:注册 / 资料 / 主题 / 密码 ----
+
+    def create_user(self, email, password):
+        """注册新账号;邮箱唯一由唯一索引+前置检查双重保证,用户名自动派生。"""
+        email = normalize_email(email)
+        with self.tx() as db:
+            if db.execute('SELECT 1 FROM users WHERE email=?', (email,)).fetchone():
+                raise Conflict('该邮箱已注册，请直接登录')
+            username = display_username(email)
+            serial = 2
+            while db.execute('SELECT 1 FROM users WHERE username=?', (username,)).fetchone():
+                username = f'{display_username(email)}_{serial}'
+                serial += 1
+            db.execute('INSERT INTO users (username, password, email, display_name) VALUES (?,?,?,?)',
+                       (username, hash_password(password), email, username))
+            user_id = db.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()[0]
+        return self.get_profile(user_id)
+
+    def get_profile(self, user_id):
+        rows = self.rows('''SELECT u.id, u.username, u.email, u.display_name, u.avatar_path,
+                            COALESCE(p.theme, 'b1bit') AS theme
+                            FROM users u LEFT JOIN user_preferences p ON p.user_id = u.id WHERE u.id=?''', (user_id,))
+        return rows[0] if rows else None
+
+    def update_profile(self, user_id, display_name=None, avatar_path=None):
+        changes, values = [], []
+        if display_name is not None:
+            changes.append('display_name=?'); values.append(display_name)
+        if avatar_path is not None:
+            changes.append('avatar_path=?'); values.append(avatar_path)
+        if not changes:
+            return
+        with self.tx() as db:
+            db.execute(f'UPDATE users SET {", ".join(changes)} WHERE id=?', (*values, user_id))
+
+    def set_user_theme(self, user_id, theme):
+        with self.tx() as db:
+            db.execute('''INSERT INTO user_preferences (user_id, theme) VALUES (?,?)
+                          ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme''', (user_id, theme))
+
+    def set_password(self, user_id, hashed):
+        """改密/重置密码:同一事务内吊销该用户全部会话,旧 token/媒体票据/WS 即刻失效。"""
+        with self.tx() as db:
+            db.execute('UPDATE users SET password=? WHERE id=?', (hashed, user_id))
+            db.execute('DELETE FROM sessions WHERE user_id=?', (user_id,))
 
     def config(self):
         return json.loads(self.rows('SELECT value FROM settings WHERE id=1')[0]['value'])
@@ -211,6 +283,51 @@ class Store:
             counts['completed'] = self.rows("SELECT COUNT(*) n FROM commands WHERE status='completed'")[0]['n']
             counts['pending'] = counts['pending'] or 0
             return {'alarms': alarms, 'commands': commands, 'events': events, 'counts': counts, 'settings': self.config()}
+
+    def stats(self, days):
+        """果园数据分析聚合(所有账号共享果园数据,口径见接口文档):
+
+        - 范围:服务器本地时区自然日,含今天,共 days 个日桶;
+        - trend = 按天告警事件数(口径=检测告警,非逐帧识别次数),缺失日期补 0;
+        - species = 按告警条数 TOP5,不累计鸟只数;
+        - hourly = 范围内所有天按小时聚合 24 桶;
+        - breakdown = 范围内告警状态分布;
+        - exec = 范围内指令统计,平均启动响应=started_at-at、平均完成耗时=ended_at-at
+          (仅 status='completed'),无记录时为 null;双模占比分母=范围内已完成指令。
+        """
+        now = time.time()
+        local = time.localtime(now)
+        midnight = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1))
+        start = midnight - (days - 1) * 86400
+        trend = [0] * days
+        for row in self.rows('SELECT CAST((at-?)/86400 AS INTEGER) b, COUNT(*) n FROM alarms WHERE at>=? GROUP BY b', (start, start)):
+            if 0 <= row['b'] < days:
+                trend[row['b']] = row['n']
+        species = self.rows('SELECT species, COUNT(*) count FROM alarms WHERE at>=? GROUP BY species ORDER BY count DESC, species LIMIT 5', (start,))
+        hourly = [0] * 24
+        for row in self.rows("SELECT CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms WHERE at>=? GROUP BY h", (start,)):
+            if 0 <= row['h'] < 24:
+                hourly[row['h']] = row['n']
+        breakdown = {'new': 0, 'processing': 0, 'handled': 0, 'ignored': 0}
+        for row in self.rows('SELECT status, COUNT(*) n FROM alarms WHERE at>=? GROUP BY status', (start,)):
+            if row['status'] in breakdown:
+                breakdown[row['status']] = row['n']
+        commands = self.rows('SELECT status, COUNT(*) n FROM commands WHERE at>=? GROUP BY status', (start,))
+        counts = {r['status']: r['n'] for r in commands}
+        total = sum(counts.values())
+        completed = counts.get('completed', 0)
+        failed = counts.get('failed', 0)
+        def avg(sql, args=()):
+            rows = self.rows(sql, args)
+            return round(rows[0]['avg'], 2) if rows and rows[0]['avg'] is not None else None
+        avg_start = avg('SELECT AVG(started_at-at) avg FROM commands WHERE at>=? AND started_at IS NOT NULL', (start,))
+        avg_done = avg("SELECT AVG(ended_at-at) avg FROM commands WHERE at>=? AND status='completed' AND ended_at IS NOT NULL", (start,))
+        dual = self.rows("SELECT COUNT(*) n FROM commands WHERE at>=? AND status='completed' AND mode='both'", (start,))[0]['n']
+        return {'range_days': days, 'trend': trend, 'species': species, 'hourly': hourly,
+                'breakdown': breakdown,
+                'exec': {'total': total, 'completed': completed, 'failed': failed,
+                         'avg_start_seconds': avg_start, 'avg_done_seconds': avg_done,
+                         'dual_share': round(dual / completed, 2) if completed else None}}
 
     def close(self):
         with self.lock:

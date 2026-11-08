@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import re
 import threading
 import time
 import secrets
@@ -7,6 +8,8 @@ from urllib.parse import unquote
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
+import cv2
+import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,13 +18,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import ROOT, Settings
+from .emailer import MailSendError, send_code_mail
 from .video_pipeline import VideoPipeline
-from .security import check_media, digest, media_ticket
-from .store import Conflict, Store
+from .security import check_media, digest, hash_password, media_ticket, verify_password
+from .store import Conflict, Store, normalize_email
+from .verification import RateLimited, VerificationService
 
 
 class Login(BaseModel):
-    username: str = Field(min_length=1, max_length=80)
+    username: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=1, max_length=200)
 
 
@@ -44,10 +49,71 @@ class StartVideo(BaseModel):
     video_id: Optional[str] = None
 
 
+EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+THEME_IDS = ('b1bit', 'tower', 'signal', 'pixel')
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
+AVATAR_MAX_PIXELS = 4096
+
+
+def parse_email(value):
+    email = normalize_email(value)
+    if not EMAIL_PATTERN.match(email) or len(email) > 254:
+        raise HTTPException(422, '邮箱格式不正确')
+    return email
+
+
+class SendCode(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    purpose: Literal['register', 'reset']
+
+
+class RegisterPayload(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=6, max_length=6, pattern=r'^\d{6}$')
+    password: str = Field(min_length=8, max_length=200)
+
+
+class ResetPayload(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=6, max_length=6, pattern=r'^\d{6}$')
+    password: str = Field(min_length=8, max_length=200)
+
+
+class ChangePassword(BaseModel):
+    old_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class DisplayName(BaseModel):
+    display_name: str = Field(min_length=1, max_length=32)
+
+
+class ThemePref(BaseModel):
+    theme: Literal['b1bit', 'tower', 'signal', 'pixel']
+
+
+def _reencode_avatar(data):
+    """头像真实校验与重编码:cv2 解码拒绝伪装/空文件,限像素尺寸,统一转 JPG。
+
+    已知限制:cv2 不处理 EXIF 方向;主流手机浏览器上传时已自动转正。
+    """
+    image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(415, '仅支持 JPG / PNG / WebP 图片')
+    height, width = image.shape[:2]
+    if max(height, width) > AVATAR_MAX_PIXELS:
+        raise HTTPException(413, '图片像素过大，请缩小后再上传')
+    ok, buffer = cv2.imencode('.jpg', image, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+    if not ok:
+        raise HTTPException(500, '头像处理失败，请重试')
+    return buffer.tobytes()
+
+
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
     monitor = VideoPipeline(settings, store)
+    verification = VerificationService()
     shutdown = threading.Event()
 
     def worker():
@@ -68,7 +134,7 @@ def create_app(settings=None):
         store.close()
 
     app = FastAPI(title='青禾果园守护 MVP', lifespan=lifespan)
-    app.state.store, app.state.monitor = store, monitor
+    app.state.store, app.state.monitor, app.state.verification = store, monitor, verification
     app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5178', 'http://localhost:5178'],
                        allow_methods=['GET', 'POST', 'PUT'], allow_headers=['Authorization', 'Content-Type', 'X-Filename'])
 
@@ -109,6 +175,121 @@ def create_app(settings=None):
     def logout(user=Depends(auth)):
         store.logout(user[0])
         return {'ok': True}
+
+    # ---- 账号体系:注册 / 找回 / 资料 / 头像 / 主题 ----
+    # 产品边界:同一个演示果园的多个账号,果园数据(告警/指令/视频)共享,
+    # 个人资料、主题偏好独立;统计分析覆盖整个果园。
+
+    @app.post('/api/auth/send-code')
+    def auth_send_code(body: SendCode):
+        email = parse_email(body.email)
+        if body.purpose == 'reset':
+            if not store.rows('SELECT id FROM users WHERE email=?', (email,)):
+                raise HTTPException(404, '该邮箱未绑定任何账号')
+        try:
+            code = verification.issue(email, body.purpose)
+        except RateLimited as exc:
+            raise HTTPException(429, str(exc))
+        try:
+            demo = send_code_mail(settings, email, code, body.purpose)
+        except MailSendError as exc:
+            raise HTTPException(502, str(exc))
+        return {'sent': True, 'demo': demo, **({'demo_code': code} if demo else {})}
+
+    @app.post('/api/auth/register')
+    def auth_register(body: RegisterPayload):
+        email = parse_email(body.email)
+        if store.rows('SELECT 1 FROM users WHERE email=?', (email,)):
+            raise HTTPException(409, '该邮箱已注册，请直接登录')
+        if not verification.verify(email, 'register', body.code):
+            raise HTTPException(400, '验证码错误或已过期')
+        try:
+            user = store.create_user(email, body.password)
+        except Conflict as exc:
+            raise HTTPException(409, str(exc))  # 并发注册兜底(唯一索引)
+        token = store.login(email, body.password)
+        return {'token': token, 'username': user['username'], 'display_name': user['display_name']}
+
+    @app.post('/api/auth/reset')
+    def auth_reset(body: ResetPayload):
+        email = parse_email(body.email)
+        if not verification.verify(email, 'reset', body.code):
+            raise HTTPException(400, '验证码错误或已过期')
+        rows = store.rows('SELECT id FROM users WHERE email=?', (email,))
+        if not rows:
+            raise HTTPException(404, '该邮箱未绑定任何账号')
+        store.set_password(rows[0]['id'], hash_password(body.password))
+        return {'ok': True}
+
+    @app.post('/api/password/change')
+    def change_password(body: ChangePassword, user=Depends(auth)):
+        rows = store.rows('SELECT password FROM users WHERE id=?', (user[1],))
+        if not rows or not verify_password(body.old_password, rows[0]['password']):
+            raise HTTPException(400, '当前密码不正确')
+        # 同事务改密并吊销该用户全部会话(含当前),前端收到后跳转登录页
+        store.set_password(user[1], hash_password(body.new_password))
+        return {'ok': True, 'relogin': True}
+
+    @app.get('/api/me')
+    def me(user=Depends(auth)):
+        profile = store.get_profile(user[1])
+        if not profile:
+            raise HTTPException(401, '登录已过期，请重新登录')
+        avatar = profile['avatar_path']
+        return {'username': profile['username'],
+                'display_name': profile['display_name'] or profile['username'],
+                'email': profile['email'],
+                'avatar': ('/api/avatars/' + avatar) if avatar else None,
+                'theme': profile['theme'] or 'b1bit'}
+
+    @app.put('/api/me')
+    def update_me(body: DisplayName, user=Depends(auth)):
+        name = body.display_name.strip()
+        store.update_profile(user[1], display_name=name)
+        return {'ok': True, 'display_name': name}
+
+    @app.put('/api/me/preferences')
+    def update_my_preferences(body: ThemePref, user=Depends(auth)):
+        store.set_user_theme(user[1], body.theme)
+        return {'ok': True, 'theme': body.theme}
+
+    @app.post('/api/avatar')
+    async def upload_avatar(request: Request, user=Depends(auth)):
+        data = bytearray()
+        async for chunk in request.stream():
+            data.extend(chunk)
+            if len(data) > AVATAR_MAX_BYTES:
+                raise HTTPException(413, '头像不能超过 2 MB')
+        if not data:
+            raise HTTPException(400, '请选择图片文件')
+        payload = await run_in_threadpool(_reencode_avatar, bytes(data))
+        avatars_dir = settings.data_dir / 'avatars'
+        avatars_dir.mkdir(parents=True, exist_ok=True)
+        name = f"{user[1]}-{int(time.time())}.jpg"
+        target = avatars_dir / name
+        staging = avatars_dir / (name + '.part')
+        staging.write_bytes(payload)
+        staging.replace(target)  # 原子替换,失败不留半截文件
+        previous = store.rows('SELECT avatar_path FROM users WHERE id=?', (user[1],))[0]['avatar_path']
+        store.update_profile(user[1], avatar_path=name)
+        if previous and previous != name:  # 同秒重传时新旧同名,不能误删新文件
+            old_path = (avatars_dir / previous).resolve()
+            if old_path.parent == avatars_dir.resolve():
+                old_path.unlink(missing_ok=True)
+        return {'ok': True, 'avatar': '/api/avatars/' + name}
+
+    @app.get('/api/avatars/{name}', dependencies=[Depends(media_auth)])
+    def avatar_file(name: str):
+        folder = (settings.data_dir / 'avatars').resolve()
+        path = (folder / name).resolve()
+        if path.parent != folder or not path.is_file():
+            raise HTTPException(404, '头像不存在')
+        return FileResponse(path, media_type='image/jpeg', headers={'Cache-Control': 'private, max-age=300'})
+
+    @app.get('/api/stats')
+    def statistics(scope: Literal['today', '7d', '30d'] = Query('7d', alias='range'), user=Depends(auth)):
+        """果园数据分析聚合(口径见 store.stats)。共享果园数据,不区分账号。"""
+        return store.stats({'today': 1, '7d': 7, '30d': 30}[scope])
 
     @app.get('/api/state')
     def state(user=Depends(auth)):
