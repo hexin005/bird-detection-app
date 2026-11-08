@@ -68,8 +68,8 @@ onMounted(() => { void load() })
       <text class="qh-page-subtitle">待人工确认后，才会执行驱离</text>
     </view>
     <button class="qh-iconbtn" :class="{ 'is-open': open }" @click="toggle">
-      <svg v-if="!open" width="22" height="20" viewBox="0 0 22 20" fill="none"><path d="M2 5h18M5 10h12M8 15h6" stroke="#44523E" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5" stroke="#44523E" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg v-if="!open" width="22" height="20" viewBox="0 0 22 20" fill="none"><path d="M2 5h18M5 10h12M8 15h6" stroke="#111111" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5" stroke="#111111" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
   </view>
 
@@ -95,7 +95,7 @@ onMounted(() => { void load() })
           mode="aspectFill"
         />
         <view v-else class="qh-birdrow__cover qh-birdrow__cover--empty">
-          <text style="font-size:16px;color:#7B9B63">♪</text>
+          <text style="font-size:16px;color:#111111">♪</text>
         </view>
         <view class="qh-birdrow__info">
           <text class="qh-birdrow__name">{{ g.species }}</text>

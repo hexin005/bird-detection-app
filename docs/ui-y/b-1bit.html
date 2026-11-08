@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>B · 果园守护 1.0 (1984)</title>
+<style>
+/* ============================================================
+   B · 果园守护 1.0 —— 整个 App 是一台 1984 年的 1-bit 电脑
+   锚定: 初代 Macintosh System 1.0 窗口 GUI × 点阵抖动
+   配色: 纯黑白 + 棋盘格抖动灰; 禁: 圆角/渐变/彩色/emoji
+   ============================================================ */
+:root{ --b:#111; --w:#f4f4f0; --g1:#c8c8c2; --g2:#a9a9a2; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#3a3a36;font-family:"SimHei","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--b);
+  -webkit-font-smoothing:none}
+.mono{font-family:"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;position:relative;overflow:hidden;
+  background:#f4f4f0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px;
+  box-shadow:0 0 0 8px #d6d6d0,0 0 0 10px #2a2a26,0 30px 70px rgba(0,0,0,.6)}
+/* ———— 菜单栏 ———— */
+.menubar{height:26px;background:var(--w);border-bottom:2px solid var(--b);display:flex;align-items:center;gap:14px;padding:0 10px;font-size:12px;font-weight:700}
+.menubar .logo{width:16px;height:13px;image-rendering:pixelated}
+.menubar .ttl{background:var(--b);color:var(--w);padding:1px 8px}
+.menubar .right{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px}
+.sig{display:inline-flex;align-items:flex-end;gap:1px}
+.sig i{width:3px;background:var(--b)}
+/* ———— 桌面图标 ———— */
+.desk{position:absolute;right:12px;top:44px;width:64px;display:flex;flex-direction:column;gap:16px}
+.dicon{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;font-weight:700;text-align:center}
+.dicon .ic{width:30px;height:30px;background:var(--w);border:2px solid var(--b);position:relative}
+.dicon.sel .ic{background:var(--b)}
+.dicon.sel{background:var(--b);color:var(--w);padding:1px 3px}
+/* ———— 窗口通用 ———— */
+.win{position:absolute;background:var(--w);border:2px solid var(--b);box-shadow:3px 3px 0 rgba(17,17,17,.85)}
+.win.focus{box-shadow:5px 5px 0 var(--b)}
+.tbar{height:24px;background:repeating-linear-gradient(180deg,var(--b) 0 1px,var(--w) 1px 3px);position:relative;display:flex;align-items:center;justify-content:center;border-bottom:2px solid var(--b)}
+.tbar .t{background:var(--w);padding:0 10px;font-size:12px;font-weight:800;letter-spacing:1px}
+.tbar .box{position:absolute;left:5px;top:4px;width:16px;height:16px;background:var(--w);border:2px solid var(--b);font-size:10px;line-height:13px;text-align:center;font-weight:800}
+/* ———— 监测窗口 ———— */
+.win-cam{left:12px;top:44px;width:300px}
+.camview{position:relative;margin:8px;height:150px;overflow:hidden;border:2px solid var(--b)}
+.camview img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.7) brightness(1.02)}
+.camview::after{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='2' height='2' fill='%2311111138'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%2311111138'/%3E%3C/svg%3E") 0 0/4px 4px}
+.dbox{position:absolute;left:22%;top:30%;width:52%;height:56%;border:2px dashed var(--b);z-index:2}
+.dbox .tag{position:absolute;left:-2px;top:-20px;background:var(--b);color:var(--w);font-size:10px;font-weight:800;padding:1px 6px;white-space:nowrap}
+.cam-tl{position:absolute;left:6px;top:5px;font-size:9px;font-weight:800;letter-spacing:1px;z-index:2}
+.transport{display:flex;gap:6px;padding:0 8px 8px}
+.btn{flex:1;border:2px solid var(--b);background:var(--w);font-size:12px;font-weight:800;padding:7px 0;text-align:center;box-shadow:2px 2px 0 var(--b)}
+.btn.pri{background:var(--b);color:var(--w)}
+.segbar{margin:0 8px 8px;height:12px;border:2px solid var(--b);display:flex;gap:2px;padding:1px}
+.segbar i{flex:1;background:var(--b)}
+.segbar i.o{background:#f4f4f0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f4f4f0'/%3E%3Crect width='2' height='2' fill='%23111'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23111'/%3E%3C/svg%3E") 0 0/4px 4px}
+.cam-status{padding:0 8px 8px;font-size:10px;font-weight:700}
+/* ———— 记录窗口 ———— */
+.win-log{left:12px;top:312px;width:262px}
+.logrow{display:flex;align-items:center;gap:7px;padding:6px 9px;border-bottom:1px solid var(--b);font-size:11.5px;font-weight:700}
+.logrow:last-child{border-bottom:0}
+.logrow .cb{width:12px;height:12px;border:2px solid var(--b);flex-shrink:0}
+.logrow.done .cb{background:#f4f4f0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23111'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23111'/%3E%3C/svg%3E") 0 0/6px 6px}
+.logrow .st{margin-left:auto;font-size:10px}
+.logrow .st.nw{background:var(--b);color:var(--w);padding:1px 5px}
+/* ———— 控制窗口 ———— */
+.win-ctl{left:96px;top:472px;width:282px}
+.ctl-row{padding:8px 10px 2px;font-size:12px;font-weight:800}
+.opts{display:flex;gap:6px;padding:5px 10px 8px}
+.opt{flex:1;border:2px solid var(--b);font-size:11.5px;font-weight:700;text-align:center;padding:6px 0;box-shadow:2px 2px 0 var(--b)}
+.opt.on{background:var(--b);color:var(--w)}
+.ctl-actions{display:flex;gap:6px;padding:0 10px 10px;align-items:center}
+.dur{display:flex;border:2px solid var(--b)}
+.dur span{padding:6px 9px;font-size:11.5px;font-weight:800;border-right:2px solid var(--b)}
+.dur span:last-child{border-right:0}
+.dur span.on{background:var(--b);color:var(--w)}
+.bigbtn{flex:1;border:2px solid var(--b);background:var(--b);color:var(--w);font-size:13px;font-weight:800;padding:9px 0;text-align:center;box-shadow:3px 3px 0 rgba(17,17,17,.45)}
+/* ———— 便签窗口 ———— */
+.win-note{left:12px;top:596px;width:226px}
+.note-bd{padding:9px 10px;font-size:11px;font-weight:700;line-height:1.9}
+.note-bd i{font-style:normal;color:var(--w);background:var(--b);padding:0 4px;margin-right:5px}
+/* ———— 桌面底部告示 ———— */
+.notice{position:absolute;left:250px;bottom:52px;width:128px;font-size:9.5px;font-weight:700;color:#55554f;line-height:1.8}
+/* ———— 任务栏 ———— */
+.dock{position:absolute;left:0;right:0;bottom:0;height:30px;background:var(--w);border-top:2px solid var(--b);display:flex;align-items:center;font-size:11px;font-weight:800}
+.dock span{padding:0 12px;border-right:2px solid var(--b);height:100%;display:flex;align-items:center}
+.dock .on{background:var(--b);color:var(--w)}
+.dock .ct{margin-left:auto;border-right:0;padding-right:10px;font-size:10px}
+.blink{animation:bk 1.2s steps(2) infinite}
+@keyframes bk{50%{opacity:.1}}
+</style></head><body>
+<div class="phone">
+  <!-- 菜单栏 -->
+  <div class="menubar">
+    <svg class="logo" viewBox="0 0 16 13" width="16" height="13"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+    <span class="ttl">果园守护</span>
+    <span>文件</span><span>监测</span><span>告警</span><span>特效</span>
+    <span class="right"><span class="sig"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i></span> 9:41</span>
+  </div>
+
+  <!-- 桌面图标 -->
+  <div class="desk">
+    <div class="dicon sel"><div class="ic"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="6" width="13" height="10" fill="#111"/><rect x="16" y="9" width="6" height="4" fill="#111"/><rect x="5" y="8" width="4" height="3" fill="#f4f4f0"/></svg></div>监测.finder</div>
+    <div class="dicon"><div class="ic"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="4" y="3" width="16" height="18" fill="none" stroke="#111" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#111" stroke-width="2"/></svg></div>鸟情档案</div>
+    <div class="dicon"><div class="ic"><svg viewBox="0 0 24 24" width="22" height="22"><rect x="6" y="4" width="12" height="3" fill="#111"/><rect x="8" y="8" width="8" height="12" fill="none" stroke="#111" stroke-width="2"/><path d="M10 11v6M14 11v6" stroke="#111" stroke-width="2"/></svg></div>驱离终端</div>
+  </div>
+
+  <!-- 监测窗口 -->
+  <div class="win win-cam focus">
+    <div class="tbar"><span class="box">×</span><span class="t">监测 — CAM-01 (东区)</span></div>
+    <div class="camview">
+      <img src="../../.runtime/captures/T9311ae2050-15.jpg" alt="">
+      <span class="cam-tl">REC ● 09:41</span>
+      <div class="dbox"><span class="tag">珠颈斑鸠 93%</span></div>
+    </div>
+    <div class="segbar"><i></i><i></i><i></i><i class="o"></i><i class="o"></i><i class="o"></i></div>
+    <div class="cam-status">正在分析录像… <span class="mono blink">▮▮▮</span> 47%</div>
+    <div class="transport"><div class="btn pri">▶ 开始检测</div><div class="btn">选择视频…</div></div>
+  </div>
+
+  <!-- 记录窗口 -->
+  <div class="win win-log">
+    <div class="tbar"><span class="box">×</span><span class="t">今日鸟情</span></div>
+    <div class="logrow"><span class="cb"></span>09:41 珠颈斑鸠 ×2 <span class="st nw">待处理</span></div>
+    <div class="logrow done"><span class="cb"></span>08:12 白喉红臀鹎 ×2 <span class="st">执行中</span></div>
+    <div class="logrow done"><span class="cb"></span>07:56 八哥 ×1 <span class="st">已处理</span></div>
+    <div class="logrow done"><span class="cb"></span>06:30 麻雀群 ×6 <span class="st">已忽略</span></div>
+  </div>
+
+  <!-- 控制窗口 -->
+  <div class="win win-ctl">
+    <div class="tbar"><span class="box">×</span><span class="t">驱离控制台 v0.2</span></div>
+    <div class="ctl-row">驱离方式:</div>
+    <div class="opts"><div class="opt">□ 声波</div><div class="opt">□ 红外</div><div class="opt on">▣ 双模</div></div>
+    <div class="ctl-actions">
+      <div class="dur"><span class="on">3秒</span><span>5秒</span><span>8秒</span></div>
+      <div class="bigbtn">确认执行 ►</div>
+    </div>
+  </div>
+
+  <!-- 便签窗口 -->
+  <div class="win win-note">
+    <div class="tbar"><span class="box">×</span><span class="t">巡护备忘</span></div>
+    <div class="note-bd">
+      <i>▲</i>晨间 06:00-08:00 双模待机<br>
+      <i>▲</i>午后灌溉通道无活动<br>
+      <i>▲</i>周五检修红外镜头
+    </div>
+  </div>
+
+  <div class="notice">模拟执行器<br>不会控制真实硬件<br>视频来自果园服务<br>HLS · 2帧/秒抽样</div>
+
+  <!-- 任务栏 -->
+  <div class="dock">
+    <span class="on">机坪</span><span>告警</span><span>控制</span><span>档案</span>
+    <span class="ct mono">DET 128 · NEW 03 · OK 12</span>
+  </div>
+</div>
+</body></html>

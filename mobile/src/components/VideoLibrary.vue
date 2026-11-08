@@ -41,7 +41,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
 
   <template v-if="mode === 'species' && !species">
     <view v-for="group in groups" :key="group.species" class="qh-folder" @click="folder(group.species)">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15c0-5 3.5-9 8.5-9.5 2-.2 3.5.8 3.5 2.3 0 1.2-1 2.2-2.4 2.2h-2.1c-.3 2.8-2.6 5-5.5 5H4z" stroke="#7B9B63" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 15h9.5" stroke="#7B9B63" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15c0-5 3.5-9 8.5-9.5 2-.2 3.5.8 3.5 2.3 0 1.2-1 2.2-2.4 2.2h-2.1c-.3 2.8-2.6 5-5.5 5H4z" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 15h9.5" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg>
       <view class="qh-folder__info"><text class="qh-folder__name">{{ group.species }}</text><text class="qh-folder__stat">出现在 {{ group.videos }} 次视频检测中</text></view>
       <text class="qh-chevron">›</text>
     </view>
@@ -53,7 +53,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
 
     <view v-for="item in items" :key="item.id" class="qh-card qh-archcard" style="cursor:pointer" @click="open(item.id, species ? item.species.find(s => s.species === species)?.first_seen || 0 : 0)">
       <view class="qh-archcard__top">
-        <view class="qh-archcard__cover"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4.5v7l5.5-3.5L6 4.5z" fill="#D3E856"/></svg></view>
+        <view class="qh-archcard__cover"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4.5v7l5.5-3.5L6 4.5z" fill="#f4f4f0"/></svg></view>
         <view class="qh-archcard__info">
           <text class="qh-archcard__name">{{ item.name }}</text>
           <text class="qh-archcard__meta">{{ shortTime(item.at) }} · {{ item.duration.toFixed(1) }} 秒</text>
@@ -77,7 +77,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
 
     <text v-if="mode === 'video' && groups.length" class="qh-sectionlabel">按鸟类视图</text>
     <view v-for="group in (mode === 'video' ? groups.slice(0, 4) : [])" :key="'g-' + group.species" class="qh-folder" @click="mode = 'species'; folder(group.species)">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15c0-5 3.5-9 8.5-9.5 2-.2 3.5.8 3.5 2.3 0 1.2-1 2.2-2.4 2.2h-2.1c-.3 2.8-2.6 5-5.5 5H4z" stroke="#7B9B63" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 15h9.5" stroke="#7B9B63" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15c0-5 3.5-9 8.5-9.5 2-.2 3.5.8 3.5 2.3 0 1.2-1 2.2-2.4 2.2h-2.1c-.3 2.8-2.6 5-5.5 5H4z" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 15h9.5" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg>
       <view class="qh-folder__info"><text class="qh-folder__name">{{ group.species }}</text><text class="qh-folder__stat">出现在 {{ group.videos }} 次视频检测中</text></view>
       <text class="qh-chevron">›</text>
     </view>
@@ -91,7 +91,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
       <view class="qh-sheet__grab"/>
       <view class="qh-sheet__titlerow">
         <view><text class="qh-sheet__title">检测档案</text><text style="display:block;font-size:var(--text-xs);color:var(--ink-400);margin-top:3px">{{ detail.name }}</text></view>
-        <view class="qh-iconbtn--sm" @click="detail = null"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#6D7F6C" stroke-width="1.5" stroke-linecap="round"/></svg></view>
+        <view class="qh-iconbtn--sm" @click="detail = null"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg></view>
       </view>
 
       <view class="qh-seg">

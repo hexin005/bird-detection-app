@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>A · 果园塔台 QINGHE TWR</title>
+<style>
+/* ============================================================
+   A · 果园塔台 —— 鸟情监测 = 塔台航显板
+   锚定: 1970s 机场航站楼翻牌航显 (Split-Flap) × 塔台管制
+   配色: 板岩深灰 + 翻牌琥珀 + 信号红; 禁: 蓝紫渐变/圆角容器/emoji
+   ============================================================ */
+:root{
+  --slab:#0c0f14; --slab-2:#12161d; --line:#2a313c; --line-2:#3d4756;
+  --amber:#ffb400; --amber-dim:#8a6a1e; --flap:#171c24; --flap-face:#e8e2d2;
+  --white:#e9e9e4; --dim:#6b7686; --red:#ff4b3e; --ok:#8fb573;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#05070a;font-family:"Arial Narrow","Roboto Condensed","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif}
+.mono{font-family:Consolas,"Courier New",monospace}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--slab);position:relative;overflow:hidden;
+  box-shadow:0 0 0 8px #171b22,0 0 0 9px #000,0 30px 70px rgba(0,0,0,.7);color:var(--white)}
+/* ———— 顶部塔台标牌 ———— */
+.twr-top{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.twr-id{display:flex;align-items:baseline;gap:8px}
+.twr-id b{font-size:19px;letter-spacing:3px;color:var(--white);font-weight:800}
+.twr-id span{font-size:10px;letter-spacing:2px;color:var(--amber);border:1px solid var(--amber-dim);padding:2px 6px}
+.twr-clock{text-align:right;font-size:10px;line-height:1.5;color:var(--dim);letter-spacing:1px}
+.twr-clock b{color:var(--white);font-size:13px;letter-spacing:2px}
+/* ———— LIVE 机坪画面 ———— */
+.apron{position:relative;margin:12px 14px 0;height:190px;background:#000;border:1px solid var(--line-2)}
+.apron img{width:100%;height:100%;object-fit:cover;filter:saturate(.82) contrast(1.05) brightness(.88)}
+.apron .brk{position:absolute;width:16px;height:16px;border:2px solid var(--amber)}
+.apron .brk.tl{left:6px;top:6px;border-right:0;border-bottom:0}
+.apron .brk.tr{right:6px;top:6px;border-left:0;border-bottom:0}
+.apron .brk.bl{left:6px;bottom:6px;border-right:0;border-top:0}
+.apron .brk.br{right:6px;bottom:6px;border-left:0;border-top:0}
+.dbox{position:absolute;left:32%;top:26%;width:42%;height:56%;border:2px solid var(--amber);box-shadow:0 0 14px rgba(255,180,0,.35)}
+.dbox .tag{position:absolute;left:-2px;top:-24px;background:var(--amber);color:#141414;font-size:11px;font-weight:800;padding:2px 8px;letter-spacing:1px}
+.live-chip{position:absolute;left:10px;top:10px;display:flex;align-items:center;gap:6px;background:rgba(6,8,11,.85);border:1px solid var(--line-2);padding:3px 8px;font-size:10px;letter-spacing:2px;color:var(--white)}
+.live-chip i{width:7px;height:7px;border-radius:50%;background:var(--red);animation:bk 1.1s steps(2) infinite}
+@keyframes bk{50%{opacity:.15}}
+.apron-meta{position:absolute;right:10px;bottom:8px;font-size:9px;letter-spacing:1.5px;color:var(--dim)}
+/* ———— 计数板: 翻牌数字 ———— */
+.counters{display:flex;gap:8px;margin:10px 14px 0}
+.cnt{flex:1;border:1px solid var(--line);background:var(--slab-2);padding:8px 0 7px;text-align:center}
+.cnt .digits{display:inline-flex;gap:3px}
+.cnt .d{width:20px;height:30px;background:linear-gradient(180deg,#20262f 0 47%,#12161c 53% 100%);color:var(--amber);
+  font-family:Consolas,monospace;font-size:20px;font-weight:700;line-height:29px;text-align:center;position:relative}
+.cnt .d::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#000}
+.cnt.warn .d{color:var(--red)}
+.cnt span{display:block;font-size:9px;letter-spacing:2px;color:var(--dim);margin-top:5px}
+/* ———— 航显板 ———— */
+.board{margin:12px 14px 0;border:1px solid var(--line)}
+.board-hd{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--slab-2)}
+.board-hd b{font-size:11px;letter-spacing:3px;color:var(--white)}
+.board-hd span{font-size:9px;letter-spacing:2px;color:var(--dim)}
+.cols{display:grid;grid-template-columns:64px 1fr 34px 44px 58px;padding:5px 10px;font-size:9px;letter-spacing:2px;color:var(--dim);border-bottom:1px solid var(--line)}
+.row{display:grid;grid-template-columns:64px 1fr 34px 44px 58px;align-items:center;padding:0 10px;border-bottom:1px solid rgba(42,49,60,.55)}
+.row:last-child{border-bottom:0}
+.row .fl{padding:7px 0}
+.fno{font-family:Consolas,monospace;font-size:11px;font-weight:700;color:var(--amber);letter-spacing:1px}
+.spn{font-size:13px;font-weight:700;color:var(--white);letter-spacing:1px}
+.spn small{display:block;font-size:8.5px;color:var(--dim);letter-spacing:1.5px;font-weight:400;margin-top:1px}
+.qty{font-family:Consolas,monospace;font-size:14px;color:var(--white)}
+.tm{font-family:Consolas,monospace;font-size:11px;color:var(--dim)}
+.st{justify-self:end}
+.flap{display:inline-block;min-width:52px;text-align:center;font-size:10px;font-weight:800;letter-spacing:2px;padding:4px 0 3px;position:relative}
+.flap::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.45)}
+.flap.new{background:var(--red);color:#160b0a}
+.flap.run{background:var(--amber);color:#161307;animation:bk 1.4s steps(2) infinite}
+.flap.done{background:var(--flap);color:var(--dim);border:1px solid var(--line)}
+.row.is-new{background:linear-gradient(90deg,rgba(255,75,62,.12),transparent 65%);box-shadow:inset 3px 0 0 var(--red)}
+/* ———— 放行许可条 ———— */
+.clearance{position:absolute;left:14px;right:14px;bottom:74px;border:1px solid var(--amber-dim);background:var(--slab-2)}
+.cl-hd{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--line);font-size:9px;letter-spacing:2px}
+.cl-hd b{color:var(--amber)}
+.cl-hd span{color:var(--dim)}
+.cl-body{display:flex;align-items:center}
+.cl-modes{display:flex;flex:1}
+.cl-mode{flex:1;text-align:center;padding:9px 0 8px;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--dim);border-right:1px solid var(--line)}
+.cl-mode small{display:block;font-size:8px;letter-spacing:1px;color:var(--line-2);margin-top:2px;font-weight:400}
+.cl-mode.on{color:#161307;background:var(--amber)}
+.cl-mode.on small{color:rgba(22,19,7,.65)}
+.cl-go{width:96px;text-align:center;background:var(--amber);color:#161307;font-weight:800;font-size:12px;letter-spacing:2px;padding:13px 0 12px}
+.cl-go em{display:block;font-style:normal;font-size:9px;letter-spacing:1px;opacity:.7;margin-top:1px}
+/* ———— 塔台频道导航 ———— */
+.twr-nav{position:absolute;left:0;right:0;bottom:0;height:62px;background:var(--slab-2);border-top:1px solid var(--line);display:flex}
+.twr-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--dim);font-size:9.5px;letter-spacing:2px;position:relative}
+.twr-tab b{font-size:10.5px}
+.twr-tab.on{color:var(--amber)}
+.twr-tab.on::before{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--amber)}
+.twr-tab .badge{position:absolute;top:9px;left:58%;background:var(--red);color:#160b0a;font-size:8.5px;font-weight:800;padding:1px 4px}
+.sq{width:12px;height:12px;border:1.6px solid currentColor;display:inline-block}
+.sq.fill{background:currentColor}
+</style></head><body>
+<div class="phone">
+  <!-- 塔台标牌 -->
+  <div class="twr-top">
+    <div class="twr-id"><b>果园塔台</b><span>QINGHE TWR</span></div>
+    <div class="twr-clock mono"><b>09:41 LCL</b><br>东区 · 01 号监控点 · YOLOv8</div>
+  </div>
+
+  <!-- LIVE 机坪 -->
+  <div class="apron">
+    <img src="../../.runtime/captures/T9311ae2050-15.jpg" alt="">
+    <i class="brk tl"></i><i class="brk tr"></i><i class="brk bl"></i><i class="brk br"></i>
+    <div class="dbox"><span class="tag">珠颈斑鸠 0.93</span></div>
+    <div class="live-chip"><i></i>LIVE · CAM-01 · 2 FPS 抽样</div>
+    <div class="apron-meta mono">RESULT.MP4 · HLS</div>
+  </div>
+
+  <!-- 计数翻牌 -->
+  <div class="counters">
+    <div class="cnt warn"><div class="digits"><span class="d">0</span><span class="d">3</span></div><span>待处理告警</span></div>
+    <div class="cnt"><div class="digits"><span class="d">1</span><span class="d">2</span><span class="d">8</span></div><span>今日检测事件</span></div>
+    <div class="cnt"><div class="digits"><span class="d">1</span><span class="d">2</span></div><span>执行完成</span></div>
+  </div>
+
+  <!-- 航显板 -->
+  <div class="board">
+    <div class="board-hd"><b>今日鸟情 BOARD</b><span class="mono">BIRD MOVEMENTS · 24H</span></div>
+    <div class="cols"><span>班次</span><span>鸟种</span><span>数量</span><span>时刻</span><span style="text-align:right">状态</span></div>
+    <div class="row is-new">
+      <div class="fl fno">BRD-1114</div>
+      <div class="fl spn">珠颈斑鸠<small>SPOTTED DOVE · 93%</small></div>
+      <div class="fl qty">2</div>
+      <div class="fl tm">09:41</div>
+      <div class="fl st"><span class="flap new">待处理</span></div>
+    </div>
+    <div class="row">
+      <div class="fl fno">BRD-1097</div>
+      <div class="fl spn">白喉红臀鹎<small>RED-VENTED BULBUL · 96%</small></div>
+      <div class="fl qty">2</div>
+      <div class="fl tm">08:12</div>
+      <div class="fl st"><span class="flap run">执行中</span></div>
+    </div>
+    <div class="row">
+      <div class="fl fno">BRD-1082</div>
+      <div class="fl spn">八哥<small>CRESTED MYNA · 85%</small></div>
+      <div class="fl qty">1</div>
+      <div class="fl tm">07:56</div>
+      <div class="fl st"><span class="flap done">已处理</span></div>
+    </div>
+    <div class="row">
+      <div class="fl fno">BRD-1065</div>
+      <div class="fl spn">麻雀群<small>TREE SPARROW · 53%</small></div>
+      <div class="fl qty">6</div>
+      <div class="fl tm">06:30</div>
+      <div class="fl st"><span class="flap done">已忽略</span></div>
+    </div>
+  </div>
+
+  <!-- 放行许可 -->
+  <div class="clearance">
+    <div class="cl-hd"><b>CLEARANCE · 放行许可</b><span class="mono">关联 BRD-1114</span></div>
+    <div class="cl-body">
+      <div class="cl-modes">
+        <div class="cl-mode">声波<small>ACOUSTIC 01</small></div>
+        <div class="cl-mode">红外<small>INFRARED 02</small></div>
+        <div class="cl-mode on">双模联动<small>DUAL-MODE</small></div>
+      </div>
+      <div class="cl-go">确认放行<em>双模 · 5 秒</em></div>
+    </div>
+  </div>
+
+  <!-- 塔台频道 -->
+  <div class="twr-nav">
+    <div class="twr-tab on"><span class="sq fill"></span><b>机坪</b>LIVE</div>
+    <div class="twr-tab"><span class="sq"></span><b>告警板</b>BOARD<span class="badge">3</span></div>
+    <div class="twr-tab"><span class="sq"></span><b>放行</b>CLEARANCE</div>
+    <div class="twr-tab"><span class="sq"></span><b>日志</b>LOG</div>
+  </div>
+</div>
+</body></html>

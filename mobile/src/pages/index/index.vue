@@ -88,20 +88,24 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <!-- ======================= 登录页 ======================= -->
     <view class="page page--nologin" :class="{ 'is-current': !store.token }">
       <view class="statusbar">
-        <text class="time">9:41</text>
-        <view class="icons">
-          <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect y="7" width="3" height="5" rx="1" fill="#232B1D"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#232B1D"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#232B1D"/><rect x="15" width="3" height="12" rx="1" fill="#232B1D"/></svg>
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><path d="M1 4a11 11 0 0115 0M3.7 6.8a7 7 0 019.6 0M6.4 9.4a3.2 3.2 0 014.2 0" stroke="#232B1D" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1.2" fill="#232B1D"/></svg>
-          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#232B1D" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="#232B1D"/></svg>
+        <view class="qh-menubar">
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+          <text class="qh-menubar__ttl">果园守护</text>
+          <text class="qh-menubar__item">文件</text>
+          <text class="qh-menubar__item">监测</text>
+          <text class="qh-menubar__item">告警</text>
+          <text class="qh-menubar__item">特效</text>
+          <view class="qh-menubar__right"><text class="time">9:41</text></view>
         </view>
       </view>
       <view class="page__content">
         <view class="qh-brand">
           <view class="qh-brand__mark">
-            <svg width="30" height="34" viewBox="0 0 30 34" fill="none"><path d="M15 32V14" stroke="#F5F7EC" stroke-width="2" stroke-linecap="round"/><path d="M15 20C15 12 9 7 2 6c1 8 5.5 13 13 14z" stroke="#F5F7EC" stroke-width="2" stroke-linejoin="round"/><path d="M15 16c0-7 5.5-11.5 13-12.5-1 8-5.5 12.5-13 12.5z" stroke="#F5F7EC" stroke-width="2" stroke-linejoin="round"/></svg>
+            <svg width="30" height="34" viewBox="0 0 30 34" fill="none"><path d="M15 32V14" stroke="#f4f4f0" stroke-width="2" stroke-linecap="round"/><path d="M15 20C15 12 9 7 2 6c1 8 5.5 13 13 14z" stroke="#f4f4f0" stroke-width="2" stroke-linejoin="round"/><path d="M15 16c0-7 5.5-11.5 13-12.5-1 8-5.5 12.5-13 12.5z" stroke="#f4f4f0" stroke-width="2" stroke-linejoin="round"/></svg>
           </view>
           <text class="qh-brand__title">青禾 · 果园守护</text>
           <text class="qh-brand__tag">欢迎回来，开启今天的巡护</text>
+          <view class="qh-mvp">SYSTEM 1.0</view>
         </view>
         <text class="qh-formlabel">连接你的果园监测服务</text>
         <view class="qh-input"><input v-model="credentials.server" type="text" placeholder="http://192.168.1.23:8008" /></view>
@@ -109,18 +113,21 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         <view class="qh-input"><input v-model="credentials.password" type="password" placeholder="请输入密码" /></view>
         <button class="qh-btn qh-btn--primary" :disabled="store.busy || !credentials.password" @click="run(async () => { await store.login(credentials.server, credentials.username, credentials.password); credentials.password = '' })">{{ store.busy ? '正在连接…' : '登录并进入果园' }}</button>
         <text class="qh-hint">账号由本地服务创建。手机访问时，请填写电脑的局域网地址，并确保手机与电脑处于同一网络。</text>
-        <view class="qh-footer"><text>MVP · 仅限局域网使用 · v0.2</text></view>
+        <view class="qh-footer"><text>System 1.0 · 仅限局域网使用 · MVP</text></view>
       </view>
     </view>
 
     <!-- ======================= 监控页 ======================= -->
     <view class="page" :class="{ 'is-current': store.token && page === 'monitor' }">
       <view class="statusbar">
-        <text class="time">9:41</text>
-        <view class="icons">
-          <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect y="7" width="3" height="5" rx="1" fill="#232B1D"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#232B1D"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#232B1D"/><rect x="15" width="3" height="12" rx="1" fill="#232B1D"/></svg>
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><path d="M1 4a11 11 0 0115 0M3.7 6.8a7 7 0 019.6 0M6.4 9.4a3.2 3.2 0 014.2 0" stroke="#232B1D" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1.2" fill="#232B1D"/></svg>
-          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#232B1D" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="#232B1D"/></svg>
+        <view class="qh-menubar">
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+          <text class="qh-menubar__ttl">果园守护</text>
+          <text class="qh-menubar__item">文件</text>
+          <text class="qh-menubar__item">监测</text>
+          <text class="qh-menubar__item">告警</text>
+          <text class="qh-menubar__item">特效</text>
+          <view class="qh-menubar__right"><text class="time">9:41</text></view>
         </view>
       </view>
       <view class="page__content">
@@ -129,7 +136,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
             <view class="qh-header__row"><text class="qh-appname">青禾示范果园</text><text class="qh-mvp">MVP</text></view>
             <text class="qh-site">东区 · 01 号监控点</text>
           </view>
-          <view class="qh-header__actions"><button class="qh-3dbtn" @click="openScene"><text>3D 视角</text></button><button class="qh-iconbtn" @click="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#44523E" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#44523E" stroke-width="1.5"/></svg></button></view>
+          <view class="qh-header__actions"><button class="qh-3dbtn" @click="openScene"><text>3D 视角</text></button><button class="qh-iconbtn" @click="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="#111111" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#111111" stroke-width="1.5"/></svg></button></view>
         </view>
 
         <view class="qh-conn"><view class="qh-conn__left"><view class="qh-conn__dot"/><text>{{ store.connection }}</text></view><text class="qh-conn__src">{{ s ? '数据来自果园服务' : '等待同步' }}</text></view>
@@ -165,7 +172,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         </view>
 
         <view class="qh-devicebar">
-          <view class="qh-devicebar__icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 7v4h3l4 3.5v-11L5.5 7h-3z" stroke="#44523E" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 6.5a3.5 3.5 0 010 5M14 4.5a6.3 6.3 0 010 9" stroke="#44523E" stroke-width="1.4" stroke-linecap="round"/></svg></view>
+          <view class="qh-devicebar__icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 7v4h3l4 3.5v-11L5.5 7h-3z" stroke="#111111" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 6.5a3.5 3.5 0 010 5M14 4.5a6.3 6.3 0 010 9" stroke="#111111" stroke-width="1.4" stroke-linecap="round"/></svg></view>
           <view class="qh-devicebar__info"><text class="qh-devicebar__name">声学驱鸟器 01</text><text class="qh-devicebar__desc">模拟设备 · 人工确认后执行</text></view>
           <view class="qh-pill"><view class="qh-pill__dot"/><text class="qh-pill__text">{{ offline ? '离线' : '在线' }}</text></view>
         </view>
@@ -175,11 +182,14 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <!-- ======================= 告警页 ======================= -->
     <view class="page" :class="{ 'is-current': store.token && page === 'alarms' }">
       <view class="statusbar">
-        <text class="time">9:41</text>
-        <view class="icons">
-          <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect y="7" width="3" height="5" rx="1" fill="#232B1D"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#232B1D"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#232B1D"/><rect x="15" width="3" height="12" rx="1" fill="#232B1D"/></svg>
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><path d="M1 4a11 11 0 0115 0M3.7 6.8a7 7 0 019.6 0M6.4 9.4a3.2 3.2 0 014.2 0" stroke="#232B1D" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1.2" fill="#232B1D"/></svg>
-          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#232B1D" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="#232B1D"/></svg>
+        <view class="qh-menubar">
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+          <text class="qh-menubar__ttl">果园守护</text>
+          <text class="qh-menubar__item">文件</text>
+          <text class="qh-menubar__item">监测</text>
+          <text class="qh-menubar__item">告警</text>
+          <text class="qh-menubar__item">特效</text>
+          <view class="qh-menubar__right"><text class="time">9:41</text></view>
         </view>
       </view>
       <view class="page__content"><BirdAlarms @open="openAlarm" /></view>
@@ -188,11 +198,14 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <!-- ======================= 控制页 ======================= -->
     <view class="page" :class="{ 'is-current': store.token && page === 'control' }">
       <view class="statusbar">
-        <text class="time">9:41</text>
-        <view class="icons">
-          <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect y="7" width="3" height="5" rx="1" fill="#232B1D"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#232B1D"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#232B1D"/><rect x="15" width="3" height="12" rx="1" fill="#232B1D"/></svg>
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><path d="M1 4a11 11 0 0115 0M3.7 6.8a7 7 0 019.6 0M6.4 9.4a3.2 3.2 0 014.2 0" stroke="#232B1D" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1.2" fill="#232B1D"/></svg>
-          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#232B1D" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="#232B1D"/></svg>
+        <view class="qh-menubar">
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+          <text class="qh-menubar__ttl">果园守护</text>
+          <text class="qh-menubar__item">文件</text>
+          <text class="qh-menubar__item">监测</text>
+          <text class="qh-menubar__item">告警</text>
+          <text class="qh-menubar__item">特效</text>
+          <view class="qh-menubar__right"><text class="time">9:41</text></view>
         </view>
       </view>
       <view class="page__content">
@@ -206,9 +219,9 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         <view class="qh-devicecard">
           <view class="qh-orbit">
             <view class="qh-orbit__ring"/>
-            <view class="qh-orbit__core"><svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M2.5 7v4h3l4 3.5v-11L5.5 7h-3z" stroke="#F5F7EC" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 6.5a3.5 3.5 0 010 5M14 4.5a6.3 6.3 0 010 9" stroke="#F5F7EC" stroke-width="1.4" stroke-linecap="round"/></svg></view>
-            <svg class="qh-orbit__wave" style="left:2px;" width="14" height="20" viewBox="0 0 14 20" fill="none"><path d="M11 3Q4 10 11 17M7 6.5Q3.5 10 7 13.5" stroke="#7B9B63" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <svg class="qh-orbit__wave" style="right:2px;" width="14" height="20" viewBox="0 0 14 20" fill="none"><path d="M3 3Q10 10 3 17M7 6.5Q10.5 10 7 13.5" stroke="#7B9B63" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <view class="qh-orbit__core"><svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M2.5 7v4h3l4 3.5v-11L5.5 7h-3z" stroke="#f4f4f0" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 6.5a3.5 3.5 0 010 5M14 4.5a6.3 6.3 0 010 9" stroke="#f4f4f0" stroke-width="1.4" stroke-linecap="round"/></svg></view>
+            <svg class="qh-orbit__wave" style="left:2px;" width="14" height="20" viewBox="0 0 14 20" fill="none"><path d="M11 3Q4 10 11 17M7 6.5Q3.5 10 7 13.5" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <svg class="qh-orbit__wave" style="right:2px;" width="14" height="20" viewBox="0 0 14 20" fill="none"><path d="M3 3Q10 10 3 17M7 6.5Q10.5 10 7 13.5" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg>
             <view class="qh-orbit__dot"/>
           </view>
           <view class="qh-devicerow">
@@ -247,17 +260,17 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         </view>
 
         <view v-else-if="s?.commands[0]" class="qh-resultcard" style="cursor:pointer" @click="detailId = s.commands[0].id; modal = 'mLog'">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="#56753F" stroke-width="1.5"/><path d="M5.8 9.2l2.2 2.2 4.2-4.6" stroke="#56753F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="#111111" stroke-width="1.5"/><path d="M5.8 9.2l2.2 2.2 4.2-4.6" stroke="#111111" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <view class="qh-resultcard__info"><text class="qh-resultcard__title">最近一次执行 · {{ names(s.commands[0].status) }}</text><text class="qh-resultcard__desc">{{ s.commands[0].message }}</text></view>
         </view>
 
         <button class="qh-btn qh-btn--primary" :disabled="store.busy || offline || !!store.active" @click="modal = 'mConfirm'">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 5.5v4h2.5L8 12.5v-10L4.5 5.5H2z" fill="#F5F7EC"/><path d="M10.5 5a3.5 3.5 0 010 5M12.5 3a6.5 6.5 0 010 9" stroke="#F5F7EC" stroke-width="1.4" stroke-linecap="round"/></svg>{{ offline ? '设备离线，无法执行' : '执行一次驱离' }}
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 5.5v4h2.5L8 12.5v-10L4.5 5.5H2z" fill="#f4f4f0"/><path d="M10.5 5a3.5 3.5 0 010 5M12.5 3a6.5 6.5 0 010 9" stroke="#f4f4f0" stroke-width="1.4" stroke-linecap="round"/></svg>{{ offline ? '设备离线，无法执行' : '执行一次驱离' }}
         </button>
 
         <text class="qh-note">本设备是模拟执行器，不会控制真实硬件</text>
         <view class="qh-shortcut" @click="settings">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="4.6" height="4.6" rx="1" stroke="#8A917F" stroke-width="1.3"/><rect x="7.4" y="1" width="4.6" height="4.6" rx="1" stroke="#8A917F" stroke-width="1.3"/><rect x="1" y="7.4" width="4.6" height="4.6" rx="1" stroke="#8A917F" stroke-width="1.3"/><rect x="7.4" y="7.4" width="4.6" height="4.6" rx="1" stroke="#8A917F" stroke-width="1.3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="4.6" height="4.6" rx="1" stroke="#111111" stroke-width="1.3"/><rect x="7.4" y="1" width="4.6" height="4.6" rx="1" stroke="#111111" stroke-width="1.3"/><rect x="1" y="7.4" width="4.6" height="4.6" rx="1" stroke="#111111" stroke-width="1.3"/><rect x="7.4" y="7.4" width="4.6" height="4.6" rx="1" stroke="#111111" stroke-width="1.3"/></svg>
           <text>切换离线 / 超时演示场景</text>
         </view>
       </view>
@@ -266,11 +279,14 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <!-- ======================= 记录页 ======================= -->
     <view class="page" :class="{ 'is-current': store.token && page === 'records' }">
       <view class="statusbar">
-        <text class="time">9:41</text>
-        <view class="icons">
-          <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><rect y="7" width="3" height="5" rx="1" fill="#232B1D"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#232B1D"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#232B1D"/><rect x="15" width="3" height="12" rx="1" fill="#232B1D"/></svg>
-          <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><path d="M1 4a11 11 0 0115 0M3.7 6.8a7 7 0 019.6 0M6.4 9.4a3.2 3.2 0 014.2 0" stroke="#232B1D" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="10.5" r="1.2" fill="#232B1D"/></svg>
-          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3" stroke="#232B1D" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="#232B1D"/></svg>
+        <view class="qh-menubar">
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="#111111"/><rect x="6" y="4" width="2" height="2" fill="#f4f4f0"/></svg>
+          <text class="qh-menubar__ttl">果园守护</text>
+          <text class="qh-menubar__item">文件</text>
+          <text class="qh-menubar__item">监测</text>
+          <text class="qh-menubar__item">告警</text>
+          <text class="qh-menubar__item">特效</text>
+          <view class="qh-menubar__right"><text class="time">9:41</text></view>
         </view>
       </view>
       <view class="page__content">
@@ -327,7 +343,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <view v-if="modal === 'mSet'" class="qh-mask qh-mask--bottom is-open" @click.self="modal = ''">
       <view class="qh-sheet">
         <view class="qh-sheet__grab"/>
-        <view class="qh-sheet__titlerow"><text class="qh-sheet__title">设置</text><view class="qh-iconbtn--sm" @click="modal = ''"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#6D7F6C" stroke-width="1.5" stroke-linecap="round"/></svg></view></view>
+        <view class="qh-sheet__titlerow"><text class="qh-sheet__title">设置</text><view class="qh-iconbtn--sm" @click="modal = ''"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg></view></view>
         <text style="font-size:var(--text-base);font-weight:500;color:var(--ink-900);">场景切换</text>
         <view v-for="opt in [{id:'normal',name:'正常执行',desc:'识别到鸟类后人工确认驱离'},{id:'offline',name:'设备离线',desc:'演示设备不在线时的界面与提示'},{id:'timeout',name:'执行超时',desc:'演示指令无响应时的状态与恢复'}]" :key="opt.id" class="qh-radio" :class="{ 'is-selected': preferences.scenario === opt.id }" @click="preferences.scenario = opt.id as Preferences['scenario']">
           <view class="qh-radio__circle"><view class="qh-radio__dot"/></view>
@@ -367,8 +383,8 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
     <!-- ======================= 弹窗：确认执行 ======================= -->
     <view v-if="modal === 'mConfirm'" class="qh-mask qh-mask--center is-open" @click.self="modal = ''">
       <view class="qh-dialog">
-        <view style="width:44px;height:44px;border-radius:50%;background:var(--warn-bg);display:flex;align-items:center;justify-content:center;">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 8v4h3l4 3.5v-11L6 8H3z" fill="#96682B"/><path d="M13 7a4.5 4.5 0 010 6M15.5 5a8 8 0 010 10" stroke="#96682B" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <view style="width:44px;height:44px;background:var(--warn-bg);display:flex;align-items:center;justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 8v4h3l4 3.5v-11L6 8H3z" fill="#f4f4f0"/><path d="M13 7a4.5 4.5 0 010 6M15.5 5a8 8 0 010 10" stroke="#f4f4f0" stroke-width="1.5" stroke-linecap="round"/></svg>
         </view>
         <text class="qh-dialog__title">确认执行驱离？</text>
         <text class="qh-dialog__desc">{{ activeMode.desc }}</text>
@@ -391,7 +407,7 @@ watch(() => s.value?.alarms.find(a => a.id === selectedAlarm.value)?.status, st 
         <view class="qh-sheet__grab"/>
         <view class="qh-sheet__titlerow">
           <view><text class="qh-sheet__title">操作记录</text><text style="display:block;font-size:var(--text-xs);color:var(--ink-400);margin-top:3px;">{{ command.id }}<text v-if="command.alarm_id"> · {{ command.alarm_id }}</text></text></view>
-          <view class="qh-iconbtn--sm" @click="modal = ''"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#6D7F6C" stroke-width="1.5" stroke-linecap="round"/></svg></view>
+          <view class="qh-iconbtn--sm" @click="modal = ''"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="#111111" stroke-width="1.5" stroke-linecap="round"/></svg></view>
         </view>
         <view class="qh-tl">
           <view class="qh-tl__item"><view class="qh-tl__dot qh-tl__dot--confirm"/><view class="qh-tl__info"><view class="qh-tl__head"><text class="qh-tl__title">人工确认</text><text class="qh-tl__time">{{ time(command.at) }}</text></view><text class="qh-tl__msg">确认了下发一次 {{ command.duration }} 秒驱离操作</text></view></view>

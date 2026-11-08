@@ -1,17 +1,16 @@
 /* ==========================================================================
-   青禾 · 果园守护 — 页面布局层
+   青禾 · 果园守护 — 页面布局层(v3 "果园守护 1.0" · 1-bit)
    --------------------------------------------------------------------------
    结构：.phone（视口内自适应，不滚动）
-           ├── .statusbar（固定 44px）
+           ├── .statusbar（Mac 菜单栏，固定 var(--statusbar-height)）
            ├── .page.is-current（flex:1，min-height:0）
            │     └── .page__content（唯一滚动区）
-           └── .qh-tabbar（flex-shrink:0 吸底）
-   手机壳高度受视口约束，导航栏永远完整可见。
+           └── .qh-tabbar（flex-shrink:0 吸底任务栏）
    ========================================================================== */
 
 page,
 :root {
-  background: #e5e3d6;
+  background: #f4f4f0;
   color: var(--ink-900);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -100,6 +99,32 @@ uni-image {
 }
 
 /* ==========================================================================
+   uni-app 原生 Toast 方形化(notify() → uni.showToast,H5 下默认灰底圆角)
+   ========================================================================== */
+
+uni-toast > div,
+uni-toast .uni-toast,
+uni-toast .uni-sample-toast {
+  background: #f4f4f0 !important;
+  border: 2px solid #111111 !important;
+  border-radius: 0 !important;
+  box-shadow: 3px 3px 0 #111111 !important;
+  color: #111111 !important;
+  font-family: var(--font-sans) !important;
+}
+uni-toast * {
+  border-radius: 0 !important;
+}
+uni-toast .uni-toast .uni-toast__content,
+uni-toast .uni-sample-toast .uni-toast__content,
+uni-toast .uni-simple-toast__text,
+uni-toast > div > div,
+uni-toast p {
+  color: #111111 !important;
+  font-family: var(--font-sans) !important;
+}
+
+/* ==========================================================================
    视口根：占满视口，不产生外层滚动
    ========================================================================== */
 
@@ -120,7 +145,7 @@ uni-page-body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #e5e3d6;
+  background: #f4f4f0;
 }
 
 /* 桌面端：让手机壳在视口内水平垂直居中 */
@@ -136,7 +161,7 @@ uni-page-body {
 }
 
 /* ==========================================================================
-   手机壳：高度贴合视口
+   手机壳：高度贴合视口；桌面端三层 ring——一台"机器"
    ========================================================================== */
 
 .phone {
@@ -144,12 +169,15 @@ uni-page-body {
   height: 100vh;
   height: 100dvh;
   margin: 0 auto;
-  background: var(--surface-canvas);
+  background: var(--dither-light);
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 18px 60px rgba(31, 47, 38, 0.18);
+  box-shadow:
+    0 0 0 8px #d6d6d0,
+    0 0 0 10px #2a2a26,
+    0 30px 70px rgba(0, 0, 0, 0.6);
   flex-shrink: 0;
   box-sizing: border-box;
 }
@@ -164,22 +192,23 @@ uni-page-body {
 }
 
 /* ==========================================================================
-   状态栏
+   状态栏 → Mac 菜单栏（内部 .qh-menubar 结构见 components-qh.css）
    ========================================================================== */
 
 .statusbar {
-  height: 44px;
+  height: var(--statusbar-height);
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
+  background: var(--surface-card);
+  border-bottom: 2px solid #111111;
+  padding: 0 12px;
   padding-top: env(safe-area-inset-top);
 }
 .statusbar .time {
   font-family: var(--font-num);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--ink-900);
 }
 .statusbar .icons {
@@ -219,7 +248,7 @@ uni-page-body {
   gap: var(--section-gap);
   padding-bottom: var(--space-6);
   scrollbar-width: thin;
-  scrollbar-color: rgba(52, 80, 47, 0.22) transparent;
+  scrollbar-color: #111111 transparent;
 }
 
 /* 内容区子元素不允许被压缩：超出时滚动，而不是压扁卡片/视频 */
@@ -228,17 +257,15 @@ uni-page-body {
 }
 
 .page__content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 .page__content::-webkit-scrollbar-track {
   background: transparent;
 }
 .page__content::-webkit-scrollbar-thumb {
-  background: rgba(52, 80, 47, 0.22);
-  border-radius: 3px;
-}
-.page__content::-webkit-scrollbar-thumb:hover {
-  background: rgba(52, 80, 47, 0.38);
+  background: #111111;
+  border: 2px solid #f4f4f0;
+  border-radius: 0;
 }
 
 .page--nologin .page__content {

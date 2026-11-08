@@ -1,81 +1,89 @@
 /* ==========================================================================
-   青禾 · 果园守护 — 重设计 Design Tokens (v2 "纸面·田园笔记")
+   青禾 · 果园守护 — Design Tokens (v3 "果园守护 1.0" · 1984 1-bit Macintosh)
    --------------------------------------------------------------------------
-   替代 current-tokens.css。变量命名沿用旧版风格（--brand-* / --ink-* /
-   --surface-* ...），组件里统一 var(--token) 取值，改主题只改本文件。
-   生成依据：Ardot 设计稿「青禾·果园守护 UI 重设计」。
+   变量命名沿用 v2(组件里统一 var(--token) 取值),本次只换值不换名:
+   纯黑白 + 棋盘格抖动灰、零圆角、硬偏移阴影、等宽数字。
+   依据参考稿 docs/ui-y/b-1bit.html。想恢复彩色视频,只改 --video-filter。
    ========================================================================== */
 
 page,
 :root {
-  /* ---------- 品牌色：墨绿（唯一重色，只给主按钮 / 选中态 / 正在监测） ---------- */
-  --brand-900: #22371f;
-  --brand-800: #27402a; /* 主按钮按压态 */
-  --brand-700: #34502f; /* 主色 */
-  --brand-600: #3f5c33;
-  --brand-500: #4f6b3f;
-  --brand-400: #7b9b63; /* 苔绿，辅助 */
-  --brand-300: #a7b78e;
-  --brand-200: #cdd9b8;
-  --brand-100: #e4eddc; /* 进行中底 */
-  --brand-50:  #f4f6ea; /* 选中浅底 */
+  /* ---------- 品牌色:黑(唯一重色,给主按钮 / 选中态 / 正在监测) ---------- */
+  --brand-900: #000000;
+  --brand-800: #1a1a1a; /* 主按钮按压态(位移+去阴影) */
+  --brand-700: #111111; /* 主色 */
+  --brand-600: #111111;
+  --brand-500: #111111;
+  --brand-400: #55554f; /* 原"苔绿辅助"位 → 深灰 */
+  --brand-300: #a9a9a2;
+  --brand-200: #c8c8c2;
+  --brand-100: #e4e4de;
+  --brand-50:  #f4f4f0;
 
-  /* ---------- 中性色：带绿的暖墨 ---------- */
-  --ink-900: #232b1d; /* 主标题 / 数字 */
-  --ink-800: #2a3324; /* 正文强调 */
-  --ink-700: #43503e; /* 次级强调（次按钮文字 #44523e 同源） */
-  --ink-600: #6d7f6c; /* 弱强调 / 中性语义 */
-  --ink-500: #7c8472; /* 次要正文 */
-  --ink-400: #8a917f; /* 说明文字 / 未激活图标 */
-  --ink-300: #a3ab97; /* 占位 / 极弱提示 */
-  --ink-200: #b8bfa9; /* 页脚 */
-  --ink-100: #c3cbb8; /* 未选中描边 */
+  /* ---------- 中性色:1-bit 灰阶 ---------- */
+  --ink-900: #111111; /* 主标题 / 数字 */
+  --ink-800: #111111;
+  --ink-700: #111111;
+  --ink-600: #55554f; /* 弱强调 / 中性语义 */
+  --ink-500: #55554f;
+  --ink-400: #6f6f68; /* 说明文字 / 未激活 */
+  --ink-300: #8f8f88; /* 占位 / 极弱提示 */
+  --ink-200: #a9a9a2;
+  --ink-100: #c8c8c2;
 
-  /* ---------- 表面：暖纸面体系 ---------- */
-  --surface-canvas: #f3f1e7; /* 页面底（暖纸） */
-  --surface-card: #ffffff;   /* 卡片 */
-  --surface-raised: #fbfaf3; /* 浮层 / Token 板 */
-  --surface-sunken: #edefdf; /* 凹陷区 / 分段槽 / chips */
-  --surface-muted: #f7f5ec;  /* 信息格 / 弱底块 */
-  --surface-video: #1c2318;  /* 视频区深底 */
-  --surface-mask: rgba(35, 43, 29, 0.5); /* 弹窗遮罩（墨绿半透明，勿改纯黑） */
+  /* ---------- 表面:纸白 + 抖动棋盘 ---------- */
+  --surface-canvas: #f4f4f0; /* 页面底(棋盘格平铺见 styles.css) */
+  --surface-card: #f4f4f0;   /* 窗口 / 卡片 */
+  --surface-raised: #fbfbf7; /* 浮层 */
+  --surface-sunken: #e4e4de; /* 凹陷区 / 分段槽 / chips */
+  --surface-muted: #ecece6;  /* 信息格 / 弱底块 */
+  --surface-video: #111111;  /* 视频区深底 */
+  --surface-mask: rgba(17, 17, 17, 0.45); /* 遮罩兜底色(实际用 --mask-dither) */
 
-  /* ---------- 描边 ---------- */
-  --line-strong: #dcd9c8; /* 输入框默认描边 / 次按钮描边 */
-  --line: #e9e6d7;        /* 卡片描边 */
-  --line-soft: #e5e2d2;   /* 分隔 / 图标容器描边 */
-  --line-focus: #34502f;  /* 聚焦态描边 */
+  /* ---------- 抖动图案(background 简写值,含 position/size) ---------- */
+  --dither-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23c8c8c2'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23c8c8c2'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --dither-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f4f4f0'/%3E%3Crect width='3' height='3' fill='%23111111'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23111111'/%3E%3C/svg%3E") 0 0/6px 6px;
+  --mask-dither: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='3' height='3' fill='rgba(17,17,17,0.4)'/%3E%3Crect x='3' y='3' width='3' height='3' fill='rgba(17,17,17,0.4)'/%3E%3C/svg%3E") 0 0/6px 6px;
 
-  /* ---------- 语义色 ---------- */
-  /* 待处理 / 需关注 / 连接中断 / 状态未知：暖沙 */
-  --warn-bg: #f5ebd5;
-  --warn-fg: #96682b;
-  --warn-line: #e7d5ae;
+  /* ---------- 描边:全黑,粗细分层 ---------- */
+  --line-strong: #111111; /* 输入框默认描边 / 次按钮描边 */
+  --line: #111111;        /* 卡片描边 */
+  --line-soft: #111111;   /* 分隔(用 1px 细线区分层级) */
+  --line-focus: #111111;
 
-  /* 危险 / 失败 / 检测异常 / 退出登录：赤陶 */
-  --danger-bg: #f3e4dd;
-  --danger-fg: #9c5546;
-  --danger-line: #e2c9be;
-  --danger-stroke: #b97a63; /* 错误输入框描边 */
+  /* ---------- 语义色:黑白等价(状态靠底纹/反白/灰阶区分) ---------- */
+  /* 待处理 / 需关注:黑底白字(最高警示) */
+  --warn-bg: #111111;
+  --warn-fg: #f4f4f0;
+  --warn-line: #111111;
 
-  /* 成功 / 已完成 / 在线：叶绿 */
-  --success-bg: #e9f0dc;
-  --success-fg: #56753f;
-  --success-line: #d3e3c6;
+  /* 危险 / 失败:白底黑边黑字(靠文字与边框表达) */
+  --danger-bg: #f4f4f0;
+  --danger-fg: #111111;
+  --danger-line: #111111;
+  --danger-stroke: #111111;
 
-  /* 进行中 / 启动中 / 停止中：浅绿 */
-  --info-bg: #e4eddc;
-  --info-fg: #3f6b49;
-  --info-line: #c8dcc0;
+  /* 成功 / 已完成 / 在线:白底黑字 */
+  --success-bg: #f4f4f0;
+  --success-fg: #111111;
+  --success-line: #111111;
 
-  /* 未知 / 未开始 / 已停止 / 已取消：中性 */
-  --neutral-bg: #edeee4;
-  --neutral-fg: #6d7f6c;
-  --neutral-line: #dde1d5;
+  /* 进行中 / 启动中 / 停止中:白底黑字(徽标加闪烁) */
+  --info-bg: #f4f4f0;
+  --info-fg: #111111;
+  --info-line: #111111;
 
-  /* 检测框 / 模型叠加（视频画面上唯一亮色） */
-  --detect-box: #d3e856;
-  --detect-text: #22301f;
+  /* 未知 / 未开始 / 已停止 / 已取消:灰阶 */
+  --neutral-bg: #e4e4de;
+  --neutral-fg: #55554f;
+  --neutral-line: #c8c8c2;
+
+  /* 检测框(视频画面上唯一叠加元素):黑虚线 + 白蚂蚁线,标签黑底白字 */
+  --detect-box: #111111;
+  --detect-text: #f4f4f0;
+
+  /* 视频滤镜:1984 单色监视器;恢复彩色改为 none */
+  --video-filter: grayscale(1) contrast(1.7) brightness(1.02);
 
   /* ---------- 字号 ---------- */
   --text-2xs: 9px;
@@ -86,18 +94,18 @@ page,
   --text-lg: 14px;
   --text-xl: 15px;
   --text-2xl: 18px;
-  --text-3xl: 24px;   /* 登录页品牌标题 */
-  --text-title: 25px; /* 全 App 页面标题统一字号（宋体） */
+  --text-3xl: 24px;
+  --text-title: 25px;
 
-  /* ---------- 字族（系统栈，不引入外部字体文件） ---------- */
-  --font-sans: "Noto Sans SC", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
-  --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif; /* 页面标题 / 弹窗标题 / 品牌语 */
-  --font-num: "Inter", "SF Pro Text", "Noto Sans SC", sans-serif; /* 指标数字 / 时间 / 百分比 */
+  /* ---------- 字族(系统栈,不引入外部字体文件;黑体模拟点阵感) ---------- */
+  --font-sans: "SimHei", "Microsoft YaHei", "Noto Sans SC", "PingFang SC", sans-serif;
+  --font-serif: "SimHei", "Microsoft YaHei", "Noto Sans SC", "PingFang SC", sans-serif; /* 页面标题同族,靠字重区分 */
+  --font-num: "Courier New", Consolas, monospace; /* 指标数字 / 时间 / 百分比 */
 
   /* ---------- 字重 ---------- */
   --weight-normal: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
+  --weight-medium: 700;
+  --weight-semibold: 700;
   --weight-bold: 700;
 
   /* ---------- 行高 ---------- */
@@ -106,12 +114,12 @@ page,
   --leading-normal: 1.65;
 
   /* ---------- 字距 ---------- */
-  --tracking-title: 0;
-  --tracking-btn: 2px;    /* 主按钮文字 */
-  --tracking-caps: 1px;   /* MVP / Tab 标签 */
+  --tracking-title: 1px;
+  --tracking-btn: 2px;
+  --tracking-caps: 1px;
   --tracking-num: 0;
 
-  /* ---------- 间距（4px 基准） ---------- */
+  /* ---------- 间距(4px 基准,不变) ---------- */
   --space-1: 4px;
   --space-2: 6px;
   --space-3: 8px;
@@ -123,25 +131,25 @@ page,
   --space-9: 24px;
   --space-10: 32px;
 
-  /* ---------- 圆角 ---------- */
-  --radius-xs: 6px;   /* chips / MVP 徽标 */
-  --radius-sm: 9px;   /* 分段选中块 */
-  --radius-md: 12px;  /* 输入框 / 凹陷条 / 指标卡 */
-  --radius-lg: 13px;  /* 按钮 */
-  --radius-xl: 14px;  /* 告警卡 / 档案卡 */
-  --radius-2xl: 16px; /* 设备卡 */
-  --radius-3xl: 18px; /* 视频区 */
-  --radius-sheet: 20px; /* 底部抽屉 / 居中弹窗卡 */
-  --radius-pill: 999px; /* 状态徽标 / 底部导航胶囊 */
+  /* ---------- 圆角:1-bit 零圆角 ---------- */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-sheet: 0;
+  --radius-pill: 0;
 
-  /* ---------- 阴影（低层叠，低端机友好） ---------- */
-  --shadow-xs: 0 1px 3px rgba(36, 43, 28, 0.06);
-  --shadow-sm: 0 2px 6px rgba(36, 43, 28, 0.08);
-  --shadow-btn: 0 4px 12px rgba(41, 61, 33, 0.25);   /* 主按钮 */
-  --shadow-float: 0 6px 16px rgba(36, 43, 28, 0.12); /* hover / 抽屉 */
-  --shadow-focus: 0 0 0 3px rgba(52, 80, 47, 0.14);  /* 输入框聚焦光晕 */
+  /* ---------- 阴影:硬偏移(无模糊) ---------- */
+  --shadow-xs: none;
+  --shadow-sm: 2px 2px 0 rgba(17, 17, 17, 0.85);
+  --shadow-btn: 3px 3px 0 #111111;
+  --shadow-float: 4px 4px 0 #111111;
+  --shadow-focus: 2px 2px 0 #111111;
 
-  /* ---------- 动效（CSS 原生，兼容 uni-app H5） ---------- */
+  /* ---------- 动效 ---------- */
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --dur-fast: 120ms;
@@ -150,12 +158,12 @@ page,
 
   /* ---------- 尺寸 ---------- */
   --page-max: 390px;
-  --control-height: 46px;   /* 主按钮 */
-  --input-height: 48px;     /* 登录页输入框 */
-  --btn-height: 44px;       /* 通用按钮 / 触控目标下限 */
-  --touch-min: 44px;        /* 触控目标硬下限 */
-  --tabbar-height: 78px;    /* 底部导航总高 */
-  --statusbar-height: 44px;
-  --page-pad: 14px;         /* 页面左右留白 */
-  --section-gap: 9px;       /* 区块纵向间距 */
+  --control-height: 46px;
+  --input-height: 44px;
+  --btn-height: 44px;
+  --touch-min: 44px;
+  --tabbar-height: 34px;   /* 底部任务栏 dock(30px 条 + 上边框) */
+  --statusbar-height: 26px; /* Mac 菜单栏高度 */
+  --page-pad: 14px;
+  --section-gap: 9px;
 }
