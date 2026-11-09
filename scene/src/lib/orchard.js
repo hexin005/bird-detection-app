@@ -1,8 +1,8 @@
 /**
- * 低多边形果园场景构建器
+ * 程序化自然果园场景构建器
  * ---------------------------------------------------------------------------
  * 全部几何体由代码生成，不依赖外部 GLB/GLTF 资源，保证零下载依赖。
- * 配色取自 designs token：墨绿果园 + 荧绿检测框。
+ * 自然材质与实例化植被，保留墨绿果园 + 荧绿检测框的识别色。
  */
 import * as THREE from 'three'
 
@@ -29,65 +29,122 @@ export const PALETTE = {
   bird: 0x2f3a2a,
 }
 
-/* ---------- 低多边形树 ---------- */
-/**
- * 生成一棵低多边形果树：锥台树干 + 3~5 个多面体树冠。
- * @param {() => number} rand 伪随机函数，保证同 seed 下形态稳定
- * @param {number} scale 整体缩放
- */
-export function createTree(rand, scale = 1) {
-  const group = new THREE.Group()
-
-  const height = (2.4 + rand() * 1.4) * scale
-  const trunkR = (0.16 + rand() * 0.08) * scale
-
-  // 树干：上细下粗的锥台
-  const trunkGeo = new THREE.CylinderGeometry(trunkR * 0.72, trunkR, height, 6, 1)
-  const trunkMat = new THREE.MeshLambertMaterial({ color: PALETTE.trunk, flatShading: true })
-  const trunk = new THREE.Mesh(trunkGeo, trunkMat)
-  trunk.position.y = height / 2
-  trunk.castShadow = true
-  trunk.receiveShadow = true
-  group.add(trunk)
-
-  // 树冠：3~5 个不同大小的二十面体堆叠
-  const leafColors = [PALETTE.leafA, PALETTE.leafB, PALETTE.leafC, PALETTE.leafD]
-  const crownCount = 3 + Math.floor(rand() * 3)
-  for (let i = 0; i < crownCount; i += 1) {
-    const radius = (0.85 + rand() * 0.55) * scale
-    const geo = new THREE.SphereGeometry(radius, 8, 6)
-    const mat = new THREE.MeshLambertMaterial({
-      color: leafColors[Math.floor(rand() * leafColors.length)],
-      flatShading: true,
-    })
-    const crown = new THREE.Mesh(geo, mat)
-    const angle = rand() * Math.PI * 2
-    const spread = rand() * 0.55 * scale
-    crown.position.set(
-      Math.cos(angle) * spread,
-      height + (rand() - 0.3) * 0.7 * scale,
-      Math.sin(angle) * spread,
-    )
-    crown.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI)
-    crown.scale.set(1.08, 0.88, 1.02)
-    crown.castShadow = true
-    crown.receiveShadow = true
-    group.add(crown)
-
-    // 少量果实点缀
-    if (rand() > 0.45) {
-      const fruitGeo = new THREE.IcosahedronGeometry(0.09 * scale, 0)
-      const fruitMat = new THREE.MeshLambertMaterial({ color: PALETTE.fruit, flatShading: true })
-      const fruit = new THREE.Mesh(fruitGeo, fruitMat)
-      fruit.position.set(
-        crown.position.x + (rand() - 0.5) * radius * 1.4,
-        crown.position.y + (rand() - 0.5) * radius * 1.2,
-        crown.position.z + (rand() - 0.5) * radius * 1.4,
-      )
-      group.add(fruit)
+/* Procedural surfaces: deterministic, tiled, no network or image dependencies. */
+function surfaceTexture(kind, repeats = 1) {
+  const size = 128
+  const data = new Uint8Array(size * size * 4)
+  const random = mulberry32(kind === 'bark' ? 421 : kind === 'soil' ? 933 : 711)
+  const noiseGrid = Array.from({ length: 64 }, () => random() - .5)
+  const smoothNoise = (x, y) => {
+    const gx = x / 16, gy = y / 16
+    const ix = Math.floor(gx), iy = Math.floor(gy)
+    const u = gx - ix, v = gy - iy
+    const sx = u * u * (3 - 2 * u), sy = v * v * (3 - 2 * v)
+    const at = (a, b) => noiseGrid[(b % 8) * 8 + a % 8]
+    const top = at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx
+    const bottom = at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx
+    return top * (1 - sy) + bottom * sy
+  }
+  const base = kind === 'bark' ? [111, 91, 69] : kind === 'soil' ? [152, 130, 99] : [112, 133, 77]
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const grain = (random() - .5) * 22
+      const broad = smoothNoise(x, y) * 12
+      const furrow = kind === 'bark' ? -Math.pow(.5 + .5 * Math.sin(x * Math.PI / 8 + Math.sin(y * Math.PI / 64)), 12) * 43 : 0
+      const i = (y * size + x) * 4
+      for (let c = 0; c < 3; c++) data[i + c] = Math.max(0, Math.min(255, base[c] + grain + broad + furrow))
+      data[i + 3] = 255
     }
   }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.generateMipmaps = true
+  texture.repeat.set(repeats, repeats)
+  texture.needsUpdate = true
+  return texture
+}
 
+// Shared geometry and materials keep the extra botanical detail inexpensive.
+let botanicalResources
+function botanics() {
+  if (botanicalResources) return botanicalResources
+  const bark = surfaceTexture('bark')
+  botanicalResources = {
+    trunk: new THREE.CylinderGeometry(.65, 1, 1, 9, 3),
+    branch: new THREE.CylinderGeometry(.3, 1, 1, 7),
+    leaf: new THREE.SphereGeometry(1, 5, 3),
+    fruit: new THREE.SphereGeometry(1, 8, 6),
+    bark: new THREE.MeshStandardMaterial({ map: bark, roughness: .96, bumpMap: bark, bumpScale: .055 }),
+    foliage: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .84 }),
+    fruitMat: new THREE.MeshStandardMaterial({ color: 0xc47735, roughness: .64 }),
+  }
+  const resources = botanicalResources
+  resources.bark.addEventListener('dispose', () => {
+    if (botanicalResources === resources) botanicalResources = undefined
+  })
+  return resources
+}
+
+export function createTree(rand, scale = 1) {
+  const group = new THREE.Group()
+  const res = botanics()
+  const height = (2.4 + rand() * 1.4) * scale
+  const trunkR = (.16 + rand() * .08) * scale
+  const trunk = new THREE.Mesh(res.trunk, res.bark)
+  trunk.scale.set(trunkR, height, trunkR)
+  trunk.position.y = height / 2
+  trunk.castShadow = trunk.receiveShadow = true
+  group.add(trunk)
+
+  const crowns = []
+  for (let i = 0; i < 5; i++) {
+    const angle = i * Math.PI * 2 / 5 + rand() * .4
+    const radius = (.7 + rand() * .4) * scale
+    const center = new THREE.Vector3(Math.cos(angle) * .64 * scale, height + (rand() - .25) * scale, Math.sin(angle) * .64 * scale)
+    crowns.push({ center, radius })
+    const start = new THREE.Vector3(0, height * .65, 0)
+    const delta = center.clone().sub(start)
+    const branch = new THREE.Mesh(res.branch, res.bark)
+    branch.position.copy(start).addScaledVector(delta, .5)
+    branch.scale.set(trunkR * .48, delta.length(), trunkR * .48)
+    branch.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize())
+    branch.castShadow = true
+    group.add(branch)
+  }
+  // Small overlapping foliage clusters produce a broken, organic silhouette.
+  const count = 190
+  const leaves = new THREE.InstancedMesh(res.leaf, res.foliage, count)
+  const dummy = new THREE.Object3D()
+  const color = new THREE.Color()
+  for (let i = 0; i < count; i++) {
+    const crown = crowns[i % crowns.length]
+    const theta = rand() * Math.PI * 2
+    const vertical = rand() * 2 - 1
+    const r = Math.cbrt(rand()) * crown.radius
+    const horizontal = Math.sqrt(1 - vertical * vertical)
+    dummy.position.copy(crown.center).add(new THREE.Vector3(Math.cos(theta) * horizontal * r, vertical * r * .85, Math.sin(theta) * horizontal * r))
+    dummy.rotation.set(rand() * 2, rand() * 6, rand() * 2)
+    const leafSize = (.15 + rand() * .13) * scale
+    dummy.scale.set(leafSize * 1.5, leafSize * .6, leafSize)
+    dummy.updateMatrix()
+    leaves.setMatrixAt(i, dummy.matrix)
+    color.setHSL(.23 + rand() * .045, .34 + rand() * .17, .19 + rand() * .13)
+    leaves.setColorAt(i, color)
+  }
+  leaves.castShadow = leaves.receiveShadow = true
+  group.add(leaves)
+  const fruits = new THREE.InstancedMesh(res.fruit, res.fruitMat, 9)
+  for (let i = 0; i < 9; i++) {
+    const c = crowns[i % crowns.length]
+    dummy.position.copy(c.center).add(new THREE.Vector3((rand() - .5) * c.radius, -.35 * scale, (rand() - .5) * c.radius))
+    dummy.scale.setScalar(.08 * scale)
+    dummy.updateMatrix()
+    fruits.setMatrixAt(i, dummy.matrix)
+  }
+  group.add(fruits)
   return group
 }
 
@@ -111,17 +168,16 @@ export function createGround(rand) {
   }
   geo.computeVertexNormals()
 
-  const groundMat = new THREE.MeshLambertMaterial({
-    color: PALETTE.ground,
-    flatShading: true,
-  })
+  const grassTexture = surfaceTexture('grass', 24)
+  const groundMat = new THREE.MeshStandardMaterial({ map: grassTexture, roughness: 1, bumpMap: grassTexture, bumpScale: .008 })
   const ground = new THREE.Mesh(geo, groundMat)
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
   group.add(ground)
 
   // 果树下的耕作带让种植行列可读，草地与土壤形成柔和层次。
-  const bedMat = new THREE.MeshLambertMaterial({ color: 0x9b8966, flatShading: true })
+  const soilTexture = surfaceTexture('soil', 8)
+  const bedMat = new THREE.MeshStandardMaterial({ map: soilTexture, roughness: 1, bumpMap: soilTexture, bumpScale: .012 })
   const irrigationMat = new THREE.MeshLambertMaterial({ color: 0x52694b, flatShading: true })
   for (const z of [-11.4, -5.6, 0.2, 6.0]) {
     const bed = new THREE.Mesh(new THREE.PlaneGeometry(27.5, 3.5), bedMat)
@@ -152,7 +208,8 @@ export function createGround(rand) {
 
   // 中央土路
   const roadGeo = new THREE.PlaneGeometry(3.8, 34, 1, 8)
-  const roadMat = new THREE.MeshLambertMaterial({ color: PALETTE.path, flatShading: true })
+  const roadTexture = surfaceTexture('soil', 9)
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0xe0cfac, map: roadTexture, roughness: 1, bumpMap: roadTexture, bumpScale: .008 })
   const road = new THREE.Mesh(roadGeo, roadMat)
   road.rotation.x = -Math.PI / 2
   road.position.set(0, 0.035, 2)

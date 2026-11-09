@@ -32,12 +32,12 @@ import {
   createAlarmMarker,
   mulberry32,
 } from './orchard.js'
-import { loadCaptureTexture } from './capture.js'
+
 
 const MAX_BIRDS = 6
 
 export function createOrchardScene(canvas, options = {}) {
-  const { onReady, onCrewAlertReady, onCrewArrived } = options
+  const { onReady, onCrewAlertReady, onCrewArrived, onAutoRotateChange } = options
 
   /* ---------- 基础三件套 ---------- */
   const renderer = new THREE.WebGLRenderer({
@@ -46,7 +46,8 @@ export function createOrchardScene(canvas, options = {}) {
     alpha: false,
     powerPreference: 'high-performance',
   })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  const compactDevice = window.innerWidth <= 640
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactDevice ? 1.25 : 1.75))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.08
@@ -55,7 +56,7 @@ export function createOrchardScene(canvas, options = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(PALETTE.sky)
-  scene.fog = new THREE.Fog(PALETTE.fog, 44, 96)
+  scene.fog = new THREE.Fog(PALETTE.fog, 65, 145)
 
   const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 260)
   // 正对果园中心，带一定俯视角度，让果树、摄像头、驱鸟器都进画面
@@ -70,7 +71,7 @@ export function createOrchardScene(canvas, options = {}) {
   controls.maxDistance = 58
   controls.maxPolarAngle = Math.PI * 0.475
   controls.minPolarAngle = Math.PI * 0.12
-  controls.autoRotate = true
+  controls.autoRotate = false
   controls.autoRotateSpeed = 0.18
   controls.enablePan = false
   controls.update()
@@ -79,6 +80,7 @@ export function createOrchardScene(canvas, options = {}) {
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
   const bloomPass = new UnrealBloomPass(new THREE.Vector2(1440, 900), 0.32, 0.32, 0.9)
+  bloomPass.enabled = !compactDevice
   composer.addPass(bloomPass)
   composer.addPass(new OutputPass())
 
@@ -89,7 +91,8 @@ export function createOrchardScene(canvas, options = {}) {
   const sun = new THREE.DirectionalLight(0xffdfae, 2.15)
   sun.position.set(-18, 26, 16)
   sun.castShadow = true
-  sun.shadow.mapSize.set(1024, 1024)
+  sun.shadow.mapSize.set(compactDevice ? 1024 : 2048, compactDevice ? 1024 : 2048)
+  sun.shadow.normalBias = 0.035
   sun.shadow.camera.near = 1
   sun.shadow.camera.far = 70
   sun.shadow.camera.left = -26
@@ -274,7 +277,7 @@ export function createOrchardScene(canvas, options = {}) {
       detectBox,
       alarm,
       // 飞行参数
-      radius: 6 + Math.random() * 7,
+      radius: 0.8 + Math.random() * 1.2,
       angle: Math.random() * Math.PI * 2,
       speed: 0.16 + Math.random() * 0.16,
       height: 5.5 + Math.random() * 4.5,
@@ -544,13 +547,21 @@ export function createOrchardScene(canvas, options = {}) {
   /* ---------- 相机控制 ---------- */
   // 视角完全交给用户：不自动推进、不自动拉近，只在用户开启"自动环绕"时缓慢绕转。
   // 用户一旦手动拖拽，立即停止自动环绕，且不会自己恢复。
-  let userAutoRotate = true
+  let userAutoRotate = false
+  let cameraFlight = null
+  const flightPosition = new THREE.Vector3()
+  const flightTarget = new THREE.Vector3()
+  function changeRotation(on) {
+    userAutoRotate = !!on
+    controls.autoRotate = !!on
+    onAutoRotateChange?.(!!on)
+  }
 
   function bindUserControl() {
     controls.addEventListener('start', () => {
       // 用户开始拖拽：立刻停掉自动环绕，避免"抢视角"
-      controls.autoRotate = false
-      userAutoRotate = false
+      changeRotation(false)
+      cameraFlight = null
     })
   }
   bindUserControl()
@@ -640,51 +651,8 @@ export function createOrchardScene(canvas, options = {}) {
       const det = occ ? { species: occ.species, confidence: occ.confidence, bbox: occ.bbox } : null
       b.species = occ ? occ.species : ''
 
-      // ---- 真实抓拍贴图：按物种懒加载，取到后贴到 billboard 上 ----
-      if (occ && occ.snap && !b.textureSettled && !b.texLoading) {
-        b.texLoading = true
-        if (captureCtx.server && captureCtx.ticket) {
-          loadCaptureTexture(
-            captureCtx.server,
-            occ.snap,
-            captureCtx.ticket,
-            occ.snapBbox,
-            { title: occ.species, sub: Math.round((occ.confidence || 0) * 100) + '%' },
-          )
-            .then((tex) => {
-              b.texLoading = false
-              if (!tex) return
-              b.textureSettled = true
-              b.mesh.userData.spriteMat.map = tex
-              b.mesh.userData.spriteMat.needsUpdate = true
-              b.waitTex = 0
-            })
-            .catch(() => { b.texLoading = false })
-        } else {
-          b.texLoading = false
-        }
-      }
-      // 贴图就绪后淡入并隐藏低模鸟（保留检测框与告警标记）
-      const sm = b.mesh.userData.spriteMat
-      if (sm.map) {
-        // 首帧就接近满不透明，之后快速到 1（保证任何截帧都能看清照片）
-        b.waitTex = Math.min(1, Math.max(0.95, b.waitTex || 0) + dt * 8)
-        sm.opacity = b.waitTex
-        const sp = b.mesh.userData.sprite
-        sp.visible = true
-        // 尺寸跟随检测框，保证远处也清晰可辨
-        const sw = Math.max(2.4, b.detectBox.scale.x * 1.6)
-        const sh = Math.max(1.7, b.detectBox.scale.y * 1.5)
-        sp.scale.set(sw, sh, 1)
-        // 低模鸟整体渐隐（鸟身 + 双翼），让真实照片更清晰
-        const bodyMat = b.mesh.userData.body.material
-        bodyMat.opacity = Math.max(0, 1 - b.waitTex)
-        bodyMat.transparent = true
-        b.mesh.userData.wings.forEach(({ mesh }) => {
-          mesh.material.opacity = Math.max(0, 1 - b.waitTex)
-          mesh.material.transparent = true
-        })
-      }
+      // 抓拍证据由面板展示；场景始终保留具有空间体积的鸟体。
+      b.mesh.userData.sprite.visible = false
 
       // ---- 用 bbox 映射鸟在果园中的位置 ----
       // 画面坐标系：x 左→右（0~960），y 上→下（0~540）
@@ -842,8 +810,15 @@ export function createOrchardScene(canvas, options = {}) {
     rafId = requestAnimationFrame(loop)
     const dt = Math.min(clock.getDelta(), 0.05)
     const elapsed = clock.elapsedTime
+    if (document.hidden) return
 
     // 不再自动操控相机，视角完全由用户掌握
+    if (cameraFlight) {
+      const alpha = 1 - Math.exp(-dt * 5)
+      camera.position.lerp(flightPosition, alpha)
+      controls.target.lerp(flightTarget, alpha)
+      if (camera.position.distanceTo(flightPosition) < 0.02) cameraFlight = null
+    }
     controls.update()
     updateBirds(dt, elapsed)
     updateFleeBirds(dt)
@@ -883,7 +858,14 @@ export function createOrchardScene(canvas, options = {}) {
           adoptDetections(visual.detections, snapshots)
         } else {
           // 已驻留的鸟：补齐可能后到的抓拍图
+          const available = [...visual.detections]
           for (const o of occupants) {
+            const index = available.findIndex((d) => d.species === o.species)
+            if (index >= 0) {
+              const d = available.splice(index, 1)[0]
+              o.bbox = Array.isArray(d.bbox) ? d.bbox.slice() : o.bbox
+              o.confidence = d.confidence ?? o.confidence
+            }
             const info = snapTable[o.species]
             if (!o.snap && info) {
               o.snap = info.name
@@ -895,8 +877,7 @@ export function createOrchardScene(canvas, options = {}) {
     },
     /** 暂停/恢复自动环绕 */
     setAutoRotate(on) {
-      userAutoRotate = !!on
-      controls.autoRotate = !!on
+      changeRotation(on)
     },
     /** 昼夜光照:传入 0~24 小时(真实本地时间或光照演示滑杆) */
     setDaylight(hour) {
@@ -949,29 +930,31 @@ export function createOrchardScene(canvas, options = {}) {
         captureStats: (typeof window !== 'undefined' && window.__captureStats) || null,
       }
     },
-    /** 重置视角（回到俯瞰全景，并恢复自动环绕） */
+    /** 重置视角（回到俯瞰全景，保留环绕选择） */
     resetView() {
-      userAutoRotate = true
-      controls.autoRotate = true
-      camera.position.set(26, 24, 37)
-      controls.target.set(0, 1.8, 0)
-      controls.update()
+      flightPosition.set(26, 24, 37)
+      flightTarget.set(0, 1.45, 0)
+      cameraFlight = true
     },
     /** 聚焦某个点（演示用：聚焦大门 / 设备等） */
     /** 定位到某条检测记录(按 bbox 映射场景坐标,与 updateBirds 同一公式) */
-    focusDetection(bbox) {
+    focusDetection(bbox, species) {
       if (!Array.isArray(bbox) || bbox.length !== 4) return
       const cx = ((bbox[0] + bbox[2]) / 2) / 960
       const cy = ((bbox[1] + bbox[3]) / 2) / 540
       const x = (cx - 0.5) * 26
       const z = (cy - 0.5) * 14
-      controls.autoRotate = false
-      camera.position.set(x, 8.5, z + 15)
-      controls.target.set(x, 3.2, z)
-      controls.update()
+      const candidates = birds.filter((b) => b.active && (!species || b.species === species))
+      candidates.sort((a, b) => Math.hypot(a.mesh.position.x - x, a.mesh.position.z - z) - Math.hypot(b.mesh.position.x - x, b.mesh.position.z - z))
+      const target = candidates[0]?.mesh.position
+      changeRotation(false)
+      flightTarget.set(target?.x ?? x, target?.y ?? 3.2, target?.z ?? z)
+      flightPosition.copy(flightTarget).add(new THREE.Vector3(4, 5, 12))
+      cameraFlight = true
     },
     focusPoint(x, y, z, dist = 12) {
-      controls.autoRotate = false
+      changeRotation(false)
+      cameraFlight = null
       camera.position.set(x, y + dist * 0.55, z + dist * 0.82)
       controls.target.set(x, y, z)
       controls.update()
@@ -982,14 +965,22 @@ export function createOrchardScene(canvas, options = {}) {
       cancelAnimationFrame(rafId)
       ro.disconnect()
       controls.dispose()
+      bloomPass.dispose()
+      composer.passes.forEach((pass) => { if (pass !== bloomPass) pass.dispose?.() })
       composer.dispose()
+      const textures = new Set()
       scene.traverse((obj) => {
+        if (obj.isInstancedMesh) obj.dispose()
         if (obj.geometry) obj.geometry.dispose()
         if (obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
-          mats.forEach((m) => m.dispose())
+          mats.forEach((m) => {
+            Object.values(m).forEach((value) => { if (value?.isTexture) textures.add(value) })
+            m.dispose()
+          })
         }
       })
+      textures.forEach((texture) => texture.dispose())
       renderer.dispose()
     },
   }

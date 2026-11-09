@@ -49,17 +49,20 @@ const executing = computed(() => !!state.activeCommand)
 /* 驱离完成瞬间:按钮短暂变绿提示「鸟群散去」 */
 const repelDone = ref(false)
 let repelDoneTimer = null
-watch(executing, (now, before) => {
-  if (before && !now) {
-    repelDone.value = true
-    if (repelDoneTimer) clearTimeout(repelDoneTimer)
-    repelDoneTimer = setTimeout(() => { repelDone.value = false }, 2400)
-  }
-})
 /* 果农流程横向步骤条:phase → 当前步索引 */
 const crewStepIndex = computed(() => ({ home: -1, alert: 0, working: 1, positioned: 1, actuating: 2, waiting: 3, returning: 3 }[crewPhase.value] ?? -1))
 /* 最近检测 → 3D 场景定位(bbox 映射与 renderer 同源);再次点击返回全景 */
 const focusTarget = ref('')
+const focusedAlarm = computed(() => state.alarms.find(a => a.id === focusTarget.value))
+const captureFailed = ref(false)
+const focusedCapture = computed(() => {
+  const name = focusedAlarm.value?.snapshot
+  return name && state.mediaTicket
+    ? `${state.server || defaultServer()}/api/captures/${encodeURIComponent(name)}?ticket=${encodeURIComponent(state.mediaTicket)}`
+    : ''
+})
+watch(focusedCapture, () => { captureFailed.value = false })
+const detectedCount = computed(() => state.detections.length)
 function focusAlarm(a) {
   if (!handle) return
   if (focusTarget.value === a.id) {
@@ -70,7 +73,7 @@ function focusAlarm(a) {
   let bbox = null
   try { bbox = typeof a.bbox === 'string' ? JSON.parse(a.bbox) : (a.bbox || null) } catch { bbox = null }
   if (!handle.focusDetection || !bbox) return
-  handle.focusDetection(bbox)
+  handle.focusDetection(bbox, a.species)
   focusTarget.value = a.id
 }
 function hasBbox(a) {
@@ -83,7 +86,8 @@ const responseMode = ref(localStorage.getItem('bird-scene-response-mode') === 'a
 const selectedRepelMode = ref('both')
 const effectiveRepelMode = computed(() => responseMode.value === 'auto' ? 'both' : selectedRepelMode.value)
 const crewPhase = ref('home')
-const crewExpanded = ref(true)
+const crewExpanded = ref(false)
+const daylightExpanded = ref(false)
 const controlCollapsed = ref(typeof window !== 'undefined' && window.innerWidth <= 640)
 const infoCollapsed = ref(typeof window !== 'undefined' && window.innerWidth <= 640)
 const crewTasks = computed(() => [
@@ -124,7 +128,7 @@ const birdCount = ref(0)
 /** 本次演示的驱离次数 */
 const repelCount = ref(0)
 /** 上一次已结算的驱离指令 id，避免重复触发 */
-let settledCommandId = ''
+const settledCommandIds = new Set()
 
 /**
  * 监听驱离指令完成：每次成功驱离驱散一部分鸟。
@@ -136,20 +140,26 @@ watch(
     if (!Array.isArray(cmds)) return
     for (const c of cmds) {
       if (!['completed', 'failed', 'unknown', 'cancelled'].includes(c.status)) continue
-      if (c.id === settledCommandId) continue
+      if (settledCommandIds.has(c.id)) continue
       // 只结算最近 30 秒内的指令，避免加载历史数据时批量触发
       if (c.ended_at && Date.now() / 1000 - c.ended_at > 30) {
-        settledCommandId = c.id
+        settledCommandIds.add(c.id)
         continue
       }
-      settledCommandId = c.id
+      settledCommandIds.add(c.id)
       if (['failed', 'unknown', 'cancelled'].includes(c.status)) {
+        repelDone.value = false
+        repelFail.value = true
+        flash(c.status === 'cancelled' ? '指令已取消，未确认驱离效果' : '指令未成功，请检查设备后重试')
         if (c.automatic) {
           crewPhase.value = 'positioned'
           flash('驱离未完成，果农仍在设备旁待命')
         }
         break
       }
+      repelDone.value = true
+      clearTimeout(repelDoneTimer)
+      repelDoneTimer = setTimeout(() => { repelDone.value = false }, 4000)
       if (handle) {
         const before = handle.occupantCount()
         const left = handle.disperse()
@@ -158,7 +168,7 @@ watch(
         const autoCommand = !!c.automatic
         if (left === 0) {
           repelFail.value = false
-          flash('鸟群已全部清空')
+          flash('模拟鸟群已散去 · 实际效果请复核监控画面')
           crewPhase.value = autoCommand ? 'returning' : 'home'
           if (autoCommand) {
             clearTimeout(crewReturnTimer)
@@ -167,16 +177,16 @@ watch(
         } else if (left === before) {
           // 本次声波没有驱走任何一只（拟真：单只时有可能抵抗）
           repelFail.value = true
-          flash('鸟群未离开，建议再次驱离')
+          flash('模拟鸟群仍停留 · 请复核监控画面')
           crewPhase.value = autoCommand ? 'positioned' : 'home'
         } else {
           repelFail.value = false
-          flash(`驱离生效，剩余 ${left} 只`)
+          flash(`模拟驱离后剩余 ${left} 只 · 实际效果待复核`)
           crewPhase.value = autoCommand ? 'positioned' : 'home'
         }
         if (left > 0 && autoCommand && responseMode.value === 'auto') scheduleAutomaticRetry()
       } else {
-        flash('驱离完成')
+        flash('指令执行完成 · 实际效果待复核')
       }
       break
     }
@@ -334,6 +344,7 @@ onMounted(() => {
         loadProgress.value = 100
         ready.value = true
       },
+      onAutoRotateChange: (on) => { autoRotate.value = on },
       onCrewAlertReady,
       onCrewArrived,
     })
@@ -378,9 +389,19 @@ onBeforeUnmount(() => {
   clearTimeout(autoResponseTimer)
   clearTimeout(crewReturnTimer)
   clearTimeout(repelMsgTimer)
+  clearTimeout(repelDoneTimer)
   if (handle) handle.dispose()
   disconnect()
 })
+
+function togglePanel(panel) {
+  const target = panel === 'control' ? controlCollapsed : infoCollapsed
+  target.value = !target.value
+  if (!target.value && window.innerWidth <= 640) {
+    if (panel === 'control') infoCollapsed.value = true
+    else controlCollapsed.value = true
+  }
+}
 
 /* ---------- 登录动作 ---------- */
 async function doLogin() {
@@ -402,6 +423,7 @@ async function doLogin() {
 }
 
 function resetView() {
+  focusTarget.value = ''
   if (handle) handle.resetView()
 }
 
@@ -480,7 +502,7 @@ if (debugMode) {
   }, 2000)
 }
 
-const autoRotate = ref(true)
+const autoRotate = ref(false)
 function toggleRotate() {
   autoRotate.value = !autoRotate.value
   if (handle) handle.setAutoRotate(autoRotate.value)
@@ -593,8 +615,8 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
     <!-- 左侧：远程驱离控制与果农协作 -->
     <aside class="hud-panel hud-panel--control" :class="{ 'is-collapsed': controlCollapsed }">
       <div class="hud-panel__head">
-        <div><strong>远程驱离控制</strong><span>ORCHARD RESPONSE · {{ crewPhaseLabel }}</span></div>
-        <button class="hud-panel__toggle" @click="controlCollapsed = !controlCollapsed">{{ controlCollapsed ? '展开' : '收起' }}</button>
+        <div><strong>远程驱离控制</strong><span>{{ crewPhaseLabel }}</span></div>
+        <button class="hud-panel__toggle" :aria-expanded="!controlCollapsed" @click="togglePanel('control')">{{ controlCollapsed ? '展开' : '收起' }}</button>
       </div>
 
       <template v-if="!controlCollapsed">
@@ -611,7 +633,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
             <button :class="{ 'is-selected': selectedRepelMode === 'both' }" :disabled="executing || repelling" @click="selectRepelMode('both')">双模</button>
           </div>
           <button class="hud-action hud-action--repel hud-control-submit" :class="{ 'is-done': repelDone, 'is-executing': executing }" :disabled="responseMode === 'auto' || !birdCount || executing || repelling || offline || !state.token" @click="repel(effectiveRepelMode, false)">
-            {{ repelDone ? '✓ 已驱离 · 鸟群散去' : responseMode === 'auto' ? crewPhase === 'home' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `立即驱离 · ${birdCount} 只鸟` : '等待检测到鸟类' }}
+            {{ repelDone ? '指令完成 · 待复核' : responseMode === 'auto' ? crewPhase === 'home' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `模拟驱离 · ${birdCount} 只示意鸟` : '等待检测到鸟类' }}
           </button>
           <div class="control-footnote">{{ responseMode === 'auto' ? '设备抵达判定已开启 · 模拟执行器' : '手动触发不派出果农 · 模拟执行器' }}</div>
         </div>
@@ -633,24 +655,29 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
               <i v-if="index < crewTasks.length - 1" class="crew-step__line" :class="{ 'is-done': index < crewStepIndex }" />
             </template>
           </div>
-          <div class="crew-step__status-line">
+          <div v-if="crewExpanded" class="crew-step__status-line">
             <span>{{ crewPhaseLabel }}</span>
             <span class="crew-step__detail">{{ crewTasks[Math.max(0, Math.min(crewStepIndex, 2))]?.detail || '三名果农屋内待命' }}</span>
           </div>
         </div>
 
         <div class="hud-card daylight-card">
-          <div class="hud-card__title">光照演示</div>
+          <div class="crew-card__head">
+            <div><div class="hud-card__title">场景设置</div><span class="crew-card__phase">{{ daylightName }}</span></div>
+            <button class="crew-card__toggle" :aria-expanded="daylightExpanded" @click="daylightExpanded = !daylightExpanded">{{ daylightExpanded ? '收起' : '展开' }}</button>
+          </div>
+          <template v-if="daylightExpanded">
           <div class="daylight-switch">
             <button :class="{ 'is-active': daylightMode === 'real' }" @click="setDaylightMode('real')">实时</button>
             <button :class="{ 'is-active': daylightMode === 'manual' }" @click="setDaylightMode('manual')">手动</button>
           </div>
-          <input class="daylight-slider" type="range" min="0" max="24" step="0.25"
+          <input class="daylight-slider" aria-label="场景光照时间" type="range" min="0" max="24" step="0.25"
             :value="daylightMode === 'manual' ? daylightHour : realHour"
             :disabled="daylightMode === 'real'" @input="onDaylightSlide" />
           <div class="daylight-scale"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
           <div class="daylight-readout mono">{{ daylightName }}</div>
-          <div class="daylight-hint">拖动滑杆看晨昏与夜间 — 夜间红外束与声波更醒目</div>
+          <div class="daylight-hint">拖动滑杆预览晨昏与夜间光照</div>
+          </template>
         </div>
 
       </template>
@@ -659,12 +686,12 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
     <!-- 右侧：果园概览、检测记录与设备遥测 -->
     <aside class="hud-panel hud-panel--info" :class="{ 'is-collapsed': infoCollapsed }">
       <div class="hud-panel__head">
-        <div><strong>果园运行数据</strong><span>LIVE ORCHARD TELEMETRY</span></div>
-        <button class="hud-panel__toggle" @click="infoCollapsed = !infoCollapsed">{{ infoCollapsed ? '展开' : '收起' }}</button>
+        <div><strong>果园运行数据</strong><span>检测与模拟设备状态</span></div>
+        <button class="hud-panel__toggle" :aria-expanded="!infoCollapsed" @click="togglePanel('info')">{{ infoCollapsed ? '展开' : '收起' }}</button>
       </div>
       <template v-if="!infoCollapsed">
         <div class="hud-card">
-          <div class="hud-card__title">果园概览 · OVERVIEW</div>
+          <div class="hud-card__title">果园概览</div>
           <div class="hud-stats">
             <div class="hud-stat"><span class="hud-stat__num is-warn">{{ state.counts.pending }}</span><span class="hud-stat__label">待处理告警</span></div>
             <div class="hud-stat"><span class="hud-stat__num">{{ state.counts.total }}</span><span class="hud-stat__label">检测事件</span></div>
@@ -673,19 +700,25 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
         </div>
 
         <div class="hud-card">
-          <div class="hud-card__title">最近检测 · DETECTIONS</div>
+          <div class="hud-card__title">最近检测 · 位置示意</div>
+          <p class="detection-count">最新帧检出 {{ detectedCount }} 只 · 场景示意 {{ birdCount }} 只</p>
           <template v-if="recentAlarms.length">
             <div v-for="a in recentAlarms" :key="a.id" class="hud-detect">
               <i class="hud-detect__dot" :class="{ 'is-alarm': a.status === 'new' }" />
               <div class="hud-detect__body"><span class="hud-detect__name">{{ a.species }} · {{ a.count }} 只</span><span class="hud-detect__meta">{{ timeText(a.at) }} · {{ (a.confidence * 100).toFixed(0) }}%</span></div>
-              <button v-if="hasBbox(a)" class="hud-detect__locate" :class="{ 'is-on': focusTarget === a.id }" @click="focusAlarm(a)">{{ focusTarget === a.id ? '✓ 已定位' : '定位' }}</button>
+              <button v-if="hasBbox(a)" class="hud-detect__locate" :class="{ 'is-on': focusTarget === a.id }" @click="focusAlarm(a)">{{ focusTarget === a.id ? '返回' : '查看' }}</button>
             </div>
           </template>
           <div v-else class="hud-empty">开始检测后，这里显示最新识别结果</div>
+          <figure v-if="focusedAlarm" class="capture-detail">
+            <img v-if="focusedCapture && !captureFailed" :src="focusedCapture" :alt="focusedAlarm.species + '检测抓拍'" @error="captureFailed = true" />
+            <p v-else class="hud-empty">{{ captureFailed ? '抓拍暂时无法加载' : '暂无抓拍照片' }}</p>
+            <figcaption>{{ focusedAlarm.species }} · 历史抓拍，场景位置仅供示意</figcaption>
+          </figure>
         </div>
 
         <div class="hud-card">
-          <div class="hud-card__title">设备遥测 · DEVICES</div>
+          <div class="hud-card__title">模拟设备</div>
           <div class="hud-device"><div class="hud-device__icon">◉</div><div class="hud-device__body"><span class="hud-device__name">声学驱鸟器 01</span><span class="hud-device__desc">{{ acousticDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
           <div class="hud-device" style="margin-top: 8px;"><div class="hud-device__icon" style="color: #ef6472;">◎</div><div class="hud-device__body"><span class="hud-device__name">红外驱鸟器 02</span><span class="hud-device__desc">{{ irDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
         </div>
@@ -718,7 +751,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
       </div>
     </div>
 
-    <div class="hud-note-abs">三维场景数据来自果园服务 · 驱鸟设备为模拟执行器</div>
+    <div class="hud-note-abs">空间位置与鸟群动画为示意 · 驱离效果以监控复核为准</div>
     <div v-if="debugText" style="position:absolute;left:8px;top:70px;font:11px monospace;color:#d3e856;background:rgba(0,0,0,.7);padding:6px;border-radius:4px;max-width:520px;white-space:pre-wrap;z-index:60">{{ debugText }}</div>
   </div>
 </template>
@@ -899,16 +932,17 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 }
 
 .hud-panel {
-  width: 318px;
+  width: 270px;
   top: 78px;
   right: 24px;
   max-height: calc(100vh - 148px);
   overflow-y: auto;
   padding: 2px;
   scrollbar-width: thin;
+  scrollbar-color: #6e9d8e transparent;
 }
 .hud-panel--control { left: 24px; right: auto; }
-.hud-panel--info { width: 268px; left: auto; right: 24px; }
+.hud-panel--info { width: 248px; left: auto; right: 24px; }
 .hud-panel.is-collapsed { width: auto; max-height: none; overflow: visible; }
 .hud-panel__head {
   display: flex;
@@ -962,7 +996,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .response-switch { grid-template-columns: 1fr 1fr; }
 .repel-modes { grid-template-columns: repeat(3, 1fr); margin: 10px 0; }
 .response-switch button, .repel-modes button {
-  min-height: 32px;
+  min-height: 36px;
   border: 1px solid rgba(126, 188, 176, .22);
   border-radius: var(--radius-sm);
   color: #b6cec7;
@@ -1016,7 +1050,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .crew-step__detail { color: var(--ink-400); font-size: 10px; }
 
 /* 最近检测定位按钮 */
-.hud-detect__locate { flex: 0 0 auto; border: 1px solid rgba(97,221,192,.35); background: rgba(43,156,134,.12); color: #8be8cc; font-size: 10px; font-weight: 600; padding: 3px 8px; cursor: pointer; }
+.hud-detect__locate { flex: 0 0 auto; border: 1px solid rgba(97,221,192,.35); background: rgba(43,156,134,.12); color: #8be8cc; font-size: 11px; font-weight: 600; min-height: 36px; padding: 6px 8px; cursor: pointer; }
 .hud-detect__locate.is-on { background: rgba(89,225,182,.22); color: #b8f5dd; border-color: #59e1b6; }
 
 /* 驱离操作反馈 */
@@ -1059,8 +1093,15 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 @media (max-width: 640px) {
   .hud-panel { display: flex; width: min(300px, calc(100vw - 18px)); max-height: calc(100vh - 126px); }
   .hud-panel--control { left: 9px; right: auto; top: 68px; }
-  .hud-panel--info { left: auto; right: 9px; top: 112px; }
-  .hud-panel--control:not(.is-collapsed) ~ .hud-panel--info { top: min(420px, 52vh); }
+  .hud-panel--info { left: auto; right: 9px; top: 68px; }
+  .hud-panel:not(.is-collapsed) { top: 126px; left: 9px; right: 9px; width: auto; max-height: calc(100dvh - 210px); }
+  .hud-panel.is-collapsed .hud-panel__head span { display: none; }
+  .hud-panel__head { padding: 8px; gap: 6px; }
+  .hud-panel__head strong { font-size: 12px; }
+  .hud-panel button { min-height: 40px; }
+  .hud-bottom { padding: 10px; }
+  .hud-legend { display: none; }
+  .repel-msg { position: fixed; bottom: 64px; left: 10px; right: 10px; white-space: normal; }
   .hud-panel.is-collapsed { width: auto; }
   .hud-note-abs { display: none; }
   .login-card { width: 92vw; }
@@ -1075,4 +1116,14 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .daylight-card .daylight-scale { display: flex; justify-content: space-between; font-size: 10px; opacity: .5; }
 .daylight-card .daylight-readout { margin-top: 6px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
 .daylight-card .daylight-hint { margin-top: 4px; font-size: 11px; opacity: .55; line-height: 1.5; }
+button:focus-visible, input:focus-visible { outline: 2px solid #d3e856; outline-offset: 3px; }
+.hud-panel .hud-card { background: rgba(15, 36, 33, .91); box-shadow: 0 8px 24px rgba(4, 18, 22, .18); }
+.hud-panel .hud-stat__label, .hud-panel .hud-detect__meta, .hud-panel .hud-device__desc, .control-footnote { color: #b9d0c8; }
+.crew-card__head { margin-bottom: 0; }
+.crew-step__name, .crew-step__detail { color: #b9d0c8; }
+.daylight-card .daylight-switch { margin-top: 12px; }
+.detection-count { font-size: 11px; line-height: 1.5; color: #b9d0c8; margin: 0 0 8px; }
+.capture-detail { margin: 12px 0 0; }
+.capture-detail img { width: 100%; display: block; border-radius: 6px; }
+.capture-detail figcaption { margin-top: 6px; font-size: 11px; line-height: 1.5; color: #b9d0c8; }
 </style>
