@@ -83,7 +83,12 @@ export function createHost() {
     archiveNonce.value++; nav('records')
   }
   function settings() { if (s.value) Object.assign(preferences, s.value.settings); modal.value = 'mSet' }
-  function openScene() { if (typeof window !== 'undefined') window.open('/scene/', '_blank') }
+  function openScene() {
+    if (typeof window === 'undefined') return
+    // 场景挂载在后端 /scene/；开发时前端在 5178，必须用后端绝对地址
+    const base = (store.server || window.location.origin).replace(/\/$/, '')
+    window.open(base + '/scene/', '_blank')
+  }
   function handle() { selectedAlarm.value = detailId.value; modal.value = 'mConfirm' }
   async function execute() {
     await store.command(duration.value, selectedAlarm.value, mode.value)

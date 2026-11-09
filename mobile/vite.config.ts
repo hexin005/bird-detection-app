@@ -3,5 +3,5 @@ import uni from '@dcloudio/vite-plugin-uni'
 
 export default defineConfig({
   plugins: [uni()],
-  server: { proxy: { '/api': { target: 'http://127.0.0.1:8008', ws: true } } },
+  server: { proxy: { '/api': { target: 'http://127.0.0.1:8000', ws: true }, '/scene': { target: 'http://127.0.0.1:8000' } } },
 })
