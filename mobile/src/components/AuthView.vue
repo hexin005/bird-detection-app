@@ -16,6 +16,9 @@ const form = reactive({
 })
 const demoCode = ref(''), sending = ref(false), countdown = ref(0), busy = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
+/* 密码小眼睛:每个密码框独立切换明文/密文 */
+const eyes = reactive({ login: false, regPwd: false, regConfirm: false, resetPwd: false })
+function toggleEye(key: keyof typeof eyes) { eyes[key] = !eyes[key] }
 
 const emailOk = computed(() => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim().toLowerCase()))
 const passwordOk = computed(() => form.newPassword.length >= 8)
@@ -106,7 +109,7 @@ function doReset() {
     <text class="qh-auth-lbl">邮箱 / 用户名</text>
     <view class="qh-input"><input v-model="form.account" type="text" placeholder="邮箱或用户名" /></view>
     <text class="qh-auth-lbl">密码</text>
-    <view class="qh-input"><input v-model="form.password" type="password" placeholder="请输入密码" /></view>
+    <view class="qh-input"><input v-model="form.password" :type="eyes.login ? 'text' : 'password'" placeholder="请输入密码" /><button class="qh-eye" @click="toggleEye('login')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.login"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
     <view style="display:flex;justify-content:flex-end;margin-top:8px"><text class="qh-auth-link" @click="switchMode('forgot')">忘记密码?</text></view>
     <button class="qh-btn qh-btn--primary" style="margin-top:10px" :disabled="busy || !form.account || !form.password" @click="doLogin">{{ busy ? '正在连接…' : '登录并进入果园' }}</button>
   </view>
@@ -120,9 +123,9 @@ function doReset() {
       <text class="send" :class="{ off: countdown > 0 || sending || !emailOk }" @click="sendCode('register')">{{ countdown > 0 ? countdown + 's' : '获取验证码' }}</text>
     </view>
     <text class="qh-auth-lbl">设置密码</text>
-    <view class="qh-input"><input v-model="form.password" type="password" placeholder="至少 8 位" /></view>
+    <view class="qh-input"><input v-model="form.password" :type="eyes.regPwd ? 'text' : 'password'" placeholder="至少 8 位" /><button class="qh-eye" @click="toggleEye('regPwd')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.regPwd"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
     <text class="qh-auth-lbl">确认密码</text>
-    <view class="qh-input"><input v-model="form.confirm" type="password" placeholder="再次输入密码" /></view>
+    <view class="qh-input"><input v-model="form.confirm" :type="eyes.regConfirm ? 'text' : 'password'" placeholder="再次输入密码" /><button class="qh-eye" @click="toggleEye('regConfirm')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.regConfirm"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
     <button class="qh-btn qh-btn--primary" style="margin-top:14px" :disabled="busy" @click="doRegister">注册并登录</button>
   </view>
 
@@ -135,7 +138,7 @@ function doReset() {
       <text class="send" :class="{ off: countdown > 0 || sending || !emailOk }" @click="sendCode('reset')">{{ countdown > 0 ? countdown + 's' : '发送验证码' }}</text>
     </view>
     <text class="qh-auth-lbl">新密码</text>
-    <view class="qh-input"><input v-model="form.newPassword" type="password" placeholder="至少 8 位" /></view>
+    <view class="qh-input"><input v-model="form.newPassword" :type="eyes.resetPwd ? 'text' : 'password'" placeholder="至少 8 位" /><button class="qh-eye" @click="toggleEye('resetPwd')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.resetPwd"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
     <button class="qh-btn qh-btn--primary" style="margin-top:14px" :disabled="busy" @click="doReset">重置密码</button>
     <view style="text-align:center;margin-top:12px"><text class="qh-auth-link" @click="switchMode('login')">返回登录</text></view>
   </view>

@@ -39,8 +39,11 @@ function requestRepel() {
 <template>
   <!-- 台标 -->
   <view class="sgn-head">
-    <text class="sgn-title">鸟情信号站</text>
-    <text class="sgn-en">QINGHE SIGNAL SERVICE · ST.01 东区</text>
+    <view class="sgn-head-left">
+      <text class="sgn-title">鸟情信号站</text>
+      <text class="sgn-en">QINGHE SIGNAL SERVICE · ST.01 东区</text>
+    </view>
+    <button class="sgn-3d mono" @click="host.openScene">3D 沙盘 ▸</button>
   </view>
 
   <!-- 广播跑马灯 -->
@@ -128,7 +131,10 @@ function requestRepel() {
 </template>
 
 <style scoped>
-.sgn-head { background:#191919; color:#f2f1ea; padding:10px 14px 8px; display:flex; flex-direction:column; gap:2px; }
+.sgn-head { background:#191919; color:#f2f1ea; padding:10px 14px 8px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.sgn-head-left { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.sgn-3d { border:1px solid #f5c400; background:transparent; color:#f5c400; font-size:10px; letter-spacing:2px; padding:5px 9px; font-family:var(--font-num); font-weight:700; cursor:pointer; flex-shrink:0; }
+.sgn-3d:active { background:rgba(245,196,0,.18); }
 .sgn-title { font-size:21px; font-weight:900; letter-spacing:6px; }
 .sgn-en { font-size:8.5px; letter-spacing:2px; color:#9a9a92; font-family:var(--font-num); font-weight:700; }
 /* 跑马灯 */

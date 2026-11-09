@@ -28,7 +28,8 @@ function requestRepel() {
   <!-- 塔台标牌 -->
   <view class="twr-top">
     <view class="twr-id"><text class="twr-name">果园塔台</text><text class="twr-en">QINGHE TWR</text></view>
-    <view class="twr-clock mono"><text class="twr-time">9:41 LCL</text><text class="twr-sub">东区 · 01 号监控点 · YOLOv8</text></view>
+    <button class="twr-3d mono" @click="host.openScene">3D 沙盘 ▸</button>
+    <view class="twr-clock mono"><text class="twr-time">9:41 LCL</text><text class="twr-sub">东区 · 01 号 · YOLOv8</text></view>
   </view>
 
   <!-- LIVE 机坪 -->
@@ -107,11 +108,13 @@ function requestRepel() {
 <style scoped>
 .twr-top { display:flex; justify-content:space-between; align-items:center; padding:2px 0 10px; border-bottom:1px solid var(--twr-line, #2a313c); }
 .twr-id { display:flex; align-items:baseline; gap:8px; }
-.twr-name { font-size:19px; font-weight:800; letter-spacing:3px; color:var(--ink-900); }
-.twr-en { font-family:var(--font-num); font-size:10px; letter-spacing:2px; color:#ffb400; border:1px solid #8a6a1e; padding:2px 6px; }
+.twr-name { font-size:16px; font-weight:800; letter-spacing:2px; color:var(--ink-900); white-space:nowrap; }
+.twr-en { font-family:var(--font-num); font-size:9px; letter-spacing:1.5px; color:#ffb400; border:1px solid #8a6a1e; padding:2px 5px; }
 .twr-clock { text-align:right; font-size:9px; line-height:1.6; color:var(--ink-400); letter-spacing:1px; display:flex; flex-direction:column; }
 .twr-time { font-size:13px; letter-spacing:2px; color:var(--ink-900); }
-.twr-sub { font-family:var(--font-sans); font-weight:700; }
+.twr-sub { font-family:var(--font-sans); font-weight:700; white-space:nowrap; }
+.twr-3d { border:1px solid #8a6a1e; background:transparent; color:#ffb400; font-size:9px; letter-spacing:1px; padding:4px 7px; font-family:var(--font-num); font-weight:700; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+.twr-3d:active { background:rgba(255,180,0,.15); }
 /* LIVE 机坪:取景角画在容器上(视频内检测框保持后端绘制) */
 .twr-apron { position:relative; height:190px; background:#000; border:1px solid #3d4756; margin-top:10px; }
 .twr-apron-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }

@@ -14,6 +14,7 @@ const ws = useWorkspace(store)
 
 const stats = ref<Stats | null>(null)
 const wsOpen = ref(false)
+const menuOpen = ref(true)
 const today = computed(() => {
   const d = new Date()
   return `${d.getMonth() + 1}月${d.getDate()}日`
@@ -64,6 +65,7 @@ const shotUrl = (snap: string) => store.media('captures/' + snap)
     <view class="px-hud">
       <view class="px-chip"><text class="day">{{ today }}</text><text>守护中</text></view>
       <view class="px-chip cam" style="cursor:pointer" @click="wsOpen = !wsOpen"><text class="rec"/>CAM-01 · 2FPS</view>
+    <view class="px-chip" style="cursor:pointer" @click="host.openScene"><text style="color:#8fe08f">3D 沙盘</text></view>
       <view class="px-chip"><text class="pending mono">{{ host.s?.counts.pending || 0 }}</text><text>待处理</text></view>
     </view>
 
@@ -89,15 +91,20 @@ const shotUrl = (snap: string) => store.media('captures/' + snap)
     <span class="px-dlg-arrow">▼</span>
   </view>
 
-  <!-- 道具菜单 -->
-  <view class="px-menu">
-    <text class="px-menu-hd">驱离道具</text>
-    <view v-for="m in [{ id: 'acoustic', n: '声波喇叭' }, { id: 'infrared', n: '红外脉冲' }, { id: 'both', n: '双模联动' }]" :key="m.id" class="px-mi" :class="{ on: host.mode === m.id }" style="cursor:pointer" @click="host.mode = m.id as RepelMode">
-      <text class="cur">{{ host.mode === m.id ? '▶' : '' }}</text>{{ m.n }}
+  <!-- 道具菜单:可收缩小弹窗(右上角锚定,展开/收起均不遮挡) -->
+  <view class="px-menu" :class="{ open: menuOpen }">
+    <view class="px-menu-hd" style="cursor:pointer" @click="menuOpen = !menuOpen">
+      <text>驱离道具</text>
+      <text class="px-menu-arrow">{{ menuOpen ? '▾' : '▸' }}</text>
     </view>
-    <view class="px-durs">
-      <text v-for="d in [3,5,8]" :key="d" class="px-dur" :class="{ on: host.duration === d }" @click="host.duration = d">{{ d }}s</text>
-    </view>
+    <template v-if="menuOpen">
+      <view v-for="m in [{ id: 'acoustic', n: '声波喇叭' }, { id: 'infrared', n: '红外脉冲' }, { id: 'both', n: '双模联动' }]" :key="m.id" class="px-mi" :class="{ on: host.mode === m.id }" style="cursor:pointer" @click="host.mode = m.id as RepelMode">
+        <text class="cur">{{ host.mode === m.id ? '▶' : '' }}</text>{{ m.n }}
+      </view>
+      <view class="px-durs">
+        <text v-for="d in [3,5,8]" :key="d" class="px-dur" :class="{ on: host.duration === d }" @click="host.duration = d">{{ d }}s</text>
+      </view>
+    </template>
   </view>
 
   <!-- 观测工作区(NES 对话框式,点 CAM 展开) -->
@@ -184,8 +191,12 @@ const shotUrl = (snap: string) => store.media('captures/' + snap)
 .px-dlg-choices .choice.go { background:#f4f1e4; color:#10130c; }
 .px-dlg-arrow { position:absolute; right:10px; bottom:6px; color:#f4f1e4; font-size:12px; animation:qhBlink 1s steps(2) infinite; }
 /* 道具菜单 */
-.px-menu { position:absolute; right:12px; margin-top:-58px; width:124px; background:#10130c; border:4px solid #f4f1e4; box-shadow:0 0 0 4px #10130c,0 6px 0 rgba(0,0,0,.45); padding:9px 10px; z-index:9; }
-.px-menu-hd { color:#f8d94a; font-size:10px; font-weight:800; letter-spacing:2px; border-bottom:2px solid #3a4130; padding-bottom:5px; margin-bottom:7px; display:block; }
+.px-menu { position:absolute; right:10px; top:140px; width:124px; background:#10130c; border:4px solid #f4f1e4; box-shadow:0 0 0 4px #10130c,0 6px 0 rgba(0,0,0,.45); padding:9px 10px; z-index:9; }
+.px-menu:not(.open) { width:auto; padding:6px 10px; }
+.px-menu:not(.open) .px-menu-hd { border-bottom:0; margin-bottom:0; }
+.px-menu-hd { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#f8d94a; font-size:10px; font-weight:800; letter-spacing:2px; border-bottom:2px solid #3a4130; padding-bottom:5px; margin-bottom:7px; }
+.px-menu:not(.open) .px-menu-hd { border-bottom-width:1px; padding-bottom:3px; margin-bottom:0; }
+.px-menu-arrow { font-size:10px; }
 .px-mi { color:#f4f1e4; font-size:11px; font-weight:700; padding:4px 0; display:flex; gap:4px; }
 .px-mi .cur { color:#f8d94a; width:12px; }
 .px-mi.on { color:#8fe08f; }
