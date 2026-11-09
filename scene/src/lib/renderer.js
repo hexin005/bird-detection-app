@@ -310,6 +310,33 @@ export function createOrchardScene(canvas, options = {}) {
     f.mesh.visible = true
     if (f.mesh.userData.sprite) f.mesh.userData.sprite.visible = false
   }
+  function updateHeatZones(alarms) {
+    for (const cell of heatCells.values()) { cell.mesh.visible = false }
+    for (const a of alarms) {
+      let bbox = a.bbox
+      try { bbox = typeof bbox === 'string' ? JSON.parse(bbox) : bbox } catch { continue }
+      if (!Array.isArray(bbox) || bbox.length !== 4) continue
+      const cx = ((bbox[0] + bbox[2]) / 2) / 960
+      const cy = ((bbox[1] + bbox[3]) / 2) / 540
+      const gx = Math.round(((cx - 0.5) * 26) / 4) * 4
+      const gz = Math.round(((cy - 0.5) * 14) / 4) * 4
+      const key = gx + ',' + gz
+      let cell = heatCells.get(key)
+      if (!cell) {
+        const mat = new THREE.MeshBasicMaterial({ color: 0xd3452e, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+        const mesh = new THREE.Mesh(new THREE.CircleGeometry(2.1, 20), mat)
+        mesh.rotation.x = -Math.PI / 2
+        mesh.position.set(gx, 0.06, gz)
+        heatGroup.add(mesh)
+        cell = { mesh, mat, count: 0 }
+        heatCells.set(key, cell)
+      }
+      cell.mesh.visible = true
+      cell.count += 1
+      cell.mat.opacity = Math.min(0.3, 0.09 + cell.count * 0.045)
+    }
+  }
+
   function updateFleeBirds(dt) {
     fleeBirds.forEach((f) => {
       if (!f.active) return
@@ -328,6 +355,44 @@ export function createOrchardScene(canvas, options = {}) {
       f.mesh.userData.wings.forEach(({ mesh, dir }) => {
         mesh.rotation.x = dir * flap
       })
+    })
+  }
+
+  /* ---------- 活动热区:告警密集树丛的地面淡红区块(随 setState 更新) ---------- */
+  const heatGroup = new THREE.Group()
+  scene.add(heatGroup)
+  const heatCells = new Map() // "gx,gz" -> { mesh, mat, count }
+
+  /* ---------- 检测"!"闪现池:新告警出现时在对应树冠上方弹 3 秒 ---------- */
+  const flashPool = []
+  for (let i = 0; i < 4; i += 1) {
+    const g = new THREE.Group()
+    const stemMat = new THREE.MeshBasicMaterial({ color: 0xf04438, transparent: true, opacity: 0.95 })
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.46, 6), stemMat)
+    stem.position.y = 0.23
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xf04438, transparent: true, opacity: 0.95 })
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 6), dotMat)
+    dot.position.y = -0.08
+    g.add(stem, dot)
+    g.visible = false
+    scene.add(g)
+    flashPool.push({ g, stemMat, dotMat, until: 0 })
+  }
+  const flashedIds = new Set() // 已闪现过的告警 id,防重复
+
+  function spawnAlarmFlash(x, z) {
+    const f = flashPool.find((x2) => !x2.g.visible) || flashPool[0]
+    f.g.position.set(x, 0, z)
+    f.until = performance.now() + 3000
+    f.g.visible = true
+  }
+  function updateFlashPool(now) {
+    flashPool.forEach((f) => {
+      if (!f.g.visible) return
+      if (performance.now() > f.until) { f.g.visible = false; return }
+      const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.18
+      f.g.scale.setScalar(pulse)
+      f.stemMat.opacity = 0.7 + Math.sin(performance.now() * 0.008) * 0.25
     })
   }
 
@@ -837,6 +902,19 @@ export function createOrchardScene(canvas, options = {}) {
       visual.running = !!running
       visual.detections = Array.isArray(detections) ? detections : []
       visual.alarms = Array.isArray(alarms) ? alarms : []
+      // 活动热区:按告警 bbox 映射地面网格聚合;新告警触发"!"闪现
+      updateHeatZones(visual.alarms)
+      for (const a of visual.alarms) {
+        if (flashedIds.has(a.id)) continue
+        flashedIds.add(a.id)
+        if (flashedIds.size > 60) flashedIds.clear()
+        let hb = a.bbox
+        try { hb = typeof hb === 'string' ? JSON.parse(hb) : hb } catch { hb = null }
+        if (!Array.isArray(hb) || hb.length !== 4) continue
+        const fcx = ((hb[0] + hb[2]) / 2) / 960
+        const fcz = ((hb[1] + hb[3]) / 2) / 540
+        spawnAlarmFlash((fcx - 0.5) * 26, (fcz - 0.5) * 14)
+      }
       visual.executing = !!executing
       visual.offline = !!offline
       visual.detTime = detTime || 0

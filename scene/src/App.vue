@@ -47,6 +47,39 @@ const recentAlarms = computed(() => state.alarms.slice(0, 3))
 
 const executing = computed(() => !!state.activeCommand)
 /* 驱离完成瞬间:按钮短暂变绿提示「鸟群散去」 */
+/* 声波驱离音效:WebAudio 脉冲警笛;静音开关持久化;AudioContext 在用户手势后创建 */
+const soundEnabled = ref(localStorage.getItem('bird-scene-sound') === 'on')
+let audioCtx = null, audioOsc = null, audioLfo = null, audioGain = null, audioLfoGain = null
+function startRepelSound() {
+  if (!soundEnabled.value || audioOsc) return
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()
+    if (audioCtx.state === 'suspended') audioCtx.resume()
+    audioOsc = audioCtx.createOscillator()
+    audioGain = audioCtx.createGain()
+    audioOsc.type = 'sawtooth'
+    audioOsc.frequency.value = 640
+    audioLfo = audioCtx.createOscillator()
+    audioLfo.frequency.value = 2.4
+    audioLfoGain = audioCtx.createGain()
+    audioLfoGain.gain.value = 340
+    audioLfo.connect(audioLfoGain)
+    audioLfoGain.connect(audioOsc.frequency)
+    audioGain.gain.value = 0.03
+    audioOsc.connect(audioGain)
+    audioGain.connect(audioCtx.destination)
+    audioOsc.start(); audioLfo.start()
+  } catch { stopRepelSound() }
+}
+function stopRepelSound() {
+  try { audioOsc?.stop(); audioLfo?.stop(); audioGain?.disconnect(); audioLfoGain?.disconnect() } catch { /* already stopped */ }
+  audioOsc = audioLfo = null
+}
+function toggleSound() {
+  soundEnabled.value = !soundEnabled.value
+  localStorage.setItem('bird-scene-sound', soundEnabled.value ? 'on' : 'off')
+  if (!soundEnabled.value) stopRepelSound()
+}
 const repelDone = ref(false)
 let repelDoneTimer = null
 /* 果农流程横向步骤条:phase → 当前步索引 */
@@ -85,6 +118,7 @@ function hasBbox(a) {
 const responseMode = ref(localStorage.getItem('bird-scene-response-mode') === 'auto' ? 'auto' : 'manual')
 const selectedRepelMode = ref('both')
 const effectiveRepelMode = computed(() => responseMode.value === 'auto' ? 'both' : selectedRepelMode.value)
+watch(executing, (now) => { now ? startRepelSound() : stopRepelSound() })
 const crewPhase = ref('home')
 const crewExpanded = ref(false)
 const daylightExpanded = ref(false)
@@ -1126,4 +1160,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid #d3e856; outline-
 .capture-detail { margin: 12px 0 0; }
 .capture-detail img { width: 100%; display: block; border-radius: 6px; }
 .capture-detail figcaption { margin-top: 6px; font-size: 11px; line-height: 1.5; color: #b9d0c8; }
+
+/* ---- 声波音效开关 ---- */
+.sound-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+.sound-toggle { display: flex; align-items: center; gap: 6px; border: 1px solid rgba(97,221,192,.35); background: rgba(43,156,134,.1); color: #8be8cc; font-size: 11px; font-weight: 600; padding: 5px 10px; cursor: pointer; border-radius: var(--radius-sm); }
+.sound-toggle.is-on { background: rgba(89,225,182,.2); border-color: #59e1b6; color: #b8f5dd; }
+.sound-toggle__dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(133,164,157,.5); }
+.sound-toggle.is-on .sound-toggle__dot { background: #59e1b6; box-shadow: 0 0 8px rgba(89,225,182,.6); }
+.sound-hint { font-size: 10px; opacity: .55; }
 </style>
