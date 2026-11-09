@@ -46,6 +46,38 @@ const offline = computed(() => state.scenario === 'offline')
 const recentAlarms = computed(() => state.alarms.slice(0, 3))
 
 const executing = computed(() => !!state.activeCommand)
+/* 驱离完成瞬间:按钮短暂变绿提示「鸟群散去」 */
+const repelDone = ref(false)
+let repelDoneTimer = null
+watch(executing, (now, before) => {
+  if (before && !now) {
+    repelDone.value = true
+    if (repelDoneTimer) clearTimeout(repelDoneTimer)
+    repelDoneTimer = setTimeout(() => { repelDone.value = false }, 2400)
+  }
+})
+/* 果农流程横向步骤条:phase → 当前步索引 */
+const crewStepIndex = computed(() => ({ home: -1, alert: 0, working: 1, positioned: 1, actuating: 2, waiting: 3, returning: 3 }[crewPhase.value] ?? -1))
+/* 最近检测 → 3D 场景定位(bbox 映射与 renderer 同源);再次点击返回全景 */
+const focusTarget = ref('')
+function focusAlarm(a) {
+  if (!handle) return
+  if (focusTarget.value === a.id) {
+    handle.resetView()
+    focusTarget.value = ''
+    return
+  }
+  let bbox = null
+  try { bbox = typeof a.bbox === 'string' ? JSON.parse(a.bbox) : (a.bbox || null) } catch { bbox = null }
+  if (!handle.focusDetection || !bbox) return
+  handle.focusDetection(bbox)
+  focusTarget.value = a.id
+}
+function hasBbox(a) {
+  let bbox = null
+  try { bbox = typeof a.bbox === 'string' ? JSON.parse(a.bbox) : (a.bbox || null) } catch { return false }
+  return Array.isArray(bbox) && bbox.length === 4
+}
 
 const responseMode = ref(localStorage.getItem('bird-scene-response-mode') === 'auto' ? 'auto' : 'manual')
 const selectedRepelMode = ref('both')
@@ -453,6 +485,39 @@ function toggleRotate() {
   autoRotate.value = !autoRotate.value
   if (handle) handle.setAutoRotate(autoRotate.value)
 }
+
+/* ---------- 昼夜光照:默认跟随真实本地时间,滑杆手动演示 ---------- */
+const daylightMode = ref('real')
+const daylightHour = ref(12)
+const realHour = ref(new Date().getHours() + new Date().getMinutes() / 60)
+let daylightTimer = null
+const daylightName = computed(() => {
+  const h = daylightMode.value === 'manual' ? daylightHour.value : realHour.value
+  const name = h < 5.4 ? '深夜' : h < 7.2 ? '黎明' : h < 11 ? '上午' : h < 14 ? '正午' : h < 17 ? '下午' : h < 19.2 ? '黄昏' : h < 20.5 ? '入夜' : '深夜'
+  return `${name} · ${Math.floor(h)} 时`
+})
+function applyDaylight() {
+  realHour.value = new Date().getHours() + new Date().getMinutes() / 60
+  const h = daylightMode.value === 'manual' ? daylightHour.value : realHour.value
+  if (handle && handle.setDaylight) handle.setDaylight(h)
+}
+function setDaylightMode(m) {
+  daylightMode.value = m
+  applyDaylight()
+}
+function onDaylightSlide(event) {
+  daylightMode.value = 'manual'
+  daylightHour.value = Number(event.target.value)
+  applyDaylight()
+}
+watch(ready, r => {
+  if (r) {
+    applyDaylight()
+    if (daylightTimer) clearInterval(daylightTimer)
+    daylightTimer = setInterval(applyDaylight, 60000) // 实时模式每分钟跟随
+  }
+})
+onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 </script>
 
 <template>
@@ -545,8 +610,8 @@ function toggleRotate() {
             <button :class="{ 'is-selected': selectedRepelMode === 'infrared' }" :disabled="executing || repelling" @click="selectRepelMode('infrared')">红外</button>
             <button :class="{ 'is-selected': selectedRepelMode === 'both' }" :disabled="executing || repelling" @click="selectRepelMode('both')">双模</button>
           </div>
-          <button class="hud-action hud-action--repel hud-control-submit" :disabled="responseMode === 'auto' || !birdCount || executing || repelling || offline || !state.token" @click="repel(effectiveRepelMode, false)">
-            {{ responseMode === 'auto' ? crewPhase === 'home' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `立即驱离 · ${birdCount} 只鸟` : '等待检测到鸟类' }}
+          <button class="hud-action hud-action--repel hud-control-submit" :class="{ 'is-done': repelDone, 'is-executing': executing }" :disabled="responseMode === 'auto' || !birdCount || executing || repelling || offline || !state.token" @click="repel(effectiveRepelMode, false)">
+            {{ repelDone ? '✓ 已驱离 · 鸟群散去' : responseMode === 'auto' ? crewPhase === 'home' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `立即驱离 · ${birdCount} 只鸟` : '等待检测到鸟类' }}
           </button>
           <div class="control-footnote">{{ responseMode === 'auto' ? '设备抵达判定已开启 · 模拟执行器' : '手动触发不派出果农 · 模拟执行器' }}</div>
         </div>
@@ -559,18 +624,33 @@ function toggleRotate() {
             </div>
             <button class="crew-card__toggle" @click="crewExpanded = !crewExpanded">{{ crewExpanded ? '收起' : '展开' }}</button>
           </div>
-          <div v-if="crewExpanded" class="crew-task-list">
-            <div v-for="(task, index) in crewTasks" :key="task.key" class="crew-task" :class="{ 'is-muted': !task.enabled }">
-              <span class="crew-task__index">0{{ index + 1 }}</span>
-              <div class="crew-task__body">
-                <strong>{{ task.title }}</strong>
-                <span>{{ task.detail }}</span>
-                <small>{{ task.status }}</small>
+          <div v-if="crewExpanded" class="crew-steps">
+            <template v-for="(task, index) in crewTasks" :key="task.key">
+              <div class="crew-step" :class="{ 'is-active': index === crewStepIndex, 'is-done': index < crewStepIndex, 'is-muted': !task.enabled }">
+                <span class="crew-step__dot">{{ index < crewStepIndex ? '✓' : '0' + (index + 1) }}</span>
+                <span class="crew-step__name">{{ task.title }}</span>
               </div>
-              <i class="crew-task__status" :class="{ 'is-active': ['alert', 'working', 'actuating'].includes(crewPhase) && task.enabled, 'is-done': ['positioned', 'waiting', 'returning'].includes(crewPhase) && task.enabled }" />
-            </div>
+              <i v-if="index < crewTasks.length - 1" class="crew-step__line" :class="{ 'is-done': index < crewStepIndex }" />
+            </template>
           </div>
-          <div v-else class="crew-collapsed-note">三名果农 · {{ crewPhaseLabel }}</div>
+          <div class="crew-step__status-line">
+            <span>{{ crewPhaseLabel }}</span>
+            <span class="crew-step__detail">{{ crewTasks[Math.max(0, Math.min(crewStepIndex, 2))]?.detail || '三名果农屋内待命' }}</span>
+          </div>
+        </div>
+
+        <div class="hud-card daylight-card">
+          <div class="hud-card__title">光照演示</div>
+          <div class="daylight-switch">
+            <button :class="{ 'is-active': daylightMode === 'real' }" @click="setDaylightMode('real')">实时</button>
+            <button :class="{ 'is-active': daylightMode === 'manual' }" @click="setDaylightMode('manual')">手动</button>
+          </div>
+          <input class="daylight-slider" type="range" min="0" max="24" step="0.25"
+            :value="daylightMode === 'manual' ? daylightHour : realHour"
+            :disabled="daylightMode === 'real'" @input="onDaylightSlide" />
+          <div class="daylight-scale"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+          <div class="daylight-readout mono">{{ daylightName }}</div>
+          <div class="daylight-hint">拖动滑杆看晨昏与夜间 — 夜间红外束与声波更醒目</div>
         </div>
 
       </template>
@@ -598,6 +678,7 @@ function toggleRotate() {
             <div v-for="a in recentAlarms" :key="a.id" class="hud-detect">
               <i class="hud-detect__dot" :class="{ 'is-alarm': a.status === 'new' }" />
               <div class="hud-detect__body"><span class="hud-detect__name">{{ a.species }} · {{ a.count }} 只</span><span class="hud-detect__meta">{{ timeText(a.at) }} · {{ (a.confidence * 100).toFixed(0) }}%</span></div>
+              <button v-if="hasBbox(a)" class="hud-detect__locate" :class="{ 'is-on': focusTarget === a.id }" @click="focusAlarm(a)">{{ focusTarget === a.id ? '✓ 已定位' : '定位' }}</button>
             </div>
           </template>
           <div v-else class="hud-empty">开始检测后，这里显示最新识别结果</div>
@@ -810,6 +891,12 @@ function toggleRotate() {
   opacity: 0.55;
   cursor: not-allowed;
 }
+.hud-action--repel.is-executing { animation: qhBlink 1.4s steps(2) infinite; }
+.hud-action--repel.is-done {
+  background: linear-gradient(115deg, #2f9e6e, #1f7d5c);
+  border-color: rgba(89, 225, 182, .72);
+  box-shadow: 0 4px 16px rgba(47, 178, 126, .3), inset 0 1px rgba(255,255,255,.22);
+}
 
 .hud-panel {
   width: 318px;
@@ -854,7 +941,7 @@ function toggleRotate() {
   color: #e5f3ee;
   border-color: rgba(102, 191, 172, .2);
   background:
-    linear-gradient(135deg, rgba(10, 28, 32, .93), rgba(13, 40, 41, .89)),
+    linear-gradient(135deg, rgba(10, 28, 32, .78), rgba(13, 40, 41, .72)),
     repeating-linear-gradient(0deg, transparent 0 23px, rgba(95, 218, 190, .025) 24px);
   box-shadow: 0 12px 28px rgba(4, 18, 22, .28), inset 0 1px rgba(193, 255, 235, .055);
   backdrop-filter: blur(16px);
@@ -912,6 +999,26 @@ function toggleRotate() {
 .crew-task__status.is-done { background: #59e1b6; box-shadow: 0 0 0 4px rgba(89,225,182,.13), 0 0 10px rgba(89,225,182,.56); }
 .crew-collapsed-note { padding-top: 8px; border-top: 1px solid rgba(99,185,166,.16); color: #a4c1b8; font-size: var(--text-xs); }
 
+/* 果农流程横向步骤条 */
+.crew-steps { display: flex; align-items: flex-start; gap: 4px; padding: 4px 0 2px; }
+.crew-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.crew-step__dot { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(97,221,192,.35); display: grid; place-items: center; font: 600 10px var(--font-num); color: #8be8cc; background: rgba(43,156,134,.14); }
+.crew-step.is-active .crew-step__dot { border-color: #ff5e69; color: #fff; background: rgba(255,84,99,.28); box-shadow: 0 0 10px rgba(255,84,99,.5); }
+.crew-step.is-done .crew-step__dot { background: #59e1b6; color: #0e2a20; border-color: #59e1b6; }
+.crew-step.is-muted { opacity: .45; }
+.crew-step__name { font-size: 9.5px; color: var(--ink-400); text-align: center; line-height: 1.3; }
+.crew-step.is-active .crew-step__name { color: #e5f3ee; font-weight: 600; }
+.crew-step.is-done .crew-step__name { color: #74d9ba; }
+.crew-step__line { flex: 1; height: 1px; background: rgba(97,221,192,.3); margin-top: 12px; }
+.crew-step__line.is-done { background: #59e1b6; }
+.crew-step__status-line { padding: 6px 8px; border-radius: var(--radius-md); background: rgba(43,156,134,.12); display: flex; flex-direction: column; gap: 2px; }
+.crew-step__status-line span:first-child { color: #74d9ba; font-size: 10px; font-weight: 600; }
+.crew-step__detail { color: var(--ink-400); font-size: 10px; }
+
+/* 最近检测定位按钮 */
+.hud-detect__locate { flex: 0 0 auto; border: 1px solid rgba(97,221,192,.35); background: rgba(43,156,134,.12); color: #8be8cc; font-size: 10px; font-weight: 600; padding: 3px 8px; cursor: pointer; }
+.hud-detect__locate.is-on { background: rgba(89,225,182,.22); color: #b8f5dd; border-color: #59e1b6; }
+
 /* 驱离操作反馈 */
 .repel-msg {
   padding: 6px 12px;
@@ -958,4 +1065,14 @@ function toggleRotate() {
   .hud-note-abs { display: none; }
   .login-card { width: 92vw; }
 }
+
+/* ---- 光照演示卡 ---- */
+.daylight-card .daylight-switch { display: flex; gap: 6px; margin-bottom: 8px; }
+.daylight-card .daylight-switch button { flex: 1; border: 1px solid rgba(212, 232, 86, .35); background: transparent; color: inherit; padding: 5px 0; font-size: 12px; cursor: pointer; opacity: .65; }
+.daylight-card .daylight-switch button.is-active { opacity: 1; background: rgba(212, 232, 86, .14); border-color: #d3e856; }
+.daylight-card .daylight-slider { width: 100%; accent-color: #d3e856; }
+.daylight-card .daylight-slider:disabled { opacity: .35; }
+.daylight-card .daylight-scale { display: flex; justify-content: space-between; font-size: 10px; opacity: .5; }
+.daylight-card .daylight-readout { margin-top: 6px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+.daylight-card .daylight-hint { margin-top: 4px; font-size: 11px; opacity: .55; line-height: 1.5; }
 </style>

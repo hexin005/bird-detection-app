@@ -103,6 +103,39 @@ export function createOrchardScene(canvas, options = {}) {
   fill.position.set(14, 12, -16)
   scene.add(fill)
 
+  /* ---------- 昼夜光照:按小时在关键帧间插值(0~24) ---------- */
+  const DAYLIGHT_KEYS = [
+    { h: 0,    sky: 0x0d1420, fog: 0x0d1420, sunC: 0x9db8dd, sunI: 0.26, hemiI: 0.34, fillI: 0.10, px: -14, py: 20, pz: -12, night: 1 },
+    { h: 5.4,  sky: 0x1a2430, fog: 0x1a2430, sunC: 0xc9a06a, sunI: 0.55, hemiI: 0.52, fillI: 0.18, px: -22, py: 7,  pz: 16,  night: 1 },
+    { h: 7,    sky: 0x9ec4de, fog: 0xa9c8d8, sunC: 0xffc27a, sunI: 1.75, hemiI: 1.02, fillI: 0.34, px: -26, py: 9,  pz: 19,  night: 0 },
+    { h: 12,   sky: PALETTE.sky, fog: PALETTE.fog, sunC: 0xfff2d8, sunI: 2.3, hemiI: 1.35, fillI: 0.48, px: -12, py: 30, pz: 10, night: 0 },
+    { h: 17.6, sky: 0xe6c096, fog: 0xd6ae86, sunC: 0xff9a4d, sunI: 1.9,  hemiI: 0.96, fillI: 0.30, px: 20,  py: 12, pz: 20,  night: 0 },
+    { h: 19.4, sky: 0x272c40, fog: 0x252a3c, sunC: 0x8fb0d8, sunI: 0.32, hemiI: 0.46, fillI: 0.14, px: 18,  py: 9,  pz: -12, night: 1 },
+    { h: 24,   sky: 0x0d1420, fog: 0x0d1420, sunC: 0x9db8dd, sunI: 0.26, hemiI: 0.34, fillI: 0.10, px: -14, py: 20, pz: -12, night: 1 },
+  ]
+  function applyDaylightHour(h) {
+    const hh = ((h % 24) + 24) % 24
+    let a = DAYLIGHT_KEYS[0]
+    let b = DAYLIGHT_KEYS[DAYLIGHT_KEYS.length - 1]
+    for (let i = 0; i < DAYLIGHT_KEYS.length - 1; i += 1) {
+      if (hh >= DAYLIGHT_KEYS[i].h && hh <= DAYLIGHT_KEYS[i + 1].h) {
+        a = DAYLIGHT_KEYS[i]
+        b = DAYLIGHT_KEYS[i + 1]
+        break
+      }
+    }
+    const t = THREE.MathUtils.clamp((hh - a.h) / (b.h - a.h || 1), 0, 1)
+    sun.color.set(a.sunC).lerp(new THREE.Color(b.sunC), t)
+    sun.intensity = a.sunI + (b.sunI - a.sunI) * t
+    sun.position.set(a.px + (b.px - a.px) * t, a.py + (b.py - a.py) * t, a.pz + (b.pz - a.pz) * t)
+    hemi.intensity = a.hemiI + (b.hemiI - a.hemiI) * t
+    fill.intensity = a.fillI + (b.fillI - a.fillI) * t
+    scene.background.copy(new THREE.Color(a.sky).lerp(new THREE.Color(b.sky), t))
+    scene.fog.color.set(a.fog).lerp(new THREE.Color(b.fog), t)
+    // 夜间标志:设备灯/红外束在暗景中增强(见 updateDevices)
+    visual.night = Math.round(a.night + (b.night - a.night) * t) === 1
+  }
+
   /* ---------- 天地 ---------- */
   const rand = mulberry32(20261105)
   const ground = createGround(rand)
@@ -254,6 +287,47 @@ export function createOrchardScene(canvas, options = {}) {
     })
   }
 
+  /* ---------- 逃散鸟池:被驱离的鸟从盘旋位置起飞离场(独立于驻留池) ---------- */
+  const fleeBirds = []
+  for (let i = 0; i < MAX_BIRDS; i += 1) {
+    const mesh = createBirdMesh()
+    mesh.visible = false
+    scene.add(mesh)
+    fleeBirds.push({ mesh, active: false, t: 0, dur: 2.1 + Math.random() * 0.6, from: new THREE.Vector3(), dir: new THREE.Vector3() })
+  }
+  function spawnFlee(fromPos) {
+    const f = fleeBirds.find((b) => !b.active)
+    if (!f) return
+    f.active = true
+    f.t = 0
+    f.from.copy(fromPos)
+    f.from.y = Math.max(1.4, fromPos.y)
+    const a = Math.random() * Math.PI * 2
+    f.dir.set(Math.cos(a), 0, Math.sin(a))
+    f.mesh.visible = true
+    if (f.mesh.userData.sprite) f.mesh.userData.sprite.visible = false
+  }
+  function updateFleeBirds(dt) {
+    fleeBirds.forEach((f) => {
+      if (!f.active) return
+      f.t += dt / f.dur
+      if (f.t >= 1) {
+        f.active = false
+        f.mesh.visible = false
+        return
+      }
+      const dist = f.t * 24
+      // 先快速爬升脱离树冠，再缓升远去
+      const lift = Math.sin(Math.min(1, f.t * 1.8) * Math.PI * 0.55) * 5.5 + f.t * 2.5
+      f.mesh.position.set(f.from.x + f.dir.x * dist, f.from.y + lift, f.from.z + f.dir.z * dist)
+      f.mesh.lookAt(f.from.x + f.dir.x * (dist + 2), f.mesh.position.y, f.from.z + f.dir.z * (dist + 2))
+      const flap = Math.sin(f.t * 55) * 0.72
+      f.mesh.userData.wings.forEach(({ mesh, dir }) => {
+        mesh.rotation.x = dir * flap
+      })
+    })
+  }
+
   /* ---------- 立体扫描（监测中：扫描幕布 + 扩散圆环） ---------- */
   // 竖直扫描幕布：一面上下起伏的半透明平面，像激光幕墙扫过果园
   const curtainGeo = new THREE.PlaneGeometry(36, 12, 1, 1)
@@ -325,6 +399,7 @@ export function createOrchardScene(canvas, options = {}) {
     detTime: 0,
     repelMode: 'both',   // acoustic | infrared | both：驱离方式，决定点亮哪些设备动效
     crewPhase: 'home',
+    night: false,        // 昼夜光照的夜间标志:设备灯/束流在暗景中增强
   }
 
   const crewMotion = { phase: '', started: 0, duration: 0, paths: [], alertReadySent: false, arrivalSent: false }
@@ -509,18 +584,24 @@ export function createOrchardScene(canvas, options = {}) {
     })
   }
 
-  /** 执行一次驱离：按概率驱散部分鸟，返回是否还有剩余 */
+  /** 执行一次驱离:被移除的鸟播放逃散动画,剩余鸟进入惊飞状态;返回是否还有剩余 */
   function disperse(force = 0) {
     if (!occupants.length) return 0
     scareBoost = 1
-    // 一次驱离散掉约一半（至少 1 只），所以 2~3 次能清空
     const n = occupants.length
     let removeCount = Math.max(1, Math.ceil(n * 0.5))
-    // 只剩 1 只时有小概率没驱走（拟真），除非 force
+    // 只剩 1 只时有小概率没驱走(拟真),除非 force
     if (n === 1 && force < 1 && Math.random() < 0.3) removeCount = 0
     removeCount = Math.min(removeCount, n)
-    for (let i = 0; i < removeCount; i += 1) occupants.pop()
-    // 全部驱离完毕：本轮不允许再从检测数据"复活"，直到新一轮检测
+    // 逃散动画:被移除的鸟从各自当前盘旋位置起飞(槽位 i ↔ occupants[i] 一一对应)
+    const firstIdx = n - removeCount
+    for (let k = 0; k < removeCount; k += 1) {
+      const slot = birds[firstIdx + k]
+      if (slot && slot.mesh.visible) spawnFlee(slot.mesh.position.clone())
+      else spawnFlee(new THREE.Vector3((Math.random() - 0.5) * 14, 5.5 + Math.random() * 3, (Math.random() - 0.5) * 9))
+    }
+    occupants.length = firstIdx
+    // 全部驱离完毕:本轮不允许再从检测数据"复活",直到新一轮检测
     if (occupants.length === 0) noRespawn = true
     return occupants.length
   }
@@ -693,7 +774,7 @@ export function createOrchardScene(canvas, options = {}) {
     camRig.rotation.y = -Math.PI / 3.1
     camRig.userData.head.rotation.y = Math.sin(elapsed * 0.22) * 1.05
 
-    // 驱鸟器声波：方式含声学（acoustic/both）时才点亮
+    // 驱鸟器声波：方式含声学（acoustic/both）时才点亮;夜间波纹更亮更远
     const { led: dled, waves, controlScreen: acousticScreen } = deterrent.userData
     const wavesOn = visual.executing && visual.repelMode !== 'infrared'
     dled.material.color.setHex(wavesOn ? 0xd3e856 : (visual.offline ? 0x9c5546 : 0x56753f))
@@ -704,11 +785,11 @@ export function createOrchardScene(canvas, options = {}) {
         return
       }
       const t = (elapsed * 0.85 + phase) % 1
-      mesh.scale.setScalar(0.8 + t * 5.2)
-      mat.opacity = (1 - t) * 0.55
+      mesh.scale.setScalar(0.8 + t * (visual.night ? 6.4 : 5.2))
+      mat.opacity = Math.min(1, (1 - t) * (visual.night ? 0.8 : 0.55))
     })
 
-    // 红外驱鸟器：方式含红外（infrared/both）时才点亮束流
+    // 红外驱鸟器：方式含红外（infrared/both）时才点亮束流;夜间束流增强
     const ir = infrared.userData
     ir.controlScreen.material.color.setHex(visual.executing && visual.repelMode !== 'acoustic' ? 0xff524f : 0x3e4a46)
     const targetBird = birds.find((bird) => bird.active)
@@ -724,7 +805,7 @@ export function createOrchardScene(canvas, options = {}) {
       ir.beam.quaternion.setFromUnitVectors(worldUp, direction.normalize())
       ir.beam.scale.set(1, distance, 1)
       ir.beam.visible = true
-      ir.beamMat.opacity = 0.82 + Math.sin(elapsed * 5.5) * 0.12
+      ir.beamMat.opacity = (visual.night ? 0.95 : 0.82) + Math.sin(elapsed * 5.5) * 0.1
     } else {
       ir.beam.visible = false
       ir.beamMat.opacity = 0
@@ -765,6 +846,7 @@ export function createOrchardScene(canvas, options = {}) {
     // 不再自动操控相机，视角完全由用户掌握
     controls.update()
     updateBirds(dt, elapsed)
+    updateFleeBirds(dt)
     updateCrew(elapsed)
     updateDevices(dt, elapsed)
     composer.render()
@@ -815,6 +897,10 @@ export function createOrchardScene(canvas, options = {}) {
     setAutoRotate(on) {
       userAutoRotate = !!on
       controls.autoRotate = !!on
+    },
+    /** 昼夜光照:传入 0~24 小时(真实本地时间或光照演示滑杆) */
+    setDaylight(hour) {
+      applyDaylightHour(hour)
     },
     /**
      * 执行一次驱离，返回剩余鸟数。
@@ -872,6 +958,18 @@ export function createOrchardScene(canvas, options = {}) {
       controls.update()
     },
     /** 聚焦某个点（演示用：聚焦大门 / 设备等） */
+    /** 定位到某条检测记录(按 bbox 映射场景坐标,与 updateBirds 同一公式) */
+    focusDetection(bbox) {
+      if (!Array.isArray(bbox) || bbox.length !== 4) return
+      const cx = ((bbox[0] + bbox[2]) / 2) / 960
+      const cy = ((bbox[1] + bbox[3]) / 2) / 540
+      const x = (cx - 0.5) * 26
+      const z = (cy - 0.5) * 14
+      controls.autoRotate = false
+      camera.position.set(x, 8.5, z + 15)
+      controls.target.set(x, 3.2, z)
+      controls.update()
+    },
     focusPoint(x, y, z, dist = 12) {
       controls.autoRotate = false
       camera.position.set(x, y + dist * 0.55, z + dist * 0.82)
