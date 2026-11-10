@@ -17,7 +17,7 @@
   --warn-line: #d3212c;
   --success-fg: #191919;
   --hazard: repeating-linear-gradient(-45deg, #f5c400 0 10px, #191919 10px 20px);
-  --video-filter: grayscale(1) contrast(1.15);
+  --video-filter: none;
   --scanline: rgba(25, 25, 25, 0.35);
   --shadow-ink: rgba(25, 25, 25, 0.3);
   --shadow-btn: 3px 3px 0 rgba(25, 25, 25, 0.3);

@@ -27,7 +27,7 @@ export const useOrchard = defineStore('orchard', () => {
   let visible = false, generation = 0, syncing = false
   const active = computed(() => state.value?.commands.find(c => ['pending', 'running'].includes(c.status)))
 
-  function request<T>(path: string, method: 'GET' | 'POST' | 'PUT' = 'GET', data?: object): Promise<T> {
+  function request<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: object): Promise<T> {
     const session = token.value
     return new Promise((resolve, reject) => {
       uni.request({ url: server.value.replace(/\/$/, '') + '/api' + path, method, data,

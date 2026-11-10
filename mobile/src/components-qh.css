@@ -123,7 +123,7 @@
 .qh-alarmcard { display:flex; flex-direction:column; gap:7px; }
 .qh-alarmcard__top { display:flex; gap:10px; }
 .qh-thumb { width:44px; height:44px; flex-shrink:0; background:var(--ink-900); border:2px solid var(--ink-900); display:flex; align-items:center; justify-content:center; color:var(--accent-fg); font-size:var(--text-2xs); overflow:hidden; }
-.qh-thumb image, .qh-thumb uni-image { width:100%; height:100%; object-fit:cover; display:block; filter:grayscale(1) contrast(1.15); }
+.qh-thumb image, .qh-thumb uni-image { width:100%; height:100%; object-fit:cover; display:block; filter:none; }
 .qh-alarmcard__mid { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
 .qh-alarmcard__titlerow { display:flex; align-items:center; gap:6px; }
 .qh-alarmcard__title { font-size:var(--text-md); font-weight:700; color:var(--ink-900); }
@@ -270,7 +270,7 @@
 .qh-svcinfo { text-align:center; font-family:var(--font-num); font-size:var(--text-2xs); color:var(--ink-400); }
 
 /* ===== 告警详情弹窗 ===== */
-.qh-detailimg { width:100%; height:170px; background:var(--ink-900); border:2px solid var(--ink-900); display:flex; align-items:center; justify-content:center; color:var(--accent-fg); font-size:var(--text-sm); overflow:hidden; object-fit:cover; filter:grayscale(1) contrast(1.15); }
+.qh-detailimg { width:100%; height:170px; background:var(--ink-900); border:2px solid var(--ink-900); display:flex; align-items:center; justify-content:center; color:var(--accent-fg); font-size:var(--text-sm); overflow:hidden; object-fit:cover; filter:none; }
 .qh-infogrid { display:flex; flex-direction:column; gap:8px; width:100%; }
 .qh-infogrid__row { display:flex; gap:8px; }
 .qh-infocell { flex:1; display:flex; flex-direction:column; gap:3px; padding:10px; background:var(--surface-muted); border:1.5px solid var(--ink-900); }
@@ -307,7 +307,7 @@
 .qh-birdrow { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2); border:1px solid transparent; transition:none; }
 .qh-birdrow:active, .qh-birdrow.is-active { background:var(--surface-sunken); border-color:var(--ink-900); }
 .qh-birdrow__cover { width:40px; height:40px; flex-shrink:0; background:var(--ink-900); border:2px solid var(--ink-900); overflow:hidden; display:block; }
-.qh-birdrow__cover image, .qh-birdrow__cover uni-image { width:100%; height:100%; display:block; object-fit:cover; filter:grayscale(1) contrast(1.15); }
+.qh-birdrow__cover image, .qh-birdrow__cover uni-image { width:100%; height:100%; display:block; object-fit:cover; filter:none; }
 .qh-birdrow__cover--empty { display:flex; align-items:center; justify-content:center; background:var(--dither-light); background-size:6px 6px; color:var(--ink-900); }
 .qh-birdrow__info { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .qh-birdrow__name { font-size:var(--text-md); font-weight:700; color:var(--ink-900); line-height:var(--leading-snug); }

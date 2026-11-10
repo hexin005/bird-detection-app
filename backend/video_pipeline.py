@@ -32,6 +32,7 @@ class VideoPipeline(VideoMonitor):
                 if not self.settings.video_path.is_file():
                     raise Conflict('请先上传视频，或配置默认演示视频')
                 self.selected = self.library.register(self.settings.video_path, '演示录像 · ' + self.settings.video_path.name)
+            self.library.already_processed(self.selected)
             # Preserve legacy path checks without changing Settings for later default runs.
             original = self.settings.video_path
             try:
@@ -50,7 +51,7 @@ class VideoPipeline(VideoMonitor):
             rows = self.store.rows('SELECT progress,result_ready,duration,video_id FROM tasks WHERE id=?', (task_id,))
             if rows:
                 result.update(rows[0])
-            result['stream_ready'] = (self.library.jobs / task_id / 'index.m3u8').exists()
+            result['stream_ready'] = (self.library.job_dir(task_id) / 'index.m3u8').exists()
         return result
 
     def run(self):

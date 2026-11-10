@@ -5,10 +5,8 @@ export type ThemeId = 'b1bit' | 'tower' | 'signal' | 'pixel'
 export interface ThemeMeta { id: ThemeId; label: string; tag: string; desc: string }
 
 export const THEMES: ThemeMeta[] = [
-  { id: 'tower', label: 'A · 果园塔台', tag: 'AMBER', desc: '1970s 机场翻牌航显板 — 鸟情即航班，驱离即放行许可。监控主页已按主题复刻。' },
   { id: 'b1bit', label: 'B · 果园守护 1.0', tag: '1-BIT', desc: '1984 首代 Macintosh — 纯黑白 1-bit、条纹窗口、硬偏移阴影。' },
   { id: 'signal', label: 'C · 鸟情信号站', tag: 'SIGNAL', desc: '公共预警信号台 — 信号牌按待处理等级升降，跑马灯播报。监控主页已复刻。' },
-  { id: 'pixel', label: 'D · 像素果园', tag: '16-BIT', desc: '16-bit 掌机牧场 — 告警是"野生鸟类出现!"对话框，驱离道具即用即走。监控主页已复刻。' },
 ]
 
 const GLOBAL_KEY = 'bird-theme'

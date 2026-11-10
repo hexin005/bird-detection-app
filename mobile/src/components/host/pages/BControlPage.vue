@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// B 主题控制页(S1 自动哨兵):头部 + 快速驱离条 + 共享策略层(规则/巡逻/参数) + 最近执行。
+// B 主题控制页(S1 自动哨兵):头部 + 快速驱离条 + 共享策略层(规则/巡逻) + 最近执行。
 // 策略卡结构与文案在 ControlStrategy 共享,四主题一致,观感走 token。
 import { computed } from 'vue'
 import { useHost, modeCn, type RepelMode } from '../hostContext'
@@ -36,7 +36,7 @@ const recentTotal = computed(() => host.s?.counts.completed || 0)
   </view>
 
   <!-- 策略层:规则 / 巡逻 / 参数(共享组件) -->
-  <ControlStrategy />
+  <ControlStrategy :show-params="false" />
 
   <!-- 最近执行 -->
   <view class="sn-card sn-strip" @click="host.recordMode = 'actions'; host.nav('records')">

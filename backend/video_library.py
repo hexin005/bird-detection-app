@@ -1,6 +1,8 @@
 """Persisted video jobs and species indexes; media files are never duplicated per species."""
+import hashlib
 import secrets
 import time
+from pathlib import Path
 
 from .store import Conflict
 
@@ -10,8 +12,22 @@ class VideoLibrary:
         self.settings, self.store = settings, store
         self.root = settings.data_dir / 'videos'
         self.root.mkdir(exist_ok=True)
-        self.jobs = settings.data_dir / 'jobs'
-        self.jobs.mkdir(exist_ok=True)
+        self.jobs = settings.data_dir / 'video' / 'result'
+        self.jobs.mkdir(parents=True, exist_ok=True)
+        self.legacy_jobs = settings.data_dir / 'jobs'
+
+    def job_dir(self, task_id):
+        current = self.jobs / task_id
+        old = self.legacy_jobs / task_id
+        return current if current.exists() or not old.exists() else old
+
+    def already_processed(self, video):
+        rows = self.store.rows("""SELECT t.id FROM tasks t JOIN videos v ON v.id=t.video_id
+            WHERE t.status='ended' AND t.result_ready=1
+              AND (v.id=? OR (v.sha256 IS NOT NULL AND v.sha256=?)) LIMIT 1""",
+            (video['id'], video.get('sha256')))
+        if rows:
+            raise Conflict('该视频已经识别并归档，请在记录中查看结果，无需重复识别')
 
     def register(self, path, name):
         import cv2
@@ -21,9 +37,19 @@ class VideoLibrary:
             ok, frame = cap.read()
             if not ok or frame is None or not 1 <= fps <= 120 or frames < 1:
                 raise Conflict('无法读取视频，请选择有效的 MP4、MOV、AVI 或 WebM 文件')
+            digest = hashlib.sha256()
+            with path.open('rb') as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                    digest.update(chunk)
+            sha = digest.hexdigest()
+            existing = self.store.rows('SELECT * FROM videos WHERE sha256=? OR path=? ORDER BY at DESC LIMIT 1',
+                (sha, str(path.resolve())))
+            if existing and Path(existing[0]['path']).is_file():
+                return existing[0]
             video_id = 'V' + secrets.token_hex(8)
             with self.store.tx() as db:
-                db.execute('INSERT INTO videos VALUES (?,?,?,?,?,?)', (video_id, name[:160], str(path.resolve()), frames / fps, fps, time.time()))
+                db.execute('INSERT INTO videos (id,name,path,duration,fps,at,sha256) VALUES (?,?,?,?,?,?,?)',
+                    (video_id, name[:160], str(path.resolve()), frames / fps, fps, time.time(), sha))
             return self.video(video_id)
         finally:
             cap.release()
@@ -77,7 +103,7 @@ class VideoLibrary:
                 spans.append({'start': sample['video_time'], 'end': sample['video_time'], 'peak_count': sample['count']})
         row['intervals'] = [{'species': species, **span} for species, spans in intervals.items() for span in spans]
         row['alarms'] = self.store.rows('SELECT * FROM alarms WHERE task_id=? ORDER BY video_time', (task_id,))
-        row['stream_ready'] = (self.jobs / task_id / 'index.m3u8').exists()
+        row['stream_ready'] = (self.job_dir(task_id) / 'index.m3u8').exists()
         return row
 
     def species(self):

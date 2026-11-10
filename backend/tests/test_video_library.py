@@ -15,7 +15,7 @@ class LibraryTests(unittest.TestCase):
         self.store=Store(self.settings)
         self.lib=VideoLibrary(self.settings,self.store)
         with self.store.tx() as db:
-            db.execute('INSERT INTO videos VALUES (?,?,?,?,?,?)',('video-1','多鸟录像','source.mp4',20,30,1))
+            db.execute('INSERT INTO videos (id,name,path,duration,fps,at) VALUES (?,?,?,?,?,?)',('video-1','多鸟录像','source.mp4',20,30,1))
         self.store.task('task-1','running')
         self.lib.attach('task-1',self.lib.video('video-1'))
 
@@ -67,6 +67,28 @@ class VideoApiTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/videos',content=b'x',headers={**self.headers,'X-Filename':'test.exe'}).status_code,415)
         self.assertEqual(self.client.post('/api/videos',content=b'invalid',headers=self.headers).status_code,409)
         self.assertEqual(list((Path(self.tmp.name)/'videos').iterdir()),[])
+
+    def test_same_video_content_is_registered_once_and_completed_analysis_is_rejected(self):
+        import cv2
+        import numpy as np
+        from backend.store import Conflict
+        source = Path(self.tmp.name) / 'repeat.avi'
+        writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 10, (64, 64))
+        for _ in range(3): writer.write(np.zeros((64, 64, 3), dtype=np.uint8))
+        writer.release()
+        library = self.app.state.monitor.library
+        first = library.register(source, 'first.avi')
+        copy = Path(self.tmp.name) / 'same-content.avi'
+        copy.write_bytes(source.read_bytes())
+        second = library.register(copy, 'again.avi')
+        self.assertEqual(first['id'], second['id'])
+        self.assertEqual(len(self.app.state.store.rows('SELECT id FROM videos')), 1)
+        self.app.state.store.task('finished', 'ended')
+        library.attach('finished', first)
+        library.progress('finished', 100, True)
+        with self.assertRaisesRegex(Conflict, '已经识别'):
+            library.already_processed(second)
+        self.assertEqual(library.jobs, Path(self.tmp.name) / 'video' / 'result')
 
     def test_upload_library_and_scoped_media_range(self):
         import cv2

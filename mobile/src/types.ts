@@ -3,6 +3,8 @@ export type Command = { id: string; alarm_id: string | null; duration: number; s
 export type Event = { id: number; kind: string; ref_id: string; at: number; message: string }
 export type Frame = { key: string; frame_id: number; video_time: number; duration: number; at: number; count: number; inference_ms: number; detections: { species: string; class_name: string; confidence: number; bbox: number[] }[] }
 export type Preferences = { scenario: 'normal' | 'offline' | 'timeout'; confidence: number; consecutive: number; cooldown: number }
+export type AutoRule = { id: number; user_id: number; name: string; trigger: 'alarm_any' | 'alarm_burst'; mode: 'acoustic' | 'infrared' | 'both'; duration: number; cooldown_minutes: number; enabled: number; last_fired_at: number | null; created_at: number }
+export type Patrol = { user_id: number; enabled: number; start_minute: number; end_minute: number; interval_minutes: number; mode: 'acoustic' | 'infrared' | 'both'; duration: number; last_fired_at: number | null }
 export type Me = { username: string; display_name: string; email: string | null; avatar: string | null; theme: 'b1bit' | 'tower' | 'signal' | 'pixel' }
 export type Stats = {
   range_days: number

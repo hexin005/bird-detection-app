@@ -209,9 +209,6 @@ export function createHost() {
     theme.value = id
     applyTheme(id)
   }
-  function onForgot() {
-    void store.logout().catch(() => { /* 会话可能已失效 */ })
-  }
   /** 登录/登出时的会话级清理 */
   function onTokenChange(token: string | undefined) {
     modal.value = ''; older.value = []; selectedAlarm.value = null
@@ -227,7 +224,7 @@ export function createHost() {
     rules, patrol,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore,
     quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
-    inspectEvent, loadHistory, refreshToday, resetTransient, setTheme, onForgot, onTokenChange,
+    inspectEvent, loadHistory, refreshToday, resetTransient, setTheme, onTokenChange,
   })
   return host
 }

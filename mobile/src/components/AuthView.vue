@@ -14,6 +14,8 @@ const form = reactive({
   confirm: '',
   newPassword: '',
 })
+const passwordFocused = ref(false)
+const focusPassword = () => { passwordFocused.value = true }
 const demoCode = ref(''), sending = ref(false), countdown = ref(0), busy = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
 /* 密码小眼睛:每个密码框独立切换明文/密文 */
@@ -107,9 +109,9 @@ function doReset() {
 
   <view v-if="mode === 'login'" class="qh-card">
     <text class="qh-auth-lbl">邮箱 / 用户名</text>
-    <view class="qh-input"><input v-model="form.account" type="text" placeholder="邮箱或用户名" /></view>
+    <view class="qh-input"><input v-model="form.account" type="text" placeholder="邮箱或用户名" confirm-type="next" @confirm="focusPassword" @keyup.enter="focusPassword" @focus="passwordFocused = false" /></view>
     <text class="qh-auth-lbl">密码</text>
-    <view class="qh-input"><input v-model="form.password" :type="eyes.login ? 'text' : 'password'" placeholder="请输入密码" /><button class="qh-eye" @click="toggleEye('login')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.login"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
+    <view class="qh-input"><input v-model="form.password" :focus="passwordFocused" :type="eyes.login ? 'text' : 'password'" placeholder="请输入密码" confirm-type="done" @confirm="doLogin" @keyup.enter="doLogin" /><button class="qh-eye" @click="toggleEye('login')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.login"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
     <view style="display:flex;justify-content:flex-end;margin-top:8px"><text class="qh-auth-link" @click="switchMode('forgot')">忘记密码?</text></view>
     <button class="qh-btn qh-btn--primary" style="margin-top:10px" :disabled="busy || !form.account || !form.password" @click="doLogin">{{ busy ? '正在连接…' : '登录并进入果园' }}</button>
   </view>

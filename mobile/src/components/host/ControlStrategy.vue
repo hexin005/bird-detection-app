@@ -6,6 +6,7 @@ import { useHost, modeCn, triggerCn, type RepelMode } from './hostContext'
 import type { AutoRule, Patrol, Preferences } from '../../types'
 
 const host = useHost()
+withDefaults(defineProps<{ showParams?: boolean }>(), { showParams: true })
 
 /* ---- 响应规则 ---- */
 const addOpen = ref(false)
@@ -33,12 +34,14 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 /* ---- 设备参数(与设置弹窗共用 PUT /settings;两处均可改) ---- */
 const params = reactive({ scenario: 'normal' as Preferences['scenario'], confidence: .4, consecutive: 2, cooldown: 20 })
-watch(() => host.s?.settings, st => { if (st) Object.assign(params, st) }, { immediate: true })
+const paramsDirty = ref(false)
+watch(() => host.s?.settings, st => { if (st && !paramsDirty.value) Object.assign(params, st) }, { immediate: true })
 const bump = (k: 'confidence' | 'consecutive', d: number) => {
+  paramsDirty.value = true
   if (k === 'confidence') params.confidence = Math.min(.95, Math.max(.1, Math.round((params.confidence + d * .05) * 100) / 100))
   else params.consecutive = Math.min(10, Math.max(1, params.consecutive + d))
 }
-const saveParams = () => host.run(async() => { await host.store.mutate('/settings', 'PUT', params); host.notify('参数已保存') })
+const saveParams = () => host.run(async() => { await host.store.mutate('/settings', 'PUT', { ...params }); paramsDirty.value = false; host.notify('参数已保存') })
 
 import { ref } from 'vue'
 </script>
@@ -108,8 +111,8 @@ import { ref } from 'vue'
   </view>
 
   <!-- 设备参数(设置弹窗同款,两处均可改) -->
-  <view class="cs-card cs-card--flush">
-    <view class="cs-card__hd bar"><text class="t">⚙ 设备参数</text><text class="s">与「设置」同步</text></view>
+  <view v-if="showParams" class="cs-card cs-card--flush">
+    <view class="cs-card__hd bar"><text class="t">⚙ 设备参数</text><text class="s">{{ paramsDirty ? '有未保存修改' : '与「设置」同步' }}</text></view>
     <view class="cs-param"><text class="lab">置信度阈值</text>
       <view class="cs-step"><text class="b" @click="bump('confidence', -1)">−</text><text class="v mono">{{ params.confidence.toFixed(2) }}</text><text class="b" @click="bump('confidence', 1)">＋</text></view>
     </view>
@@ -117,7 +120,7 @@ import { ref } from 'vue'
       <view class="cs-step"><text class="b" @click="bump('consecutive', -1)">−</text><text class="v mono">{{ params.consecutive }} 帧</text><text class="b" @click="bump('consecutive', 1)">＋</text></view>
     </view>
     <view class="cs-param"><text class="lab">事件合并间隔</text>
-      <view class="cs-chips"><text v-for="c in [10, 20, 30, 60, 120]" :key="c" class="cs-chip" :class="{ 'is-on': params.cooldown === c }" @click="params.cooldown = c">{{ c }} 秒</text></view>
+      <view class="cs-chips"><text v-for="c in [10, 20, 30, 60, 120]" :key="c" class="cs-chip" :class="{ 'is-on': params.cooldown === c }" @click="params.cooldown = c; paramsDirty = true">{{ c }} 秒</text></view>
     </view>
     <view class="cs-frow btns pad"><button class="cs-mini" :disabled="host.store.busy || !!host.store.active" @click="saveParams">应用参数</button></view>
   </view>

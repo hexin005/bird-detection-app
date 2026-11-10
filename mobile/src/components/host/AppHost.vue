@@ -33,7 +33,7 @@ async function onTokenChanged(token?: string) {
   if (token) {
     try {
       const me = await store.request<{ theme: ThemeId }>('/me')
-      host.setTheme(me.theme) // setTheme 内部同步应用 DOM 与全局缓存
+      host.setTheme(me.theme === 'tower' || me.theme === 'pixel' ? 'b1bit' : me.theme) // setTheme 内部同步应用 DOM 与全局缓存
     } catch { /* me 拉取失败不阻塞进入 */ }
   }
 }
@@ -57,6 +57,13 @@ watch(() => host.page, onPageEnter, { immediate: true })
 const layouts = { b1bit: BLayout, tower: TowerLayout, signal: SignalLayout, pixel: PixelLayout } as const
 const layout = computed(() => layouts[host.theme] || BLayout)
 const overlayPage = computed(() => ['me', 'themes', 'analytics'].includes(host.page) ? host.page : '')
+function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value: number) {
+  if (!Number.isFinite(value)) return
+  if (key === 'confidence') host.preferences.confidence = Math.min(.95, Math.max(.1, value / 100))
+  else if (key === 'consecutive') host.preferences.consecutive = Math.min(10, Math.max(1, Math.round(value)))
+  else host.preferences.cooldown = Math.min(300, Math.max(1, Math.round(value)))
+}
+
 </script>
 
 <template>
@@ -75,7 +82,7 @@ const overlayPage = computed(() => ['me', 'themes', 'analytics'].includes(host.p
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><MeHome ref="meHomeRef" @nav="host.nav" @forgot="host.onForgot" /></view>
+    <view class="page__content"><MeHome ref="meHomeRef" @nav="host.nav" /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': overlayPage === 'themes' }">
@@ -117,9 +124,9 @@ const overlayPage = computed(() => ['me', 'themes', 'analytics'].includes(host.p
         <view class="qh-radio__circle"><view class="qh-radio__dot"/></view>
         <view class="qh-radio__info"><text class="qh-radio__name">{{ opt.name }}</text><text class="qh-radio__desc">{{ opt.desc }}</text></view>
       </view>
-      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">置信度阈值</text><text class="qh-paramrow__value">{{ host.preferences.confidence.toFixed(2) }}</text></view><view class="qh-slider"><view class="qh-slider__track"/><view class="qh-slider__fill" :style="{ width: ((host.preferences.confidence - 0.1) / 0.85 * 100) + '%' }"/><view class="qh-slider__knob" :style="{ left: 'calc(' + ((host.preferences.confidence - 0.1) / 0.85 * 100) + '% - 9px)' }"/></view></view>
-      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">连续检出帧数</text><text class="qh-paramrow__value">{{ host.preferences.consecutive }} 帧</text></view><view class="qh-slider"><view class="qh-slider__track"/><view class="qh-slider__fill" :style="{ width: ((host.preferences.consecutive - 1) / 9 * 100) + '%' }"/><view class="qh-slider__knob" :style="{ left: 'calc(' + ((host.preferences.consecutive - 1) / 9 * 100) + '% - 9px)' }"/></view></view>
-      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">事件合并间隔</text><text class="qh-paramrow__value">{{ host.preferences.cooldown }} 秒</text></view><view class="qh-slider"><view class="qh-slider__track"/><view class="qh-slider__fill" :style="{ width: ((host.preferences.cooldown - 1) / 299 * 100) + '%' }"/><view class="qh-slider__knob" :style="{ left: 'calc(' + ((host.preferences.cooldown - 1) / 299 * 100) + '% - 9px)' }"/></view></view>
+      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">置信度阈值</text><text class="qh-paramrow__value">{{ host.preferences.confidence.toFixed(2) }}</text></view><slider :min="10" :max="95" :step="5" :value="Math.round(host.preferences.confidence * 100)" activeColor="var(--accent)" backgroundColor="var(--ink-100)" @change="updatePreference('confidence', Number($event.detail.value))" /></view>
+      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">连续检出帧数</text><text class="qh-paramrow__value">{{ host.preferences.consecutive }} 帧</text></view><slider :min="1" :max="10" :step="1" :value="host.preferences.consecutive" activeColor="var(--accent)" backgroundColor="var(--ink-100)" @change="updatePreference('consecutive', Number($event.detail.value))" /></view>
+      <view class="qh-paramrow"><view class="qh-paramrow__top"><text class="qh-paramrow__name">事件合并间隔</text><text class="qh-paramrow__value">{{ host.preferences.cooldown }} 秒</text></view><slider :min="1" :max="300" :step="1" :value="host.preferences.cooldown" activeColor="var(--accent)" backgroundColor="var(--ink-100)" @change="updatePreference('cooldown', Number($event.detail.value))" /></view>
       <button class="qh-btn qh-btn--primary" :disabled="host.store.busy || !!host.store.active" @click="host.run(async() => { await host.store.mutate('/settings','PUT',host.preferences); host.modal=''; host.notify('设置已保存') })">保存设置</button>
       <view class="qh-logoutrow"><text style="color:var(--danger-fg)" @click="host.run(() => host.store.logout())">退出登录</text><text style="color:var(--brand-500)" @click="host.run(() => host.store.logout())">更换服务</text></view>
       <text class="qh-svcinfo">服务 {{ host.store.server }} · 视频 HLS · 推理 {{ host.s?.monitor.device || 'cpu' }} · {{ host.s?.monitor.sample_fps || 2 }} 帧/秒抽样</text>
@@ -129,6 +136,7 @@ const overlayPage = computed(() => ['me', 'themes', 'analytics'].includes(host.p
   <!-- ======================= 弹窗:告警详情 ======================= -->
   <view v-if="host.modal === 'mAlarm' && host.alarm" class="qh-mask qh-mask--center is-open" @click.self="host.modal = ''">
     <view class="qh-dialog">
+      <view class="qh-dialog__titlerow"><text class="qh-dialog__title">告警详情</text><button class="qh-iconbtn--sm" aria-label="关闭告警详情" @click="host.modal = ''">×</button></view>
       <image class="qh-detailimg" :src="host.store.media('captures/' + host.alarm!.snapshot)" mode="aspectFill"/>
       <view class="qh-dialog__titlerow"><text class="qh-dialog__title">{{ host.alarm!.species }} · {{ host.alarm!.count }} 只</text><text :class="alarmClass(host.alarm!.status)">{{ names(host.alarm!.status) }}</text></view>
       <view class="qh-infogrid">

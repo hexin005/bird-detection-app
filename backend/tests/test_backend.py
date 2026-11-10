@@ -142,6 +142,18 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/state', headers=self.headers).status_code, 401)
         self.assertEqual(self.client.get('/api/frame/x.jpg?ticket='+ticket).status_code, 401)
 
+    def test_username_endpoint_preserves_email_login_and_reports_duplicate(self):
+        changed = self.client.put('/api/me/username', json={'username': '果园_One'}, headers=self.headers)
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(self.client.get('/api/me', headers=self.headers).json()['username'], '果园_One')
+        self.assertEqual(self.client.post('/api/login', json={'username': '果园_one', 'password': 'test-password'}).status_code, 200)
+        self.assertEqual(self.client.put('/api/me/username', json={'username': 'bad name'}, headers=self.headers).status_code, 422)
+        self.app.state.store.create_user('another@example.com', 'password123')
+        self.app.state.store.set_username(2, 'Second_1')
+        duplicate = self.client.put('/api/me/username', json={'username': 'second_1'}, headers=self.headers)
+        self.assertEqual(duplicate.status_code, 409)
+        self.assertEqual(duplicate.json()['detail'], '当前名称重复')
+
     def test_missing_source_and_invalid_inputs(self):
         self.assertEqual(self.client.post('/api/monitor/start', headers=self.headers).status_code, 409)
         self.assertEqual(self.client.post('/api/commands', json={'duration':100, 'request_id':'abcdefgh'}, headers=self.headers).status_code, 422)
@@ -206,18 +218,23 @@ class UserStoreTests(unittest.TestCase):
         self.store = Store(self.settings)  # 旧库重复迁移不得报错
         self.assertEqual(self.store.rows('SELECT COUNT(*) c FROM users')[0]['c'], 1)
 
-    def test_create_user_derives_username_and_normalizes_email(self):
-        first = self.store.create_user('  Zhou@Example.COM ', 'password123')
-        self.assertEqual(first['email'], 'zhou@example.com')
-        self.assertEqual(first['username'], 'zhou')
-        self.assertEqual(first['display_name'], 'zhou')
-        self.assertEqual(first['theme'], 'b1bit')
+    def test_username_is_independent_of_email_and_unique(self):
+        first = self.store.create_user('Zhou123@Example.COM', 'password123')
+        self.assertEqual(first['email'], 'zhou123@example.com')
+        self.assertTrue(first['username'].startswith('user_'))
+        self.assertNotIn('zhou123', first['username'])
         with self.assertRaises(Conflict):
-            self.store.create_user('zhou@example.com', 'password123')  # 同邮箱(忽略大小写)
-        second = self.store.create_user('zhou@other.com', 'password123')
-        self.assertEqual(second['username'], 'zhou_2')  # 前缀冲突自动追加序号
-        third = self.store.create_user('wang@other.com', 'password123')
-        self.assertEqual(third['username'], 'wang')
+            self.store.create_user('zhou123@example.com', 'password123')
+        second = self.store.create_user('wang@other.com', 'password123')
+        self.assertNotEqual(first['username'], second['username'])
+        self.assertEqual(self.store.set_username(first['id'], '果园_Ab2'), '果园_Ab2')
+        self.assertIsNotNone(self.store.login('果园_ab2', 'password123'))
+        self.assertIsNotNone(self.store.login('zhou123@example.com', 'password123'))
+        with self.assertRaisesRegex(Conflict, '当前名称重复'):
+            self.store.set_username(second['id'], '果园_aB2')
+        for invalid in ('a', 'x' * 21, 'has space', 'bad@name', 'emoji😀'):
+            with self.assertRaises(ValueError):
+                self.store.set_username(first['id'], invalid)
 
     def test_theme_isolated_per_user(self):
         self.store.set_user_theme(1, 'pixel')
@@ -266,7 +283,7 @@ class AuthApiTests(unittest.TestCase):
         token = ok.json()['token']
         me = self.client.get('/api/me', headers={'Authorization': 'Bearer ' + token}).json()
         self.assertEqual(me['email'], 'new@example.com')
-        self.assertEqual(me['display_name'], 'new')
+        self.assertEqual(me['display_name'], '果园用户')
         self.assertEqual(me['theme'], 'b1bit')
         via_email = self.client.post('/api/login', json={'username': 'new@example.com', 'password': 'password123'})
         self.assertEqual(via_email.status_code, 200)

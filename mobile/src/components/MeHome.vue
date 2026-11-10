@@ -5,12 +5,14 @@ import type { Me } from '../types'
 import { THEMES, normalizeTheme } from '../theme'
 import ChangePassword from './ChangePassword.vue'
 
-const emit = defineEmits<{ nav: [page: 'themes' | 'analytics'], forgot: [] }>()
+const emit = defineEmits<{ nav: [page: 'themes' | 'analytics'] }>()
 const store = useOrchard()
 const me = ref<Me | null>(null)
 const error = ref('')
 const uploading = ref(false), percent = ref(0)
 const renameSheet = ref(false), renameValue = ref('')
+const usernameSheet = ref(false), usernameValue = ref('')
+const usernameError = ref('')
 const changeSheet = ref(false)
 const currentTheme = computed(() => normalizeTheme(me.value?.theme))
 const themeMeta = computed(() => THEMES.find(t => t.id === currentTheme.value))
@@ -58,6 +60,29 @@ function pickAvatar() {
   // #endif
 }
 
+function previewAvatar() {
+  if (avatarSrc.value) uni.previewImage({ urls: [avatarSrc.value], current: avatarSrc.value })
+  else pickAvatar()
+}
+function openUsername() {
+  usernameValue.value = me.value?.username || ''
+  usernameError.value = ''
+  usernameSheet.value = true
+}
+async function saveUsername() {
+  const name = usernameValue.value.trim()
+  if (!/^[A-Za-z0-9_\u4e00-\u9fff]{2,20}$/.test(name)) {
+    usernameError.value = '用户名须为 2–20 个汉字、字母、数字或下划线'
+    return
+  }
+  try {
+    await store.mutate('/me/username', 'PUT', { username: name })
+    usernameSheet.value = false
+    notify('用户名已更新，可用于登录')
+    await load()
+  } catch (e) { usernameError.value = (e as Error).message }
+}
+
 function openRename() {
   renameValue.value = me.value?.display_name || ''
   renameSheet.value = true
@@ -71,11 +96,6 @@ async function saveRename() {
     notify('昵称已更新')
     void load()
   } catch (e) { notify((e as Error).message) }
-}
-
-function forgotPassword() {
-  if (!me.value?.email) { notify('当前账号未绑定邮箱，暂无法使用邮箱找回'); return }
-  emit('forgot')
 }
 
 async function logout() {
@@ -100,11 +120,11 @@ function onPasswordChanged() {
     <view class="qh-tbar"><view class="qh-tbar__box">×</view><text class="qh-tbar__t">果园守护人</text></view>
     <view class="qh-window__bd">
       <view class="qh-me-card">
-        <view class="qh-me-avatar" @click="pickAvatar">
+        <view class="qh-me-avatar" @click="previewAvatar">
           <image v-if="avatarSrc" :src="avatarSrc" mode="aspectFill" />
           <text v-else style="font-size:10px;color:var(--ink-400)">无头像</text>
           <view class="qh-me-cam">
-            <svg width="12" height="12" viewBox="0 0 16 16"><rect x="1" y="4" width="11" height="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8l4-2.5v5L12 8z" fill="currentColor"/><rect x="5" y="2" width="4" height="2" fill="currentColor"/></svg>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" stroke-width="1.6"/><path d="m10 10 4 4" stroke="currentColor" stroke-width="1.6"/></svg>
           </view>
         </view>
         <view style="flex:1;min-width:0">
@@ -113,13 +133,14 @@ function onPasswordChanged() {
             <text v-if="me?.username" class="qh-mvp">{{ me.username }}</text>
           </view>
           <text class="qh-me-mail">{{ me?.email || '未绑定邮箱' }}</text>
-          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">点头像可更换 · 昵称仅在本应用内显示</text>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">点头像可放大查看 · 昵称仅在本应用内显示</text>
         </view>
       </view>
       <view class="qh-me-actions">
         <button class="qh-btn qh-btn--secondary" style="flex:1" :disabled="uploading" @click="pickAvatar">
           <svg width="13" height="13" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12l4-5 3 3 2-2 3 4z" fill="currentColor"/><circle cx="11" cy="6" r="1.5" fill="currentColor"/></svg>本地图片
         </button>
+        <button class="qh-btn qh-btn--secondary" style="flex:1" @click="openUsername">设置用户名</button>
         <button class="qh-btn qh-btn--secondary" style="flex:1" @click="openRename">
           <svg width="13" height="13" viewBox="0 0 16 16"><path d="M2 12l1-3 7-7 2 2-7 7-3 1z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3l2 2" stroke="currentColor" stroke-width="1.6"/></svg>改名
         </button>
@@ -139,7 +160,7 @@ function onPasswordChanged() {
       <view class="qh-me-row">
         <view style="flex:1;min-width:0">
           <view class="qh-alarmcard__title">{{ themeMeta?.label || '果园守护 1.0' }} <text class="qh-mvp">使用中</text></view>
-          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">共 4 套风格，大图预览一键切换，数据不受影响</text>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">共 2 套风格，大图预览一键切换，数据不受影响</text>
         </view>
         <text class="qh-chevron">›</text>
       </view>
@@ -172,18 +193,22 @@ function onPasswordChanged() {
         </view>
         <text class="qh-chevron">›</text>
       </view>
-      <view class="qh-me-row" style="cursor:pointer" @click="forgotPassword">
-        <view style="flex:1">
-          <view class="qh-alarmcard__title">忘记密码 / 邮箱找回</view>
-          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:2px">{{ me?.email ? '退出登录，通过注册邮箱验证码重置' : '当前账号未绑定邮箱' }}</text>
-        </view>
-        <text class="qh-chevron">›</text>
-      </view>
     </view>
   </view>
 
   <button class="qh-btn qh-btn--primary" @click="logout">退出登录</button>
   <text class="qh-svcinfo">System 1.0 · 青禾果园守护 · 数据来自果园服务</text>
+
+  <!-- 用户名抽屉 -->
+  <view v-if="usernameSheet" class="qh-mask qh-mask--bottom is-open" @click.self="usernameSheet = false">
+    <view class="qh-sheet">
+      <view class="qh-sheet__titlerow"><text class="qh-sheet__title">设置登录用户名</text><button class="qh-iconbtn--sm" aria-label="关闭用户名设置" @click="usernameSheet = false">×</button></view>
+      <text class="qh-page-subtitle">2–20 个汉字、字母、数字或下划线；邮箱仍可登录和找回密码</text>
+      <view class="qh-input"><input v-model="usernameValue" type="text" placeholder="输入新的用户名" maxlength="20" @input="usernameError = ''" /></view>
+      <text v-if="usernameError" class="qh-note" style="color:var(--danger-fg)">{{ usernameError }}</text>
+      <button class="qh-btn qh-btn--primary" @click="saveUsername">保存用户名</button>
+    </view>
+  </view>
 
   <!-- 改名抽屉 -->
   <view v-if="renameSheet" class="qh-mask qh-mask--bottom is-open" @click.self="renameSheet = false">

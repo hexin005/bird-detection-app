@@ -114,6 +114,10 @@ class DisplayName(BaseModel):
     display_name: str = Field(min_length=1, max_length=32)
 
 
+class UsernameChange(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+
+
 class ThemePref(BaseModel):
     theme: Literal['b1bit', 'tower', 'signal', 'pixel']
 
@@ -275,6 +279,14 @@ def create_app(settings=None):
         store.update_profile(user[1], display_name=name)
         return {'ok': True, 'display_name': name}
 
+    @app.put('/api/me/username')
+    def update_username(body: UsernameChange, user=Depends(auth)):
+        try:
+            name = store.set_username(user[1], body.username)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        return {'ok': True, 'username': name}
+
     @app.put('/api/me/preferences')
     def update_my_preferences(body: ThemePref, user=Depends(auth)):
         store.set_user_theme(user[1], body.theme)
@@ -385,6 +397,8 @@ def create_app(settings=None):
                         raise HTTPException(413, '视频不能超过 500 MB')
                     output.write(chunk)
             video = await run_in_threadpool(monitor.library.register, target, name)
+            if video['path'] != str(target.resolve()):
+                target.unlink(missing_ok=True)
             return {key: value for key, value in video.items() if key != 'path'}
         except BaseException:
             target.unlink(missing_ok=True)
@@ -424,9 +438,9 @@ def create_app(settings=None):
                 raise HTTPException(404, '原视频已不存在')
             return FileResponse(rows[0]['path'], media_type=mimetypes.guess_type(rows[0]['path'])[0] or 'application/octet-stream',
                                 filename=rows[0]['name'] if download else None, headers={'Cache-Control':'private, max-age=0'})
-        folder = (monitor.library.jobs / task_id).resolve()
+        folder = monitor.library.job_dir(task_id).resolve()
         path = (folder / name).resolve()
-        if folder.parent != monitor.library.jobs.resolve() or path.parent != folder or not path.is_file():
+        if folder.parent not in (monitor.library.jobs.resolve(), monitor.library.legacy_jobs.resolve()) or path.parent != folder or not path.is_file():
             raise HTTPException(404, '视频仍在生成或文件不存在')
         if name == 'index.m3u8':
             # Only segment requests receive a scoped media ticket, never an API session token.

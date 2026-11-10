@@ -1,6 +1,7 @@
 import json
 import re
 import secrets
+import unicodedata
 import sqlite3
 import threading
 import time
@@ -53,6 +54,9 @@ class Store:
           CREATE TABLE IF NOT EXISTS samples (task_id TEXT, species TEXT, video_time REAL, count INTEGER, confidence REAL, frame_id INTEGER);
           CREATE INDEX IF NOT EXISTS sample_lookup ON samples(task_id,species,video_time);
         ''')
+        if 'sha256' not in {r[1] for r in self.db.execute('PRAGMA table_info(videos)')}:
+            self.db.execute('ALTER TABLE videos ADD COLUMN sha256 TEXT')
+        self.db.execute('CREATE INDEX IF NOT EXISTS video_sha256 ON videos(sha256)')
         columns = {r[1] for r in self.db.execute('PRAGMA table_info(tasks)')}
         for name, kind in [('video_id','TEXT'),('duration','REAL DEFAULT 0'),('progress','REAL DEFAULT 0'),('result_ready','INTEGER DEFAULT 0')]:
             if name not in columns:
@@ -135,7 +139,7 @@ class Store:
         """identifier 支持用户名或邮箱(邮箱统一小写匹配)。"""
         ident = identifier.strip()
         email = normalize_email(ident) if '@' in ident else '\x00not-an-email'
-        users = self.rows('SELECT * FROM users WHERE username=? OR email=?', (ident, email))
+        users = self.rows('SELECT * FROM users WHERE username=? COLLATE NOCASE OR email=?', (ident, email))
         if not users or not verify_password(password, users[0]['password']):
             return None
         token = secrets.token_urlsafe(32)
@@ -160,15 +164,24 @@ class Store:
         with self.tx() as db:
             if db.execute('SELECT 1 FROM users WHERE email=?', (email,)).fetchone():
                 raise Conflict('该邮箱已注册，请直接登录')
-            username = display_username(email)
-            serial = 2
+            username = 'user_' + secrets.token_hex(5)
             while db.execute('SELECT 1 FROM users WHERE username=?', (username,)).fetchone():
-                username = f'{display_username(email)}_{serial}'
-                serial += 1
+                username = 'user_' + secrets.token_hex(5)
             db.execute('INSERT INTO users (username, password, email, display_name) VALUES (?,?,?,?)',
-                       (username, hash_password(password), email, username))
+                       (username, hash_password(password), email, '果园用户'))
             user_id = db.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()[0]
         return self.get_profile(user_id)
+
+    def set_username(self, user_id, username):
+        name = unicodedata.normalize('NFKC', username.strip())
+        if not 2 <= len(name) <= 20 or not re.fullmatch(r'[A-Za-z0-9_\u4e00-\u9fff]+', name):
+            raise ValueError('用户名须为 2–20 个汉字、字母、数字或下划线')
+        with self.tx() as db:
+            others = db.execute('SELECT username FROM users WHERE id<>?', (user_id,)).fetchall()
+            if any(unicodedata.normalize('NFKC', row[0]).casefold() == name.casefold() for row in others):
+                raise Conflict('当前名称重复')
+            db.execute('UPDATE users SET username=? WHERE id=?', (name, user_id))
+        return name
 
     def get_profile(self, user_id):
         rows = self.rows('''SELECT u.id, u.username, u.email, u.display_name, u.avatar_path,
