@@ -453,5 +453,134 @@ class StatsApiTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/stats?range=1h', headers=self.headers).status_code, 422)
 
 
+class AutomationTests(unittest.TestCase):
+    """自动哨兵:响应规则触发/冷却/burst、离线与互斥跳过、定时巡逻窗口。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.settings = Settings(Path(self.tmp.name), Path('missing.pt'), Path('missing.mp4'), 'tester', 'test-password', 'test-secret', worker_enabled=False)
+        self.store = Store(self.settings)
+
+    def tearDown(self):
+        self.store.close()
+        self.tmp.cleanup()
+
+    def rule(self, **kw):
+        params = dict(name='规则一', trigger='alarm_any', mode='acoustic', duration=3, cooldown_minutes=10)
+        params.update(kw)
+        return self.store.create_rule(1, **params)
+
+    def alarm(self, task='t1', species='八哥', now=None):
+        return self.store.alarm(task, species, 1, .9, f'{task}.jpg', 1, 1, 20, now)[0]
+
+    @staticmethod
+    def ts_for_minute(minute):
+        """取本机未来某个本地时刻的时间戳,用于确定性的巡逻窗口测试。"""
+        local = time.localtime()
+        base = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, minute // 60, minute % 60, 0, 0, 0, -1))
+        if base <= time.time():
+            base += 86400
+        return base
+
+    def test_rule_crud_and_ownership(self):
+        r = self.rule()
+        self.assertEqual(len(self.store.rules(1)), 1)
+        self.assertEqual(self.store.rules(2), [])
+        with self.assertRaises(Conflict):
+            self.store.update_rule(2, r['id'], {'enabled': False})
+        with self.assertRaises(Conflict):
+            self.store.delete_rule(2, r['id'])
+        self.store.update_rule(1, r['id'], {'enabled': False, 'duration': 5})
+        row = self.store.rules(1)[0]
+        self.assertEqual((row['enabled'], row['duration']), (0, 5))
+        self.store.delete_rule(1, r['id'])
+        self.assertEqual(self.store.rules(1), [])
+
+    def test_alarm_any_rule_fires_with_cooldown(self):
+        self.rule()
+        self.alarm('t1', now=1000)
+        cmds = self.store.snapshot()['commands']
+        self.assertEqual(len(cmds), 1)
+        self.assertEqual((cmds[0]['automatic'], cmds[0]['user_id'], cmds[0]['mode']), (1, 1, 'acoustic'))
+        self.assertEqual(self.store.snapshot()['alarms'][0]['status'], 'processing')
+        events = self.store.rows("SELECT * FROM events WHERE kind='automation'")
+        self.assertTrue(any('自动响应' in e['message'] and '规则一' in e['message'] for e in events))
+        self.store.tick(1000)
+        self.store.tick(1004)
+        # 冷却期内(600s)的第二报静默跳过
+        self.alarm('t2', '喜鹊', now=1100)
+        self.assertEqual(len(self.store.snapshot()['commands']), 1)
+        # 冷却过后再次触发
+        self.alarm('t3', '乌鸦', now=1700)
+        self.assertEqual(len(self.store.snapshot()['commands']), 2)
+
+    def test_burst_rule_requires_three_recent_alarms(self):
+        self.rule(name='爆发规则', trigger='alarm_burst', mode='both', duration=5)
+        for i in range(2):
+            self.alarm(f't{i}', f'鸟{i}', now=100 + i)
+        self.assertEqual(self.store.snapshot()['commands'], [])
+        self.alarm('t2', '鸟2', now=102)
+        cmds = self.store.snapshot()['commands']
+        self.assertEqual(len(cmds), 1)
+        self.assertEqual(cmds[0]['mode'], 'both')
+
+    def test_automation_respects_offline_and_busy(self):
+        self.rule(cooldown_minutes=1)
+        self.store.configure({'scenario': 'offline'})
+        self.alarm('t1', now=1000)
+        self.assertEqual(self.store.snapshot()['commands'], [])
+        events = self.store.rows("SELECT * FROM events WHERE kind='automation'")
+        self.assertTrue(any('未触发' in e['message'] and '离线' in e['message'] for e in events))
+        # 冷却被跳过占用:紧接着的第二报不刷跳过事件
+        self.alarm('t2', '喜鹊', now=1001)
+        self.assertEqual(len(self.store.rows("SELECT * FROM events WHERE kind='automation'")), len(events))
+        # 在线但指令通道被人工指令占用 → 记跳过;完成后冷却过了再触发成功
+        self.store.configure({'scenario': 'normal'})
+        manual = self.store.start_command('manual-001', None, 3, 1)
+        self.store.tick(2100)
+        self.alarm('t3', '乌鸦', now=2100)
+        self.assertEqual(len(self.store.snapshot()['commands']), 1)  # 只有 manual
+        self.assertTrue(any('未触发' in e['message'] and '执行中' in e['message']
+                            for e in self.store.rows("SELECT * FROM events WHERE kind='automation'")))
+        self.store.tick(2104)
+        self.alarm('t4', '珠颈斑鸠', now=2300)
+        self.assertEqual(len(self.store.snapshot()['commands']), 2)
+
+    def test_patrol_window_and_interval(self):
+        self.store.set_patrol(1, {'enabled': True, 'start_minute': 600, 'end_minute': 700,
+                                  'interval_minutes': 5, 'mode': 'both', 'duration': 3})
+        t_in, t_out = self.ts_for_minute(620), self.ts_for_minute(700)  # 700=窗口终点,不含
+        self.store.automation_tick(t_out)
+        self.assertEqual(self.store.snapshot()['commands'], [])
+        self.store.automation_tick(t_in)
+        cmds = self.store.snapshot()['commands']
+        self.assertEqual(len(cmds), 1)
+        self.assertEqual((cmds[0]['automatic'], cmds[0]['mode'], cmds[0]['user_id']), (1, 'both', 1))
+        # 间隔 5 分钟内不重复触发;完成上一条后,超过间隔触发第二次
+        self.store.automation_tick(t_in + 60)
+        self.assertEqual(len(self.store.snapshot()['commands']), 1)
+        self.store.tick(t_in + 2)
+        self.store.tick(t_in + 6)
+        self.store.automation_tick(t_in + 301)
+        self.assertEqual(len(self.store.snapshot()['commands']), 2)
+
+    def test_patrol_skips_when_channel_busy(self):
+        self.rule(cooldown_minutes=1)
+        self.store.set_patrol(1, {'enabled': True, 'start_minute': 0, 'end_minute': 1440, 'interval_minutes': 5})
+        now = time.time()
+        self.alarm('t1', now=now)  # 规则先占通道
+        self.store.automation_tick(now + .5)  # 巡逻到点但通道被占 → 跳过事件
+        self.assertEqual(len(self.store.snapshot()['commands']), 1)
+        events = self.store.rows("SELECT * FROM events WHERE kind='automation'")
+        self.assertTrue(any('定时巡逻未触发' in e['message'] for e in events))
+
+    def test_patrol_api_defaults_and_validation(self):
+        self.assertEqual(self.store.patrol(9)['enabled'], 0)
+        with self.assertRaises(Conflict):
+            self.store.set_patrol(1, {'start_minute': 700, 'end_minute': 600})
+        p = self.store.set_patrol(1, {'enabled': True, 'mode': 'infrared'})
+        self.assertEqual((p['enabled'], p['mode'], p['interval_minutes']), (1, 'infrared', 120))
+
+
 if __name__ == '__main__':
     unittest.main()

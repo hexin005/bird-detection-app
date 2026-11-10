@@ -2,6 +2,7 @@
 import { useHost, names, clock, shortTime, time, badgeText, monClass, alarmClass, type RepelMode } from '../host/hostContext'
 import { useWorkspace } from '../host/useWorkspace'
 import { useOrchard } from '../../store'
+import ControlStrategy from '../host/ControlStrategy.vue'
 
 const host = useHost()
 const store = useOrchard()
@@ -33,22 +34,25 @@ const ws = useWorkspace(store)
     <button class="cl-stop" @click="host.run(() => host.store.mutate('/commands/' + host.store.active!.id + '/stop'))">停止本次执行</button>
   </view>
   <text class="note">模拟执行器 · 不会控制真实硬件</text>
+
+  <!-- 策略层:自动响应规则 / 定时巡逻 / 设备参数(共享组件) -->
+  <ControlStrategy />
 </template>
 <style scoped>
-.hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px}.hd .b{font-size:18px;letter-spacing:2px;color:var(--ink-900)}.hd .s{font-size:9px;color:var(--sub);letter-spacing:2px}
-.cl{margin:0 14px 10px;border:1px solid #8a6a1e;background:var(--card)}
-.cl-hd{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--line);font-size:9px;letter-spacing:2px}.cl-hd .t{color:var(--amber);font-weight:700}.cl-hd .l{color:var(--sub)}
+.hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px}.hd .b{font-size:18px;letter-spacing:2px;color:var(--ink-900)}.hd .s{font-size:9px;color:var(--ink-400);letter-spacing:2px}
+.cl{margin:0 14px 10px;border:1px solid #8a6a1e;background:var(--surface-card)}
+.cl-hd{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px dashed var(--line);font-size:9px;letter-spacing:2px}.cl-hd .t{color:var(--accent);font-weight:700}.cl-hd .l{color:var(--ink-400)}
 .cl-body{display:flex;align-items:stretch}.cl-modes{display:flex;flex:1}
-.cl-mode{flex:1;text-align:center;padding:9px 0 8px;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--sub);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.cl-mode{flex:1;text-align:center;padding:9px 0 8px;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--ink-400);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;cursor:pointer}
 .cl-mode .en{font-size:8px;letter-spacing:1px;color:#3d4756;font-weight:400}
-.cl-mode.on{color:#161307;background:var(--amber)}.cl-mode.on .en{color:rgba(22,19,7,.65)}
-.cl-go{width:96px;text-align:center;background:var(--amber);color:#161307;font-weight:800;font-size:12px;letter-spacing:2px;border:none;display:flex;flex-direction:column;justify-content:center;gap:2px;cursor:pointer}
+.cl-mode.on{color:#161307;background:var(--accent)}.cl-mode.on .en{color:rgba(22,19,7,.65)}
+.cl-go{width:96px;text-align:center;background:var(--accent);color:#161307;font-weight:800;font-size:12px;letter-spacing:2px;border:none;display:flex;flex-direction:column;justify-content:center;gap:2px;cursor:pointer}
 .cl-go[disabled]{background:#20262f;color:#5d6672}
 .cl-go .go-s{font-size:9px;letter-spacing:1px;opacity:.7}
 .dur{padding:10px}.cl-hd-t{font-size:11px;letter-spacing:2px;color:var(--ink-900);font-weight:800}
-.cl-durs{display:flex;gap:6px;margin-top:8px}.cl-dur{flex:1;text-align:center;padding:6px 0;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--txt);cursor:pointer}
-.cl-dur.on{border-color:var(--amber);color:var(--amber)}
-.prog{padding:10px}.cl-prog-bar{height:6px;background:#12161c;border:1px solid var(--line);margin-top:6px}.cl-prog-bar view{height:100%;background:var(--amber)}
-.cl-prog-s{font-size:10px;color:var(--dim);margin-top:4px}.cl-stop{width:100%;margin-top:8px;background:transparent;border:1px solid var(--line);color:var(--dim);font-size:11px;padding:6px 0;cursor:pointer}
-.note{text-align:center;font-size:10px;color:var(--sub);padding:6px}
+.cl-durs{display:flex;gap:6px;margin-top:8px}.cl-dur{flex:1;text-align:center;padding:6px 0;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--ink-700);cursor:pointer}
+.cl-dur.on{border-color:var(--accent);color:var(--accent)}
+.prog{padding:10px}.cl-prog-bar{height:6px;background:#12161c;border:1px solid var(--line);margin-top:6px}.cl-prog-bar view{height:100%;background:var(--accent)}
+.cl-prog-s{font-size:10px;color:var(--ink-500);margin-top:4px}.cl-stop{width:100%;margin-top:8px;background:transparent;border:1px solid var(--line);color:var(--ink-500);font-size:11px;padding:6px 0;cursor:pointer}
+.note{text-align:center;font-size:10px;color:var(--ink-400);padding:6px}
 </style>

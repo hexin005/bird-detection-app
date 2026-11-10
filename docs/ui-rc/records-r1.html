@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>R1 巡逻日志</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:24px auto;position:relative;overflow:hidden;border:3px solid #000;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:12px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 7px;font-size:11px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:56px;left:0;right:0;overflow:hidden}
+.hdr{padding:16px 16px 8px}
+.hdr .t{font-size:26px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:12px;color:#555;margin-top:3px}
+.hdr .row{display:flex;align-items:baseline;gap:10px}
+.stripe{height:10px;background:repeating-linear-gradient(0deg,#000 0 2px,#f2f0e9 2px 4px);border-top:2px solid #000;border-bottom:2px solid #000;margin:10px 0}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:12px 14px;padding:12px 13px}
+.flat{box-shadow:none}
+.seg{display:flex;border:2px solid #000;background:#f2f0e9;margin:6px 14px 12px;box-shadow:4px 4px 0 #000}
+.seg .it{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:700;letter-spacing:1px;border-right:2px solid #000}
+.seg .it:last-child{border-right:none}
+.seg .it.on{background:#000;color:#f2f0e9}
+.seg.sm{box-shadow:none}.seg.sm .it{padding:7px 0;font-size:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;font-weight:800;font-size:14px;padding:11px 0}
+.btn.ghost{background:#f2f0e9;color:#000}
+.btn.mini{padding:7px 14px;font-size:12px;box-shadow:2px 2px 0 #000}
+.daybar{display:flex;align-items:center;gap:10px;margin:16px 14px 8px;font-size:11px;font-weight:800;letter-spacing:2px;color:#444}
+.daybar::before,.daybar::after{content:"";flex:1;height:2px;background:#000}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.chip{display:inline-block;border:2px solid #000;font-size:11px;font-weight:700;padding:3px 10px;background:#f2f0e9;white-space:nowrap}
+.chip.on{background:#000;color:#f2f0e9}
+.dock{position:absolute;bottom:0;left:0;right:0;height:56px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;border-right:2px solid #000;font-size:13px;font-weight:700;letter-spacing:1px}
+.dock .t:last-child{border-right:none}
+.dock .t.on{background:#000;color:#f2f0e9}
+.dock .t .bdg{font-size:9px;border:1.5px solid currentColor;padding:0 4px;margin-left:4px}
+.blk{display:inline-flex;width:26px;height:26px;border:2px solid #000;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.blk.fill{background:#000;color:#f2f0e9}
+.thumb{border:2px solid #000;object-fit:cover;background:#c8c6be;flex-shrink:0}
+.note{font-size:11px;color:#666;text-align:center;padding:14px 0 20px}
+.cap{font-size:10px;color:#888;letter-spacing:1px}
+.subtle{color:#777}
+</style></head><body>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span>特效</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row"><span class="t">检测档案</span><span class="badge fill">新版·日志流</span></div><div class="s">同一件事的 3 条流水合并为 1 组 · 时间戳对齐右栏</div></div>
+<div class="stripe"></div>
+<div class="card flat" style="display:flex;gap:0;padding:0;margin-top:2px">
+  <div style="flex:1;text-align:center;padding:9px 0;border-right:2px solid #000"><div class="mono" style="font-size:18px">12</div><div class="cap">今日事件</div></div>
+  <div style="flex:1;text-align:center;padding:9px 0;border-right:2px solid #000"><div class="mono" style="font-size:18px">111</div><div class="cap">检测累计</div></div>
+  <div style="flex:1;text-align:center;padding:9px 0"><div class="mono" style="font-size:18px">61</div><div class="cap">驱离完成</div></div>
+</div>
+<div class="seg sm"><div class="it on">▍巡逻日志</div><div class="it">视频档案</div></div>
+<div class="daybar">11月9日 · 今天</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:2px solid #000">
+    <span class="blk fill">▶</span>
+    <div style="flex:1"><b style="font-size:13px">驱离执行 · 珠颈斑鸠</b><div class="cap mono" style="margin-top:2px">双模 5 秒 · Cacdf311</div></div>
+    <span class="badge fill">完成</span>
+  </div>
+  <div style="padding:8px 12px;font-size:11px" class="mono">
+    <div style="display:flex;gap:8px;padding:2px 0"><span class="subtle">10:59:26</span><span>人工确认 · 指令入队</span></div>
+    <div style="display:flex;gap:8px;padding:2px 0"><span class="subtle">10:59:26</span><span>设备开始执行</span></div>
+    <div style="display:flex;gap:8px;padding:2px 0"><span class="subtle">10:59:31</span><span>完成回执 · 5.0s</span></div>
+  </div>
+</div>
+<div class="card" style="display:flex;align-items:center;gap:10px;padding:9px 12px">
+  <span class="blk">♦</span>
+  <div style="flex:1"><b style="font-size:12.5px">检测到珠颈斑鸠 ×1 · 置信 93%</b></div>
+  <span class="mono cap" style="white-space:nowrap">07:29</span>
+</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:2px solid #000">
+    <span class="blk fill">▶</span>
+    <div style="flex:1"><b style="font-size:13px">驱离执行 · 八哥</b><div class="cap mono" style="margin-top:2px">声波 3 秒 · Cb041d29</div></div>
+    <span class="badge fill">完成</span>
+  </div>
+  <div style="padding:8px 12px;font-size:11px" class="mono">
+    <div style="display:flex;gap:8px;padding:2px 0"><span class="subtle">07:29:45</span><span>人工确认 → 设备开始</span></div>
+    <div style="display:flex;gap:8px;padding:2px 0"><span class="subtle">07:29:48</span><span>完成回执 · 3.0s</span></div>
+  </div>
+</div>
+<div class="daybar">11月8日</div>
+<div class="card" style="display:flex;align-items:center;gap:10px;padding:9px 12px">
+  <span class="blk" style="border-style:dashed">✕</span>
+  <div style="flex:1"><b style="font-size:12.5px">人工忽略本次告警 · 珠颈斑鸠</b></div>
+  <span class="mono cap" style="white-space:nowrap">23:22</span>
+</div>
+<div class="card" style="display:flex;align-items:center;gap:10px;padding:9px 12px">
+  <span class="blk">♦</span>
+  <div style="flex:1"><b style="font-size:12.5px">检测到大嘴乌鸦 ×2 · 置信 88%</b></div>
+  <span class="mono cap" style="white-space:nowrap">21:07</span>
+</div>
+<div class="card" style="display:flex;align-items:center;gap:10px;padding:9px 12px">
+  <span class="blk">♦</span>
+  <div style="flex:1"><b style="font-size:12.5px">检测到八哥 ×3 · 置信 91%</b></div>
+  <span class="mono cap" style="white-space:nowrap">16:33</span>
+</div>
+<button class="btn ghost" style="margin:4px 14px;width:calc(100% - 28px)">加载更早 7 天 ▾</button>
+<div class="note">同一指令链路(确认→执行→回执)按 ref 合并为一组 · 一屏约 3 倍信息量</div></div>
+<div class="dock"><div class="t">监控</div><div class="t">告警<span class="bdg">46</span></div><div class="t">控制</div><div class="t on">记录</div><div class="t">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:0 20px 30px">R1 · 巡逻日志 — 指令链路合并,按日分组</p>
+</body></html>

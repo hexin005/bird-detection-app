@@ -74,6 +74,27 @@ class Store:
         self.db.execute('''CREATE TABLE IF NOT EXISTS user_preferences (
           user_id INTEGER PRIMARY KEY REFERENCES users(id),
           theme TEXT NOT NULL DEFAULT 'b1bit')''')
+        # 自动哨兵:响应规则(每用户多条) + 定时巡逻(每用户一条)
+        self.db.execute('''CREATE TABLE IF NOT EXISTS automation_rules (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          name TEXT NOT NULL,
+          trigger TEXT NOT NULL,
+          mode TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          cooldown_minutes INTEGER NOT NULL DEFAULT 10,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          last_fired_at REAL,
+          created_at REAL NOT NULL)''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS patrol_schedules (
+          user_id INTEGER PRIMARY KEY REFERENCES users(id),
+          enabled INTEGER NOT NULL DEFAULT 0,
+          start_minute INTEGER NOT NULL DEFAULT 360,
+          end_minute INTEGER NOT NULL DEFAULT 1140,
+          interval_minutes INTEGER NOT NULL DEFAULT 120,
+          mode TEXT NOT NULL DEFAULT 'acoustic',
+          duration INTEGER NOT NULL DEFAULT 3,
+          last_fired_at REAL)''')
         self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
@@ -204,6 +225,9 @@ class Store:
             db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time,bbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                        (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time, bbox_json))
             self.event(db, 'detection', aid, f'检测到{species}，画面中 {count} 只')
+            rule = self._match_rules(db, now)
+            if rule:
+                self._fire_automation(db, rule, aid, now, '自动响应')
             return aid, True
 
     def ignore(self, alarm_id):
@@ -219,27 +243,31 @@ class Store:
         if mode not in ('acoustic', 'infrared', 'both'):
             raise Conflict('驱离方式必须是 acoustic、infrared 或 both')
         with self.tx() as db:
-            old = db.execute('SELECT * FROM commands WHERE request_id=?', (request_id,)).fetchone()
-            if old:
-                if (old['alarm_id'], old['duration'], old['user_id'], old['mode'], bool(old['automatic'])) != (alarm_id, duration, user_id, mode, bool(automatic)):
-                    raise Conflict('重复请求的内容不一致')
-                return dict(old)
-            config = json.loads(db.execute('SELECT value FROM settings WHERE id=1').fetchone()[0])
-            if config['scenario'] == 'offline':
-                raise Conflict('模拟设备离线，未下发指令')
-            if db.execute("SELECT 1 FROM commands WHERE status IN ('pending','running')").fetchone():
-                raise Conflict('已有执行中的指令，请等待或停止')
-            if alarm_id:
-                a = db.execute('SELECT * FROM alarms WHERE id=?', (alarm_id,)).fetchone()
-                if not a or a['status'] != 'new':
-                    raise Conflict('关联告警已被处理或不存在')
-                db.execute("UPDATE alarms SET status='processing' WHERE id=?", (alarm_id,))
-            cid = 'C' + secrets.token_hex(5)
-            db.execute('INSERT INTO commands(id,request_id,alarm_id,user_id,duration,scenario,status,at,started_at,ended_at,message,mode,automatic) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (cid, request_id, alarm_id, user_id, duration, config['scenario'], 'pending', time.time(), None, None, '等待模拟设备接收', mode, int(bool(automatic))))
-            source = '自动策略触发' if automatic else '人工确认'
-            self.event(db, 'command', cid, f'{source}，指令已入队（模拟设备）')
-            return dict(db.execute('SELECT * FROM commands WHERE id=?', (cid,)).fetchone())
+            return self._insert_command(db, request_id, alarm_id, duration, user_id, mode, automatic)
+
+    def _insert_command(self, db, request_id, alarm_id, duration, user_id, mode='both', automatic=False):
+        """在调用方事务内落一条指令(去重/离线/互斥检查);人工与自动触发共用,保证同一套边界。"""
+        old = db.execute('SELECT * FROM commands WHERE request_id=?', (request_id,)).fetchone()
+        if old:
+            if (old['alarm_id'], old['duration'], old['user_id'], old['mode'], bool(old['automatic'])) != (alarm_id, duration, user_id, mode, bool(automatic)):
+                raise Conflict('重复请求的内容不一致')
+            return dict(old)
+        config = json.loads(db.execute('SELECT value FROM settings WHERE id=1').fetchone()[0])
+        if config['scenario'] == 'offline':
+            raise Conflict('模拟设备离线，未下发指令')
+        if db.execute("SELECT 1 FROM commands WHERE status IN ('pending','running')").fetchone():
+            raise Conflict('已有执行中的指令，请等待或停止')
+        if alarm_id:
+            a = db.execute('SELECT * FROM alarms WHERE id=?', (alarm_id,)).fetchone()
+            if not a or a['status'] != 'new':
+                raise Conflict('关联告警已被处理或不存在')
+            db.execute("UPDATE alarms SET status='processing' WHERE id=?", (alarm_id,))
+        cid = 'C' + secrets.token_hex(5)
+        db.execute('INSERT INTO commands(id,request_id,alarm_id,user_id,duration,scenario,status,at,started_at,ended_at,message,mode,automatic) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (cid, request_id, alarm_id, user_id, duration, config['scenario'], 'pending', time.time(), None, None, '等待模拟设备接收', mode, int(bool(automatic))))
+        source = '自动策略触发' if automatic else '人工确认'
+        self.event(db, 'command', cid, f'{source}，指令已入队（模拟设备）')
+        return dict(db.execute('SELECT * FROM commands WHERE id=?', (cid,)).fetchone())
 
     def _finish(self, db, command, status, message):
         db.execute('UPDATE commands SET status=?,ended_at=?,message=? WHERE id=?', (status, time.time(), message, command['id']))
@@ -267,6 +295,119 @@ class Store:
                     timeout = c['scenario'] == 'timeout'
                     self._finish(db, c, 'failed' if timeout else 'completed',
                                  '执行超时，未收到模拟完成回执' if timeout else '模拟完成回执已收到；不代表实际驱鸟效果')
+
+    # ---- 自动哨兵:响应规则 + 定时巡逻 ----
+
+    MODE_CN = {'acoustic': '声波', 'infrared': '红外', 'both': '双模'}
+    RULE_FIELDS = ('name', 'trigger', 'mode', 'duration', 'cooldown_minutes', 'enabled')
+
+    def rules(self, user_id):
+        return self.rows('SELECT * FROM automation_rules WHERE user_id=? ORDER BY id', (user_id,))
+
+    def create_rule(self, user_id, name, trigger, mode, duration, cooldown_minutes):
+        if trigger not in ('alarm_any', 'alarm_burst'):
+            raise Conflict('触发条件无效')
+        if mode not in self.MODE_CN:
+            raise Conflict('驱离方式无效')
+        if duration not in (3, 5, 8):
+            raise Conflict('执行时长必须为 3、5 或 8 秒')
+        with self.tx() as db:
+            cur = db.execute('INSERT INTO automation_rules(user_id,name,trigger,mode,duration,cooldown_minutes,enabled,last_fired_at,created_at) VALUES (?,?,?,?,?,?,1,NULL,?)',
+                             (user_id, name, trigger, mode, duration, cooldown_minutes, time.time()))
+            return dict(db.execute('SELECT * FROM automation_rules WHERE id=?', (cur.lastrowid,)).fetchone())
+
+    def update_rule(self, user_id, rule_id, changes):
+        sets = [k for k in self.RULE_FIELDS if k in changes]
+        if sets:
+            with self.tx() as db:
+                cur = db.execute(f'UPDATE automation_rules SET {", ".join(k + "=?" for k in sets)} WHERE id=? AND user_id=?',
+                                 (*[changes[k] for k in sets], rule_id, user_id))
+                if cur.rowcount != 1:
+                    raise Conflict('规则不存在或无权修改')
+        rows = self.rows('SELECT * FROM automation_rules WHERE id=? AND user_id=?', (rule_id, user_id))
+        if not rows:
+            raise Conflict('规则不存在或无权修改')
+        return rows[0]
+
+    def delete_rule(self, user_id, rule_id):
+        with self.tx() as db:
+            cur = db.execute('DELETE FROM automation_rules WHERE id=? AND user_id=?', (rule_id, user_id))
+            if cur.rowcount != 1:
+                raise Conflict('规则不存在或无权删除')
+
+    def patrol(self, user_id):
+        rows = self.rows('SELECT * FROM patrol_schedules WHERE user_id=?', (user_id,))
+        if rows:
+            return rows[0]
+        return {'user_id': user_id, 'enabled': 0, 'start_minute': 360, 'end_minute': 1140,
+                'interval_minutes': 120, 'mode': 'acoustic', 'duration': 3, 'last_fired_at': None}
+
+    def set_patrol(self, user_id, changes):
+        merged = {k: v for k, v in self.patrol(user_id).items() if k != 'user_id'}
+        merged.update(changes)
+        if merged['start_minute'] >= merged['end_minute']:
+            raise Conflict('巡逻时段无效，需开始早于结束')
+        if merged['mode'] not in self.MODE_CN:
+            raise Conflict('驱离方式无效')
+        if merged['duration'] not in (3, 5, 8):
+            raise Conflict('执行时长必须为 3、5 或 8 秒')
+        with self.tx() as db:
+            db.execute('''INSERT INTO patrol_schedules(user_id,enabled,start_minute,end_minute,interval_minutes,mode,duration,last_fired_at)
+                          VALUES (?,?,?,?,?,?,?,?)
+                          ON CONFLICT(user_id) DO UPDATE SET enabled=excluded.enabled,
+                            start_minute=excluded.start_minute,end_minute=excluded.end_minute,
+                            interval_minutes=excluded.interval_minutes,mode=excluded.mode,duration=excluded.duration''',
+                       (user_id, int(bool(merged['enabled'])), merged['start_minute'], merged['end_minute'],
+                        merged['interval_minutes'], merged['mode'], merged['duration'], merged['last_fired_at']))
+        return self.patrol(user_id)
+
+    def _match_rules(self, db, now):
+        """挑选当前该触发的首条启用规则;burst 需 10 分钟内 ≥3 报,冷却期内静默跳过。"""
+        burst = None
+        for rule in db.execute('SELECT * FROM automation_rules WHERE enabled=1 ORDER BY id').fetchall():
+            if rule['trigger'] == 'alarm_burst':
+                if burst is None:
+                    burst = db.execute('SELECT COUNT(*) n FROM alarms WHERE at>=?', (now - 600,)).fetchone()[0]
+                if burst < 3:
+                    continue
+            if rule['last_fired_at'] is not None and now - rule['last_fired_at'] < rule['cooldown_minutes'] * 60:
+                continue
+            return rule
+        return None
+
+    def _fire_automation(self, db, rule, alarm_id, now, source):
+        """在当前事务内触发规则;离线/互斥冲突记跳过事件,并同样占用冷却窗口防止事件刷屏。"""
+        request_id = f'rule-{rule["id"]}-{alarm_id or int(now)}'
+        try:
+            c = self._insert_command(db, request_id, alarm_id, rule['duration'], rule['user_id'], rule['mode'], True)
+        except Conflict as exc:
+            db.execute('UPDATE automation_rules SET last_fired_at=? WHERE id=?', (now, rule['id']))
+            self.event(db, 'automation', f'rule-{rule["id"]}', f'{source}未触发：规则「{rule["name"]}」，{exc}')
+            return None
+        db.execute('UPDATE automation_rules SET last_fired_at=? WHERE id=?', (now, rule['id']))
+        self.event(db, 'automation', c['id'], f'{source}：规则「{rule["name"]}」→ {self.MODE_CN[rule["mode"]]} {rule["duration"]} 秒')
+        return c
+
+    def automation_tick(self, now=None):
+        """worker 循环调用:巡逻窗口内按间隔自动触发;与响应规则共用单指令互斥边界。"""
+        now = now if now is not None else time.time()
+        if not self.rows('SELECT 1 FROM patrol_schedules WHERE enabled=1 LIMIT 1'):
+            return
+        local = time.localtime(now)
+        cur = local.tm_hour * 60 + local.tm_min
+        with self.tx() as db:
+            for p in db.execute('SELECT * FROM patrol_schedules WHERE enabled=1').fetchall():
+                if not (p['start_minute'] <= cur < p['end_minute']):
+                    continue
+                if p['last_fired_at'] is not None and now - p['last_fired_at'] < p['interval_minutes'] * 60:
+                    continue
+                request_id = f'patrol-{p["user_id"]}-{int(now)}'
+                try:
+                    c = self._insert_command(db, request_id, None, p['duration'], p['user_id'], p['mode'], True)
+                    self.event(db, 'automation', c['id'], f'定时巡逻：{self.MODE_CN[p["mode"]]} {p["duration"]} 秒')
+                except Conflict as exc:
+                    self.event(db, 'automation', f'patrol-{p["user_id"]}', f'定时巡逻未触发：{exc}')
+                db.execute('UPDATE patrol_schedules SET last_fired_at=? WHERE user_id=?', (now, p['user_id']))
 
     def task(self, task_id, status, message=''):
         with self.tx() as db:

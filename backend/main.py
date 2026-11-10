@@ -49,6 +49,32 @@ class StartVideo(BaseModel):
     video_id: Optional[str] = None
 
 
+class RuleIn(BaseModel):
+    name: str = Field(min_length=1, max_length=30)
+    trigger: Literal['alarm_any', 'alarm_burst']
+    mode: Literal['acoustic', 'infrared', 'both']
+    duration: Literal[3, 5, 8]
+    cooldown_minutes: int = Field(default=10, ge=1, le=720)
+
+
+class RulePatch(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=30)
+    trigger: Optional[Literal['alarm_any', 'alarm_burst']] = None
+    mode: Optional[Literal['acoustic', 'infrared', 'both']] = None
+    duration: Optional[Literal[3, 5, 8]] = None
+    cooldown_minutes: Optional[int] = Field(default=None, ge=1, le=720)
+    enabled: Optional[bool] = None
+
+
+class PatrolIn(BaseModel):
+    enabled: Optional[bool] = None
+    start_minute: Optional[int] = Field(default=None, ge=0, le=1439)
+    end_minute: Optional[int] = Field(default=None, ge=1, le=1440)
+    interval_minutes: Optional[int] = Field(default=None, ge=5, le=720)
+    mode: Optional[Literal['acoustic', 'infrared', 'both']] = None
+    duration: Optional[Literal[3, 5, 8]] = None
+
+
 EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 THEME_IDS = ('b1bit', 'tower', 'signal', 'pixel')
 AVATAR_MAX_BYTES = 2 * 1024 * 1024
@@ -119,6 +145,7 @@ def create_app(settings=None):
     def worker():
         while not shutdown.wait(.1):
             store.tick()
+            store.automation_tick()
 
     @asynccontextmanager
     async def lifespan(app):
@@ -136,7 +163,7 @@ def create_app(settings=None):
     app = FastAPI(title='青禾果园守护 MVP', lifespan=lifespan)
     app.state.store, app.state.monitor, app.state.verification = store, monitor, verification
     app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5178', 'http://localhost:5178'],
-                       allow_methods=['GET', 'POST', 'PUT'], allow_headers=['Authorization', 'Content-Type', 'X-Filename'])
+                       allow_methods=['GET', 'POST', 'PUT', 'DELETE'], allow_headers=['Authorization', 'Content-Type', 'X-Filename'])
 
     @app.exception_handler(Conflict)
     async def conflict(_, exc):
@@ -252,6 +279,35 @@ def create_app(settings=None):
     def update_my_preferences(body: ThemePref, user=Depends(auth)):
         store.set_user_theme(user[1], body.theme)
         return {'ok': True, 'theme': body.theme}
+
+    # ---- 自动哨兵:响应规则 / 定时巡逻 ----
+
+    @app.get('/api/automation/rules')
+    def automation_rules(user=Depends(auth)):
+        return {'items': store.rules(user[1])}
+
+    @app.post('/api/automation/rules')
+    def create_automation_rule(body: RuleIn, user=Depends(auth)):
+        return store.create_rule(user[1], body.name.strip(), body.trigger, body.mode, body.duration, body.cooldown_minutes)
+
+    @app.put('/api/automation/rules/{rule_id}')
+    def update_automation_rule(rule_id: int, body: RulePatch, user=Depends(auth)):
+        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        return store.update_rule(user[1], rule_id, changes)
+
+    @app.delete('/api/automation/rules/{rule_id}')
+    def delete_automation_rule(rule_id: int, user=Depends(auth)):
+        store.delete_rule(user[1], rule_id)
+        return {'ok': True}
+
+    @app.get('/api/automation/patrol')
+    def automation_patrol(user=Depends(auth)):
+        return store.patrol(user[1])
+
+    @app.put('/api/automation/patrol')
+    def update_automation_patrol(body: PatrolIn, user=Depends(auth)):
+        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        return store.set_patrol(user[1], changes)
 
     @app.post('/api/avatar')
     async def upload_avatar(request: Request, user=Depends(auth)):

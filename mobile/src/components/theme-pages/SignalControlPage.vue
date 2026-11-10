@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useHost, names, clock, shortTime, time, alarmClass } from '../host/hostContext'
 import type { RepelMode } from '../host/hostContext'
+import ControlStrategy from '../host/ControlStrategy.vue'
 
 const host = useHost()
 </script>
 <template>
-  <view class="hd"><text class="b">升降控制</text><text class="s">定时自动降下</text></view>
+  <view class="hd"><text class="b">升降控制</text><text class="s">手动单次 · 自动策略见下方</text></view>
   <view class="ctl">
     <view class="hz"/>
     <view class="bd">
@@ -23,16 +24,19 @@ const host = useHost()
       </button>
     </view>
   </view>
+
+  <!-- 策略层:自动响应规则 / 定时巡逻 / 设备参数(共享组件) -->
+  <ControlStrategy />
 </template>
 <style scoped>
-.hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px}.hd .b{font-size:16px;font-weight:900;letter-spacing:2px;color:var(--ink-900)}.hd .s{font-size:9px;color:var(--grey)}
+.hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px}.hd .b{font-size:16px;font-weight:900;letter-spacing:2px;color:var(--ink-900)}.hd .s{font-size:9px;color:var(--ink-400)}
 .ctl{margin:0 16px;border:2px solid #191919;background:#fbfaf4}
 .hz{height:10px;background:repeating-linear-gradient(-45deg,#f5c400 0 12px,#191919 12px 24px);border-bottom:2px solid #191919}
 .bd{padding:12px}
-.row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}.row .t{font-size:13px;font-weight:900;letter-spacing:2px}.row .note{font-size:9px;color:var(--grey)}
+.row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}.row .t{font-size:13px;font-weight:900;letter-spacing:2px}.row .note{font-size:9px;color:var(--ink-400)}
 .flags{display:flex;gap:8px;margin-bottom:9px}
 .flag{flex:1;border:2px solid #191919;padding:7px 0 6px;text-align:center;font-size:11.5px;font-weight:800;display:flex;flex-direction:column;gap:1px;color:#191919;cursor:pointer}
-.flag .en{font-size:8px;letter-spacing:1px;color:var(--grey);font-weight:700}
+.flag .en{font-size:8px;letter-spacing:1px;color:var(--ink-400);font-weight:700}
 .flag.on{background:#191919;color:#f2f1ea}
 .flag.on .en{color:#9a9a92}
 .durs{display:flex;gap:6px;margin-bottom:9px}

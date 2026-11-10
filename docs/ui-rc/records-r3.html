@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>R3 台账</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:24px auto;position:relative;overflow:hidden;border:3px solid #000;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:12px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 7px;font-size:11px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:56px;left:0;right:0;overflow:hidden}
+.hdr{padding:16px 16px 8px}
+.hdr .t{font-size:26px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:12px;color:#555;margin-top:3px}
+.hdr .row{display:flex;align-items:baseline;gap:10px}
+.stripe{height:10px;background:repeating-linear-gradient(0deg,#000 0 2px,#f2f0e9 2px 4px);border-top:2px solid #000;border-bottom:2px solid #000;margin:10px 0}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:12px 14px;padding:12px 13px}
+.flat{box-shadow:none}
+.seg{display:flex;border:2px solid #000;background:#f2f0e9;margin:6px 14px 12px;box-shadow:4px 4px 0 #000}
+.seg .it{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:700;letter-spacing:1px;border-right:2px solid #000}
+.seg .it:last-child{border-right:none}
+.seg .it.on{background:#000;color:#f2f0e9}
+.seg.sm{box-shadow:none}.seg.sm .it{padding:7px 0;font-size:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;font-weight:800;font-size:14px;padding:11px 0}
+.btn.ghost{background:#f2f0e9;color:#000}
+.btn.mini{padding:7px 14px;font-size:12px;box-shadow:2px 2px 0 #000}
+.daybar{display:flex;align-items:center;gap:10px;margin:16px 14px 8px;font-size:11px;font-weight:800;letter-spacing:2px;color:#444}
+.daybar::before,.daybar::after{content:"";flex:1;height:2px;background:#000}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.chip{display:inline-block;border:2px solid #000;font-size:11px;font-weight:700;padding:3px 10px;background:#f2f0e9;white-space:nowrap}
+.chip.on{background:#000;color:#f2f0e9}
+.dock{position:absolute;bottom:0;left:0;right:0;height:56px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;border-right:2px solid #000;font-size:13px;font-weight:700;letter-spacing:1px}
+.dock .t:last-child{border-right:none}
+.dock .t.on{background:#000;color:#f2f0e9}
+.dock .t .bdg{font-size:9px;border:1.5px solid currentColor;padding:0 4px;margin-left:4px}
+.blk{display:inline-flex;width:26px;height:26px;border:2px solid #000;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.blk.fill{background:#000;color:#f2f0e9}
+.thumb{border:2px solid #000;object-fit:cover;background:#c8c6be;flex-shrink:0}
+.note{font-size:11px;color:#666;text-align:center;padding:14px 0 20px}
+.cap{font-size:10px;color:#888;letter-spacing:1px}
+.subtle{color:#777}
+</style></head><body>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span>特效</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row"><span class="t">检测档案</span><span class="badge fill">新版·台账</span></div><div class="s">一张表 · 类型章 + 日分隔 · 最高密度</div></div>
+<div class="stripe"></div>
+<div class="seg sm"><div class="it on">全部</div><div class="it">检测</div><div class="it">驱离</div><div class="it">忽略</div></div>
+<div class="card" style="padding:0;margin-top:2px">
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge fill" style="width:44px;text-align:center;flex-shrink:0">驱离</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 · 双模 5s · 完成 <span class="cap mono">Cacdf311</span></span>
+  <span class="mono cap" style="white-space:nowrap">10:59</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 ×1 · 置信 93%</span>
+  <span class="mono cap" style="white-space:nowrap">07:29</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge fill" style="width:44px;text-align:center;flex-shrink:0">驱离</span>
+  <span style="flex:1;font-size:12px;font-weight:600">八哥 · 声波 3s · 完成 <span class="cap mono">Cb041d29</span></span>
+  <span class="mono cap" style="white-space:nowrap">07:29</span></div>
+</div>
+<div class="daybar">11月8日</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">忽略</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 · 人工忽略</span>
+  <span class="mono cap" style="white-space:nowrap">23:22</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge fill" style="width:44px;text-align:center;flex-shrink:0">驱离</span>
+  <span style="flex:1;font-size:12px;font-weight:600">大嘴乌鸦 · 红外 5s · 完成 <span class="cap mono">C4b96a72</span></span>
+  <span class="mono cap" style="white-space:nowrap">23:20</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">大嘴乌鸦 ×2 · 置信 88%</span>
+  <span class="mono cap" style="white-space:nowrap">21:07</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">八哥 ×3 · 置信 91%</span>
+  <span class="mono cap" style="white-space:nowrap">16:33</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge fill" style="width:44px;text-align:center;flex-shrink:0">驱离</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 · 双模 5s · 完成 <span class="cap mono">Ae0410d9</span></span>
+  <span class="mono cap" style="white-space:nowrap">12:29</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 ×1 · 置信 95%</span>
+  <span class="mono cap" style="white-space:nowrap">12:28</span></div>
+</div>
+<div class="daybar">11月7日</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">喜鹊 ×1 · 置信 90%</span>
+  <span class="mono cap" style="white-space:nowrap">21:28</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">检测</span>
+  <span style="flex:1;font-size:12px;font-weight:600">珠颈斑鸠 ×1 · 置信 93%</span>
+  <span class="mono cap" style="white-space:nowrap">21:46</span></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid #999">
+  <span class="badge " style="width:44px;text-align:center;flex-shrink:0">忽略</span>
+  <span style="flex:1;font-size:12px;font-weight:600">喜鹊 · 人工忽略</span>
+  <span class="mono cap" style="white-space:nowrap">21:30</span></div>
+</div>
+<button class="btn ghost" style="margin:4px 14px;width:calc(100% - 28px)">更早记录 ▾</button>
+<div class="note">单容器 zebra 行 · 行高约 34px · 类型章一眼分拣 · 适合回溯查找</div></div>
+<div class="dock"><div class="t">监控</div><div class="t">告警<span class="bdg">46</span></div><div class="t">控制</div><div class="t on">记录</div><div class="t">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:0 20px 30px">R3 · 台账 — zebra 表格,最高密度</p>
+</body></html>

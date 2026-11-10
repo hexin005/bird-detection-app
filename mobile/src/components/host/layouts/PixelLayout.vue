@@ -2,9 +2,9 @@
 // 像素布局:像素监控主页 + 其余页(B 版占位,功能完整)+ 像素 dock
 import { useHost } from '../hostContext'
 import PixelMonitor from '../../theme-pages/PixelMonitor.vue'
-import BAlarmsPage from '../pages/BAlarmsPage.vue'
-import BControlPage from '../pages/BControlPage.vue'
-import BRecordsPage from '../pages/BRecordsPage.vue'
+import PixelAlarmPage from '../../theme-pages/PixelAlarmPage.vue'
+import PixelControlPage from '../../theme-pages/PixelControlPage.vue'
+import PixelRecordsPage from '../../theme-pages/PixelRecordsPage.vue'
 
 const host = useHost()
 const tabs = [
@@ -39,7 +39,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BAlarmsPage /></view>
+    <view class="page__content"><PixelAlarmPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'control' }">
@@ -50,7 +50,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BControlPage /></view>
+    <view class="page__content"><PixelControlPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'records' }">
@@ -61,7 +61,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BRecordsPage /></view>
+    <view class="page__content"><PixelRecordsPage /></view>
   </view>
 
   <!-- 像素 dock -->

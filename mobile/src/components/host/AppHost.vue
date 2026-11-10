@@ -50,6 +50,7 @@ function onPageEnter(p: string) {
   if (p === 'me') meHomeRef.value?.load()
   if (p === 'analytics') analyticsRef.value?.load()
   if (p === 'monitor' || p === 'me') void host.refreshToday()
+  if (p === 'control') void host.run(host.loadAutomation)
 }
 watch(() => host.page, onPageEnter, { immediate: true })
 

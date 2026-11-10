@@ -1,0 +1,95 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>S1 自动哨兵</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:24px auto;position:relative;overflow:hidden;border:3px solid #000;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:12px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 7px;font-size:11px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:56px;left:0;right:0;overflow:hidden}
+.hdr{padding:16px 16px 8px}
+.hdr .t{font-size:26px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:12px;color:#555;margin-top:3px}
+.hdr .row{display:flex;align-items:baseline;gap:10px}
+.stripe{height:10px;background:repeating-linear-gradient(0deg,#000 0 2px,#f2f0e9 2px 4px);border-top:2px solid #000;border-bottom:2px solid #000;margin:10px 0}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:12px 14px;padding:12px 13px}
+.flat{box-shadow:none}
+.seg{display:flex;border:2px solid #000;background:#f2f0e9;margin:6px 14px 12px;box-shadow:4px 4px 0 #000}
+.seg .it{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:700;letter-spacing:1px;border-right:2px solid #000}
+.seg .it:last-child{border-right:none}
+.seg .it.on{background:#000;color:#f2f0e9}
+.seg.sm{box-shadow:none}.seg.sm .it{padding:7px 0;font-size:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;font-weight:800;font-size:14px;padding:11px 0}
+.btn.ghost{background:#f2f0e9;color:#000}
+.btn.mini{padding:7px 14px;font-size:12px;box-shadow:2px 2px 0 #000}
+.daybar{display:flex;align-items:center;gap:10px;margin:16px 14px 8px;font-size:11px;font-weight:800;letter-spacing:2px;color:#444}
+.daybar::before,.daybar::after{content:"";flex:1;height:2px;background:#000}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.chip{display:inline-block;border:2px solid #000;font-size:11px;font-weight:700;padding:3px 10px;background:#f2f0e9;white-space:nowrap}
+.chip.on{background:#000;color:#f2f0e9}
+.dock{position:absolute;bottom:0;left:0;right:0;height:56px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;border-right:2px solid #000;font-size:13px;font-weight:700;letter-spacing:1px}
+.dock .t:last-child{border-right:none}
+.dock .t.on{background:#000;color:#f2f0e9}
+.dock .t .bdg{font-size:9px;border:1.5px solid currentColor;padding:0 4px;margin-left:4px}
+.blk{display:inline-flex;width:26px;height:26px;border:2px solid #000;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.blk.fill{background:#000;color:#f2f0e9}
+.thumb{border:2px solid #000;object-fit:cover;background:#c8c6be;flex-shrink:0}
+.note{font-size:11px;color:#666;text-align:center;padding:14px 0 20px}
+.cap{font-size:10px;color:#888;letter-spacing:1px}
+.subtle{color:#777}
+</style></head><body>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span>特效</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row"><span class="t">自动哨兵</span><span class="badge fill">策略层</span></div><div class="s">首页管「现在这一下」· 这里管「以后每一刻」</div></div>
+<div class="stripe"></div>
+<div class="card" style="padding:10px 12px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:12.5px">快速驱离</b><span class="cap">手动单次 · 与首页相同能力</span></div>
+  <div style="display:flex;gap:6px">
+    <span class="chip on" style="flex:1;text-align:center">声波 ▾</span>
+    <span class="chip" style="flex:1;text-align:center">5 秒 ▾</span>
+    <div class="btn mini" style="flex:1.2">▶ 执行</div>
+  </div>
+</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:2px solid #000">
+    <span class="blk fill">⚡</span><b style="flex:1;font-size:13.5px">自动响应</b>
+    <span class="badge fill" style="border-color:#f2f0e9">开</span>
+  </div>
+  <div style="padding:4px 0 8px" class="mono">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px dashed #999;font-size:11.5px;font-family:inherit">
+      <span style="flex:1"><b>规则 1</b> · 告警出现 → 声波 5 秒</span><span class="cap">冷却 10 分</span><span class="cap">⏻</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:11.5px;font-family:inherit">
+      <span style="flex:1"><b>规则 2</b> · 10 分钟内 ≥3 报 → 双模 8 秒</span><span class="cap">冷却 30 分</span><span class="cap">⏻</span>
+    </div>
+  </div>
+  <div class="btn ghost" style="border-top:2px solid #000;border-left:none;border-right:none;border-bottom:none;box-shadow:none">＋ 添加规则</div>
+</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:2px solid #000">
+    <span class="blk">⏱</span><b style="flex:1;font-size:13.5px">定时巡逻</b><span class="badge">未启用</span>
+  </div>
+  <div style="padding:9px 12px;font-size:12px">每日 <span class="mono">06:00 – 19:00</span> · 每 2 小时 声波 3 秒</div>
+</div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:2px solid #000">
+    <span class="blk">⚙</span><b style="flex:1;font-size:13.5px">设备参数</b><span class="cap">从「设置」迁入</span>
+  </div>
+  <div style="padding:4px 12px 8px" class="mono">
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px"><span style="font-family:inherit">置信度阈值</span><span>0.40</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-top:1px dashed #999"><span style="font-family:inherit">连续检出帧数</span><span>2 帧</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-top:1px dashed #999"><span style="font-family:inherit">事件合并间隔</span><span>20 秒</span></div>
+  </div>
+</div>
+<div class="card flat" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px">
+  <span class="cap" style="font-size:11px">最近执行 12 次 · 今日全部完成</span><span class="chip" style="font-size:10px">执行历史 ›</span>
+</div>
+<div class="note">新增:自动响应规则 + 定时巡逻(需后端加规则存储) · 设备参数自设置弹窗迁入 · 快速驱离保留但不再是主角</div></div>
+<div class="dock"><div class="t">监控</div><div class="t">告警<span class="bdg">46</span></div><div class="t on">控制</div><div class="t">记录</div><div class="t">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:0 20px 30px">S1 · 自动哨兵 — 控制页升为策略层(需新增后端规则)</p>
+</body></html>

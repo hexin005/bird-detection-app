@@ -8,7 +8,10 @@ const host = useHost()
   <view v-for="a in host.pending.slice(0, 6)" :key="a.id" class="dlg" style="cursor:pointer" @click="host.openAlarm(a)">
     <view class="who mono">告警 No.{{ a.id.slice(-4) }} · {{ shortTime(a.at) }}</view>
     <p class="txt">野生的<text class="hl">{{ a.species }} ×{{ a.count }}</text> 出现在东南果树区!<text class="hl">{{ Math.round(a.confidence * 100) }}%</text> 置信度 · 已录像。</p>
-    <view class="ch"><span class="c go">▶ {{ host.mode === 'acoustic' ? '声波驱离' : host.mode === 'infrared' ? '红外驱离' : '双模驱离' }}</span><span class="c">忽略</span></view>
+    <view class="ch">
+      <span class="c go" style="cursor:pointer" @click.stop="host.quickRepel(a.id)">▶ {{ host.mode === 'acoustic' ? '声波驱离' : host.mode === 'infrared' ? '红外驱离' : '双模驱离' }}</span>
+      <span class="c" style="cursor:pointer" @click.stop="host.run(() => host.requestIgnore(a.id))">忽略</span>
+    </view>
     <span class="arrow">▼</span>
   </view>
   <view v-if="!host.pending.length" class="dlg"><p class="txt">果园平静…暂无待处理告警。开始观测后,告警会在这里出现。</p></view>

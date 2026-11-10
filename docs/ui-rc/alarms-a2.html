@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>A2 鸟情板</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:24px auto;position:relative;overflow:hidden;border:3px solid #000;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:12px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 7px;font-size:11px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:56px;left:0;right:0;overflow:hidden}
+.hdr{padding:16px 16px 8px}
+.hdr .t{font-size:26px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:12px;color:#555;margin-top:3px}
+.hdr .row{display:flex;align-items:baseline;gap:10px}
+.stripe{height:10px;background:repeating-linear-gradient(0deg,#000 0 2px,#f2f0e9 2px 4px);border-top:2px solid #000;border-bottom:2px solid #000;margin:10px 0}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:12px 14px;padding:12px 13px}
+.flat{box-shadow:none}
+.seg{display:flex;border:2px solid #000;background:#f2f0e9;margin:6px 14px 12px;box-shadow:4px 4px 0 #000}
+.seg .it{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:700;letter-spacing:1px;border-right:2px solid #000}
+.seg .it:last-child{border-right:none}
+.seg .it.on{background:#000;color:#f2f0e9}
+.seg.sm{box-shadow:none}.seg.sm .it{padding:7px 0;font-size:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;font-weight:800;font-size:14px;padding:11px 0}
+.btn.ghost{background:#f2f0e9;color:#000}
+.btn.mini{padding:7px 14px;font-size:12px;box-shadow:2px 2px 0 #000}
+.daybar{display:flex;align-items:center;gap:10px;margin:16px 14px 8px;font-size:11px;font-weight:800;letter-spacing:2px;color:#444}
+.daybar::before,.daybar::after{content:"";flex:1;height:2px;background:#000}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.chip{display:inline-block;border:2px solid #000;font-size:11px;font-weight:700;padding:3px 10px;background:#f2f0e9;white-space:nowrap}
+.chip.on{background:#000;color:#f2f0e9}
+.dock{position:absolute;bottom:0;left:0;right:0;height:56px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;border-right:2px solid #000;font-size:13px;font-weight:700;letter-spacing:1px}
+.dock .t:last-child{border-right:none}
+.dock .t.on{background:#000;color:#f2f0e9}
+.dock .t .bdg{font-size:9px;border:1.5px solid currentColor;padding:0 4px;margin-left:4px}
+.blk{display:inline-flex;width:26px;height:26px;border:2px solid #000;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.blk.fill{background:#000;color:#f2f0e9}
+.thumb{border:2px solid #000;object-fit:cover;background:#c8c6be;flex-shrink:0}
+.note{font-size:11px;color:#666;text-align:center;padding:14px 0 20px}
+.cap{font-size:10px;color:#888;letter-spacing:1px}
+.subtle{color:#777}
+</style></head><body>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span>特效</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="t" style="font-size:22px">告警中心</div><div class="s">按物种分栏 · 一群一卡 · 组内按时间</div></div>
+<div class="stripe"></div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:2px solid #000">
+    <img class="thumb" width="34" height="34" src="../../.runtime/captures/T9311ae2050-15.jpg" onerror="this.style.visibility='hidden'">
+    <b style="flex:1;font-size:13.5px">珠颈斑鸠</b>
+    <span class="cap">今日 31 · 待处理 4</span><span class="cap">▾</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #999;font-size:12px">
+  <span class="mono cap" style="width:42px">21:56</span><span style="flex:1">×1 · 置信 93%</span>
+  <span class="badge">待处理</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #999;font-size:12px">
+  <span class="mono cap" style="width:42px">21:50</span><span style="flex:1">×1 · 置信 93%</span>
+  <span class="badge">待处理</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #999;font-size:12px">
+  <span class="mono cap" style="width:42px">21:39</span><span style="flex:1">×1 · 置信 93%</span>
+  <span class="badge">待处理</span></div><div style="text-align:center;font-size:11px;padding:6px" class="cap">还有 27 条更早 · 展开 ▾</div></div>
+<div style="height:10px"></div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:2px solid #000">
+    <img class="thumb" width="34" height="34" src="../../.runtime/captures/T9311ae2050-15.jpg" onerror="this.style.visibility='hidden'">
+    <b style="flex:1;font-size:13.5px">八哥</b>
+    <span class="cap">今日 9 · 待处理 0</span><span class="cap">▾</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #999;font-size:12px">
+  <span class="mono cap" style="width:42px">16:33</span><span style="flex:1">×1 · 置信 91%</span>
+  <span class="badge">已处理</span></div></div>
+<div style="height:10px"></div>
+<div class="card" style="padding:0">
+  <div style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:2px solid #000">
+    <img class="thumb" width="34" height="34" src="../../.runtime/captures/T9311ae2050-15.jpg" onerror="this.style.visibility='hidden'">
+    <b style="flex:1;font-size:13.5px">大嘴乌鸦</b>
+    <span class="cap">今日 6 · 待处理 0</span><span class="cap">▾</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #999;font-size:12px">
+  <span class="mono cap" style="width:42px">21:07</span><span style="flex:1">×1 · 置信 88%</span>
+  <span class="badge">已处理</span></div></div>
+<div class="note">物种头像即筛选 · 待处理数顶在组头 · 处理完的组自动沉底</div></div>
+<div class="dock"><div class="t">监控</div><div class="t on">告警<span class="bdg">46</span></div><div class="t">控制</div><div class="t">记录</div><div class="t">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:0 20px 30px">A2 · 鸟情板 — 按物种分栏</p>
+</body></html>

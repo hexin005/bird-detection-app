@@ -2,7 +2,7 @@
 // 所有主题布局/页面只通过 inject(hostKey) 发语义调用,不各自持有业务状态。
 import { computed, reactive, ref } from 'vue'
 import { useOrchard } from '../../store'
-import type { Alarm, Command, Event, Preferences } from '../../types'
+import type { Alarm, AutoRule, Command, Event, Patrol, Preferences } from '../../types'
 import { applyTheme, type ThemeId } from '../../theme'
 
 export type PageId = 'monitor' | 'alarms' | 'control' | 'records' | 'me' | 'themes' | 'analytics'
@@ -31,6 +31,15 @@ export const modeMeta: Record<RepelMode, { name: string; device: string; code: s
   infrared: { name: '红外驱鸟器 02', device: '红外驱鸟器 02', code: '东区果园 · INFRARED 02', desc: '设备将以红外脉冲方式驱离鸟类，定时结束后自动停止。' },
   both: { name: '双模驱离系统', device: '声学 01 + 红外 02', code: '东区果园 · DUAL-MODE', desc: '声波与红外脉冲将同时执行，双模联动驱离鸟类，定时结束后自动停止。' },
 }
+export const modeCn: Record<RepelMode, string> = { acoustic: '声波', infrared: '红外', both: '双模' }
+export const triggerCn: Record<string, string> = { alarm_any: '告警出现', alarm_burst: '10 分钟内 ≥3 报' }
+
+/* R1 巡逻日志:事件按指令链(ref=C*)归组,自动化上下文事件作为组副标题 */
+export type EventGroup = {
+  key: string; kind: 'command' | 'detection' | 'ignored' | 'auto'
+  ref: string; title: string; status?: string; automatic: boolean; autoMsg?: string
+  lines: Event[]; at: number; day: string; today: boolean
+}
 
 export function createHost() {
   const store = useOrchard()
@@ -46,6 +55,8 @@ export function createHost() {
   const older = ref<Event[]>([]), historyEnd = ref(false)
   const fetchedAlarm = ref<Alarm | null>(null), fetchedCommand = ref<Command | null>(null)
   const theme = ref<ThemeId>('b1bit')
+  const rules = ref<AutoRule[]>([])
+  const patrol = ref<Patrol | null>(null)
 
   const s = computed(() => store.state)
   const alarm = computed(() => s.value?.alarms.find(a => a.id === detailId.value) || (fetchedAlarm.value?.id === detailId.value ? fetchedAlarm.value : null))
@@ -64,6 +75,47 @@ export function createHost() {
     return items.length ? items.join('  ｜  ') + '  ｜  ' : '暂无鸟情播报 — 开始监测后自动滚动  ｜  '
   })
   const todayAlarms = ref(0)
+  /** R1 巡逻日志:把事件流归组——指令链(确认→执行→回执)合并,自动化事件做组标题,检测/忽略为单行 */
+  const groupedEvents = computed<EventGroup[]>(() => {
+    const now = new Date()
+    const today = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`
+    const dayOf = (ts: number) => {
+      const d = new Date(ts * 1000)
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      return { key, label: `${d.getMonth() + 1}月${d.getDate()}日`, today: key === today }
+    }
+    const groups: EventGroup[] = []
+    const byRef = new Map<string, EventGroup>()
+    for (const e of [...events.value].sort((a, b) => a.id - b.id)) {
+      const chain = e.kind !== 'detection' && e.kind !== 'ignored' && e.ref_id.startsWith('C')
+      const day = dayOf(e.at)
+      if (chain && byRef.has(e.ref_id)) {
+        const g = byRef.get(e.ref_id)!
+        g.lines.push(e)
+        g.at = e.at
+        g.status = e.kind
+        continue
+      }
+      if (e.kind === 'automation' && byRef.has(e.ref_id)) {
+        const g = byRef.get(e.ref_id)!
+        g.autoMsg = e.message
+        g.automatic = true
+        g.lines.push(e)
+        continue
+      }
+      const kind: EventGroup['kind'] = e.kind === 'detection' ? 'detection' : e.kind === 'ignored' ? 'ignored' : chain ? 'command' : 'auto'
+      const g: EventGroup = {
+        key: String(e.id), kind, ref: e.ref_id, automatic: false, lines: [e], at: e.at,
+        day: day.label, today: day.today,
+        title: kind === 'detection' ? e.message : kind === 'ignored' ? e.message : kind === 'auto' ? e.message
+          : e.message.startsWith('自动策略触发') ? '自动驱离' : '人工驱离',
+        status: chain ? e.kind : undefined,
+      }
+      if (chain) byRef.set(e.ref_id, g)
+      groups.push(g)
+    }
+    return groups.reverse()
+  })
 
   async function run(action: () => Promise<unknown>) {
     if (store.busy) return
@@ -122,6 +174,32 @@ export function createHost() {
       todayAlarms.value = b.new + b.processing + b.handled + b.ignored
     } catch { todayAlarms.value = 0 }
   }
+  /** A1 分诊台:跳过详情直接弹确认框驱离指定告警 */
+  function quickRepel(id: string) { selectedAlarm.value = id; modal.value = 'mConfirm' }
+  /** S1 自动哨兵:规则/巡逻的读取与变更(错误经 run→toast 呈现) */
+  async function loadAutomation() {
+    const [r, p] = await Promise.all([
+      store.request<{ items: AutoRule[] }>('/automation/rules'),
+      store.request<Patrol>('/automation/patrol'),
+    ])
+    rules.value = r.items
+    patrol.value = p
+  }
+  async function saveRule(patch: Partial<AutoRule>, id?: number) {
+    const row = await store.request<AutoRule>(id ? '/automation/rules/' + id : '/automation/rules', id ? 'PUT' : 'POST', id ? patch : patch as Record<string, unknown>)
+    if (id) rules.value = rules.value.map(r => (r.id === id ? row : r))
+    else rules.value = [...rules.value, row]
+    notify(id ? '规则已更新' : '规则已添加')
+  }
+  async function removeRule(id: number) {
+    await store.request('/automation/rules/' + id, 'DELETE')
+    rules.value = rules.value.filter(r => r.id !== id)
+    notify('规则已删除')
+  }
+  async function savePatrol(patch: Partial<Patrol>) {
+    patrol.value = await store.request<Patrol>('/automation/patrol', 'PUT', patch)
+    notify('巡逻计划已保存')
+  }
   /** 未提交的确认弹窗在切主题时关闭并清理关联(切主题规则表) */
   function resetTransient() {
     if (modal.value === 'mConfirm') { modal.value = ''; selectedAlarm.value = null }
@@ -145,8 +223,10 @@ export function createHost() {
     store, s, page, modal, selectedAlarm, mode, duration, detailId,
     recordMode, archiveTask, archiveTime, archiveNonce, recordFilter,
     preferences, older, historyEnd, fetchedAlarm, fetchedCommand, theme,
-    alarm, command, pending, events, remaining, offline, activeMode, tickerText, todayAlarms,
+    alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
+    rules, patrol,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore,
+    quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
     inspectEvent, loadHistory, refreshToday, resetTransient, setTheme, onForgot, onTokenChange,
   })
   return host

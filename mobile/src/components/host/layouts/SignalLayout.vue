@@ -2,9 +2,9 @@
 // 信号站布局:信号站监控主页 + 其余页(B 版占位,功能完整)+ 信号站 dock
 import { useHost } from '../hostContext'
 import SignalMonitor from '../../theme-pages/SignalMonitor.vue'
-import BAlarmsPage from '../pages/BAlarmsPage.vue'
-import BControlPage from '../pages/BControlPage.vue'
-import BRecordsPage from '../pages/BRecordsPage.vue'
+import SignalAlarmPage from '../../theme-pages/SignalAlarmPage.vue'
+import SignalControlPage from '../../theme-pages/SignalControlPage.vue'
+import SignalRecordsPage from '../../theme-pages/SignalRecordsPage.vue'
 
 const host = useHost()
 const tabs = [
@@ -40,7 +40,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BAlarmsPage /></view>
+    <view class="page__content"><SignalAlarmPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'control' }">
@@ -51,7 +51,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BControlPage /></view>
+    <view class="page__content"><SignalControlPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'records' }">
@@ -62,7 +62,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
-    <view class="page__content"><BRecordsPage /></view>
+    <view class="page__content"><SignalRecordsPage /></view>
   </view>
 
   <!-- 信号站 dock -->

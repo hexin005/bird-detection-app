@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>ui-rc · 三页布局优化预览</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{background:#23231f;color:#e7e5dd;font-family:"PingFang SC",sans-serif;padding:40px 20px}
+.wrap{max-width:860px;margin:0 auto}h1{font-size:24px;letter-spacing:2px}p.lead{color:#999;margin:10px 0 30px;line-height:1.7}
+.diag{background:#2c2c27;border:1px solid #444;padding:18px 20px;margin-bottom:30px;line-height:1.9;font-size:13.5px}
+.diag b{color:#f2d94a}.diag h3{font-size:14px;margin-bottom:8px;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+a.item{display:block;background:#f2f0e9;color:#111;border:2px solid #000;box-shadow:4px 4px 0 #000;padding:16px;text-decoration:none}
+a.item b{font-size:15px}a.item .tag{float:right;font-size:10px;border:1.5px solid #000;padding:1px 6px;font-weight:800}
+a.item p{font-size:12px;color:#555;margin-top:8px;line-height:1.7}a.item .f{font-size:11px;color:#999;margin-top:8px;font-family:monospace}
+</style></head><body><div class="wrap">
+<h1>检测档案 · 告警中心 · 远程控制 — 布局优化预览</h1>
+<p class="lead">风格保持 1-bit 不变,只动布局与信息架构。记录页 3 个变体选 1,告警页 2 选 1,控制页 2 个「去重方向」选 1(这是信息架构决策,不只是样式)。</p>
+<div class="diag"><h3>📋 现状诊断(截图见 .runtime/ui-y-shots/before-*.png)</h3>
+<b>记录页</b>:时间戳黏在标题里("…驱鸟效果2026/11/9");每条流水一张重边框卡,同一指令的确认→执行→回执 3 条重复连排;双层分段控件;视频卡 230px 高一屏 2.5 张;哈希文件名直出。<br>
+<b>告警页</b>:同物种同结果卡片连排,4 张占满一屏无优先级;驱离/忽略必须点进详情;鸟类筛选藏在图标后。<br>
+<b>控制页</b>:内容半屏空;与 A/C/D 首页内嵌控制区(放行条/升降/道具)完全重复 → 显得多余。</div>
+<div class="grid">
+<a class="item" href="records-r1.html"><span class="tag">记录·推荐</span><b>R1 巡逻日志</b><p>按日分组的日志流。同一指令链路(确认→执行→回执)合并为一组,时间戳右对齐,类型方块分拣。信息密度约为现状 3 倍。</p><span class="f">records-r1.html</span></a>
+<a class="item" href="records-r2.html"><span class="tag">记录</span><b>R2 档案抽屉</b><p>视频缩略图 2 列网格 + 哈希文件名转译为「录像 #30」。以视频资产为主角,操作日志退为次层。</p><span class="f">records-r2.html</span></a>
+<a class="item" href="records-r3.html"><span class="tag">记录</span><b>R3 台账</b><p>单容器 zebra 表格,类型章(检测/驱离/忽略)+日分隔,行高 34px,回溯查找最快。</p><span class="f">records-r3.html</span></a>
+<a class="item" href="alarms-a1.html"><span class="tag">告警·推荐</span><b>A1 分诊台</b><p>最新一报升为大卡并内联「驱离/忽略」按钮,更早待处理压成单行,已处理折叠。筛选 chips 常驻不藏。</p><span class="f">alarms-a1.html</span></a>
+<a class="item" href="alarms-a2.html"><span class="tag">告警</span><b>A2 鸟情板</b><p>按物种分栏,一群一卡,组头顶今日计数;同物种连报天然归拢,处理完的组自动沉底。</p><span class="f">alarms-a2.html</span></a>
+<a class="item" href="control-s1.html"><span class="tag">控制·推荐</span><b>S1 自动哨兵(策略层)</b><p>根治重复:首页管「现在这一下」,控制页管「以后每一刻」——自动响应规则+定时巡逻+设备参数迁入。快速驱离保留为紧凑条。<b>需新增后端规则存储</b>。</p><span class="f">control-s1.html</span></a>
+<a class="item" href="control-s2.html"><span class="tag">控制·零后端</span><b>S2 设备台</b><p>设备体检+执行统计+最近执行档案+参数。用现有数据重组,不新增后端。去重效果弱于 S1(快速驱离仍占一席)。</p><span class="f">control-s2.html</span></a>
+</div>
+<p class="lead" style="margin-top:26px">四主题适配:新布局在 B(1-bit)上定型结构与文案,再以 token 换肤 + 各主题装饰复刻到 A/C/D(与监控主页同一套做法)。二期产生的 9 个 A/C/D 三页组件是未接线的骨架(19–54 行),本次实施将按选定方向重写并接线。</p>
+</div></body></html>

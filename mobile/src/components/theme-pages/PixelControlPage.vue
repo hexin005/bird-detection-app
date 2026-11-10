@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useHost, names, clock, shortTime, time, alarmClass } from '../host/hostContext'
 import type { RepelMode } from '../host/hostContext'
+import ControlStrategy from '../host/ControlStrategy.vue'
 
 const host = useHost()
 </script>
 <template>
-  <view style="padding:12px"><b style="font-size:16px;color:#10130c">▶ 放行 · 驱离道具</b></view>
+  <view style="padding:12px"><b style="font-size:16px;color:#10130c">▶ 放行 · 驱离道具</b><span style="font-size:10px;color:#4a5a3e;margin-left:8px">手动单次 · 自动策略见下方</span></view>
   <view class="card">
     <b class="t">选择驱离道具</b>
     <view class="opts">
@@ -21,6 +22,9 @@ const host = useHost()
     <p v-for="c in (host.s?.commands || []).slice(0, 4)" :key="c.id" :style="{ color: c.status === 'completed' ? '#8fe08f' : '#7f8a72' }">▸ {{ shortTime(c.at) }} {{ host.mode === 'acoustic' ? '声波' : host.mode === 'infrared' ? '红外' : '双模' }} · {{ names(c.status) }}</p>
     <p v-if="!(host.s?.commands || []).length" style="color:#7f8a72">暂无使用记录</p>
   </view>
+
+  <!-- 策略层:自动响应规则 / 定时巡逻 / 设备参数(共享组件) -->
+  <ControlStrategy />
 </template>
 <style scoped>
 .card{background:#10130c;border:4px solid #f4f1e4;box-shadow:0 0 0 4px #10130c,0 6px 0 rgba(0,0,0,.45);padding:12px 13px;margin:12px;position:relative}

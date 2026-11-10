@@ -2,9 +2,9 @@
 // 塔台布局:塔台监控主页 + 其余页(B 版占位,功能完整)+ 塔台 dock
 import { useHost } from '../hostContext'
 import TowerMonitor from '../../theme-pages/TowerMonitor.vue'
-import BAlarmsPage from '../pages/BAlarmsPage.vue'
-import BControlPage from '../pages/BControlPage.vue'
-import BRecordsPage from '../pages/BRecordsPage.vue'
+import TowerAlarmPage from '../../theme-pages/TowerAlarmPage.vue'
+import TowerControlPage from '../../theme-pages/TowerControlPage.vue'
+import TowerRecordsPage from '../../theme-pages/TowerRecordsPage.vue'
 
 const host = useHost()
 const tabs = [
@@ -39,7 +39,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41 LCL</text></view>
       </view>
     </view>
-    <view class="page__content"><BAlarmsPage /></view>
+    <view class="page__content"><TowerAlarmPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'control' }">
@@ -50,7 +50,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41 LCL</text></view>
       </view>
     </view>
-    <view class="page__content"><BControlPage /></view>
+    <view class="page__content"><TowerControlPage /></view>
   </view>
 
   <view class="page" :class="{ 'is-current': host.page === 'records' }">
@@ -61,7 +61,7 @@ const tabs = [
         <view class="qh-menubar__right"><text class="time">9:41 LCL</text></view>
       </view>
     </view>
-    <view class="page__content"><BRecordsPage /></view>
+    <view class="page__content"><TowerRecordsPage /></view>
   </view>
 
   <!-- 塔台 dock -->

@@ -166,7 +166,7 @@ function requestRepel() {
 .twr-st { justify-self:end; }
 .twr-flap { display:inline-block; min-width:52px; text-align:center; font-size:10px; font-weight:800; letter-spacing:2px; padding:4px 0 3px; position:relative; }
 .twr-flap::after { content:''; position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(0,0,0,.45); }
-.twr-flap--new { background:#ff4b3e; color:#160b0a; }
+.twr-flap--new { background:#ff4b3e; color:var(--warn-fg); }
 .twr-flap--processing, .twr-flap--running { background:#ffb400; color:#161307; animation:qhBlink 1.4s steps(2) infinite; }
 .twr-flap--handled, .twr-flap--ignored { background:#171c24; color:#5d6672; border:1px solid #2a313c; }
 .twr-empty { padding:18px 10px; text-align:center; font-size:10px; letter-spacing:2px; color:#5d6672; }
