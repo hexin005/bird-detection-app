@@ -61,6 +61,7 @@ export function createHost() {
   const recordsSummary = ref<LibrarySummary | null>(null)
   /** 告警页物种过滤(状态提升到 host:图鉴「查看该鸟告警」等语义动作可外部设置) */
   const alarmSpecies = ref('')
+  const guideSpecies = ref('')
 
   const s = computed(() => store.state)
   const alarm = computed(() => s.value?.alarms.find(a => a.id === detailId.value) || (fetchedAlarm.value?.id === detailId.value ? fetchedAlarm.value : null))
@@ -191,6 +192,10 @@ export function createHost() {
     alarmSpecies.value = name
     nav('alarms')
   }
+  function viewSpeciesGuide(name: string) {
+    guideSpecies.value = name
+    nav('guide')
+  }
   /** S1 自动哨兵:规则/巡逻的读取与变更(错误经 run→toast 呈现) */
   async function loadAutomation() {
     const [r, p] = await Promise.all([
@@ -236,8 +241,8 @@ export function createHost() {
     recordMode, archiveTask, archiveTime, archiveNonce, recordFilter,
     preferences, older, historyEnd, fetchedAlarm, fetchedCommand, theme,
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
-    rules, patrol, recordsSummary, alarmSpecies,
-    run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms,
+    rules, patrol, recordsSummary, alarmSpecies, guideSpecies,
+    run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms, viewSpeciesGuide,
     quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
     inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,
   })

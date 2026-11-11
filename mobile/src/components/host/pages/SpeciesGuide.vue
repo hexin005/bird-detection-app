@@ -30,7 +30,14 @@ async function loadCovers() {
     customImages.value = data.guide_images || []
   } catch { /* 拉不到分组时全部走剪影占位 */ }
 }
-watch(() => host.page, page => { if (page === 'guide') void loadCovers() }, { immediate: true })
+watch(() => [host.page, host.guideSpecies] as const, ([page, species]) => {
+  if (page !== 'guide') return
+  void loadCovers()
+  if (species) {
+    openInfo.value = SPECIES_GUIDE.find(item => item.name === species) || null
+    host.guideSpecies = ''
+  }
+}, { immediate: true })
 
 const hasCustom = (s: SpeciesInfo) => customImages.value.includes(s.name) && !customFailed.value[s.name]
 const coverOf = (s: SpeciesInfo) => hasCustom(s) ? store.media('species-images/' + encodeURIComponent(s.name))

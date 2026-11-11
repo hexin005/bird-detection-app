@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
+from datetime import date, timedelta
 
 from .security import digest, hash_password, verify_password
 
@@ -444,6 +445,7 @@ class Store:
         - 范围:服务器本地时区自然日,含今天,共 days 个日桶;
         - trend = 按天告警事件数(口径=检测告警,非逐帧识别次数),缺失日期补 0;
         - species = 按告警条数 TOP5,不累计鸟只数;
+        - task_trend / bird_trend / bird_species = 已归档视频任务及每场各物种峰值之和;
         - hourly = 范围内所有天按小时聚合 24 桶;
         - breakdown = 范围内告警状态分布;
         - exec = 范围内指令统计,平均启动响应=started_at-at、平均完成耗时=ended_at-at
@@ -451,13 +453,30 @@ class Store:
         """
         now = time.time()
         local = time.localtime(now)
-        midnight = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1))
-        start = midnight - (days - 1) * 86400
+        dates = [(date(local.tm_year, local.tm_mon, local.tm_mday) - timedelta(days=days - 1 - i)).isoformat() for i in range(days)]
+        start_date = dates[0]
+        start = time.mktime(time.strptime(start_date, '%Y-%m-%d'))
+        date_index = {day: i for i, day in enumerate(dates)}
         trend = [0] * days
-        for row in self.rows('SELECT CAST((at-?)/86400 AS INTEGER) b, COUNT(*) n FROM alarms WHERE at>=? GROUP BY b', (start, start)):
-            if 0 <= row['b'] < days:
-                trend[row['b']] = row['n']
+        for row in self.rows("SELECT date(at, 'unixepoch', 'localtime') day, COUNT(*) n FROM alarms WHERE at>=? GROUP BY day", (start,)):
+            if row['day'] in date_index:
+                trend[date_index[row['day']]] = row['n']
         species = self.rows('SELECT species, COUNT(*) count FROM alarms WHERE at>=? GROUP BY species ORDER BY count DESC, species LIMIT 5', (start,))
+        task_trend = [0] * days
+        bird_trend = [0] * days
+        archived = '''FROM tasks t JOIN videos v ON v.id=t.video_id
+            WHERE t.result_ready=1 AND t.at>=?'''
+        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, COUNT(*) n {archived} GROUP BY day", (start,)):
+            if row['day'] in date_index:
+                task_trend[date_index[row['day']]] = row['n']
+        peaks = '''FROM (SELECT s.task_id,s.species,MAX(s.count) peak FROM samples s
+            JOIN tasks t ON t.id=s.task_id JOIN videos v ON v.id=t.video_id
+            WHERE t.result_ready=1 AND t.at>=? GROUP BY s.task_id,s.species) p
+            JOIN tasks t ON t.id=p.task_id'''
+        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, SUM(p.peak) n {peaks} GROUP BY day", (start,)):
+            if row['day'] in date_index:
+                bird_trend[date_index[row['day']]] = row['n']
+        bird_species = self.rows(f'SELECT p.species, SUM(p.peak) count {peaks} GROUP BY p.species ORDER BY count DESC,p.species LIMIT 5', (start,))
         hourly = [0] * 24
         for row in self.rows("SELECT CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms WHERE at>=? GROUP BY h", (start,)):
             if 0 <= row['h'] < 24:
@@ -477,7 +496,8 @@ class Store:
         avg_start = avg('SELECT AVG(started_at-at) avg FROM commands WHERE at>=? AND started_at IS NOT NULL', (start,))
         avg_done = avg("SELECT AVG(ended_at-at) avg FROM commands WHERE at>=? AND status='completed' AND ended_at IS NOT NULL", (start,))
         dual = self.rows("SELECT COUNT(*) n FROM commands WHERE at>=? AND status='completed' AND mode='both'", (start,))[0]['n']
-        return {'range_days': days, 'trend': trend, 'species': species, 'hourly': hourly,
+        return {'range_days': days, 'dates': dates, 'trend': trend, 'species': species, 'hourly': hourly,
+                'task_trend': task_trend, 'bird_trend': bird_trend, 'bird_species': bird_species,
                 'breakdown': breakdown,
                 'exec': {'total': total, 'completed': completed, 'failed': failed,
                          'avg_start_seconds': avg_start, 'avg_done_seconds': avg_done,

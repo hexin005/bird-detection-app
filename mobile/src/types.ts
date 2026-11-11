@@ -8,7 +8,11 @@ export type Patrol = { user_id: number; enabled: number; start_minute: number; e
 export type Me = { username: string; display_name: string; email: string | null; avatar: string | null; theme: 'b1bit' | 'tower' | 'signal' | 'pixel' }
 export type Stats = {
   range_days: number
+  dates: string[]
   trend: number[]
+  task_trend: number[]
+  bird_trend: number[]
+  bird_species: { species: string; count: number }[]
   species: { species: string; count: number }[]
   hourly: number[]
   breakdown: { new: number; processing: number; handled: number; ignored: number }

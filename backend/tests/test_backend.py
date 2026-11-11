@@ -457,6 +457,10 @@ class StatsApiTests(unittest.TestCase):
         data = self.client.get('/api/stats?range=7d', headers=self.headers).json()
         self.assertEqual(len(data['trend']), 7)
         self.assertEqual(data['trend'], [0] * 7)
+        self.assertEqual(data['task_trend'], [0] * 7)
+        self.assertEqual(data['bird_trend'], [0] * 7)
+        self.assertEqual(data['bird_species'], [])
+        self.assertEqual(len(data['dates']), 7)
         self.assertEqual(len(data['hourly']), 24)
         self.assertEqual(data['breakdown'], {'new': 0, 'processing': 0, 'handled': 0, 'ignored': 0})
         self.assertEqual(data['exec']['total'], 0)
@@ -488,6 +492,34 @@ class StatsApiTests(unittest.TestCase):
         month = self.client.get('/api/stats?range=30d', headers=self.headers).json()
         self.assertEqual(len(month['trend']), 30)
         self.assertEqual(self.client.get('/api/stats?range=1h', headers=self.headers).status_code, 422)
+
+    def test_archived_task_peaks_drive_daily_series_and_species_ranking(self):
+        def video_task(task_id, when, ready, species):
+            with self.store.tx() as db:
+                db.execute('INSERT INTO videos (id,name,path,duration,fps,at) VALUES (?,?,?,?,?,?)',
+                           ('v-' + task_id, task_id, 'unused.mp4', 10, 25, when))
+                db.execute('INSERT INTO tasks (id,status,at,video_id,result_ready) VALUES (?,?,?,?,?)',
+                           (task_id, 'ended' if ready else 'running', when, 'v-' + task_id, int(ready)))
+                db.executemany('INSERT INTO samples VALUES (?,?,?,?,?,?)',
+                               [(task_id, name, i, count, .9, i) for i, (name, count) in enumerate(species)])
+
+        now = time.localtime()
+        midnight = time.mktime((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0, 0, 0, -1))
+        yesterday = time.mktime((now.tm_year, now.tm_mon, now.tm_mday, 12, 0, 0, 0, 0, -1)) - 86400
+        video_task('yesterday', yesterday, True, [('八哥', 2), ('八哥', 1), ('树麻雀', 3)])
+        video_task('today', midnight + 60, True, [('八哥', 4), ('树麻雀', 1)])
+        video_task('running', midnight + 120, False, [('八哥', 50)])
+        video_task('empty', midnight + 180, True, [])
+        self.store.alarm('today', '八哥', 1, .9, 'a.jpg', 0, 1, 0)
+        stats = self.client.get('/api/stats?range=7d', headers=self.headers).json()
+        self.assertEqual(stats['task_trend'][-2:], [1, 2])
+        self.assertEqual(stats['bird_trend'][-2:], [5, 5])
+        self.assertEqual(stats['trend'][-1], 1)
+        self.assertEqual(stats['bird_species'], [{'species': '八哥', 'count': 6}, {'species': '树麻雀', 'count': 4}])
+        today = self.client.get('/api/stats?range=today', headers=self.headers).json()
+        self.assertEqual(today['task_trend'], [2])
+        self.assertEqual(today['bird_trend'], [5])
+        self.assertEqual(today['bird_species'], [{'species': '八哥', 'count': 4}, {'species': '树麻雀', 'count': 1}])
 
 
 class AutomationTests(unittest.TestCase):

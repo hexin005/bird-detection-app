@@ -441,6 +441,54 @@
 .qh-an-sub { font-size:10px; color:var(--ink-500); margin-top:7px; }
 .qh-an-sub b { font-family:var(--font-num); }
 
+/* B 主题 · 一检一记分析页 */
+.qh-an-export { border:2px solid var(--ink-900);background:var(--surface-card);color:var(--ink-900);box-shadow:2px 2px 0 var(--shadow-ink);padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap; }
+.qh-an-export:disabled { opacity:.5; }
+.qh-an-hero { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:8px 14px;border:2px solid var(--ink-900);background:var(--surface-card);box-shadow:4px 4px 0 var(--shadow-ink); }
+.qh-an-hero > div { min-width:0;text-align:center;padding:11px 1px 8px; }
+.qh-an-hero > div + div { border-left:2px solid var(--ink-900); }
+.qh-an-hero b { display:block;font-family:var(--font-num);font-size:20px;line-height:1.2;color:var(--ink-900); }
+.qh-an-hero text { display:block;font-size:9px;white-space:nowrap;color:var(--ink-500); }
+.qh-an-chips { display:flex;margin:12px 14px;border:2px solid var(--ink-900);background:var(--surface-card); }
+.qh-an-chips button { flex:1;margin:0;border:0;border-radius:0;padding:6px 1px;background:transparent;color:var(--ink-500);font-size:12px;font-weight:700; }
+.qh-an-chips button + button { border-left:2px solid var(--ink-900); }
+.qh-an-chips button.on { background:var(--ink-900);color:var(--surface-card); }
+.qh-an-chartlegend { display:flex;gap:14px;font-size:10px;font-weight:700;color:var(--ink-800); }
+.qh-an-chartlegend i { display:inline-block;width:11px;height:11px;border:2px solid var(--ink-900);vertical-align:-2px;margin-right:4px;background:var(--ink-900); }
+.qh-an-chartlegend text + text i { background:var(--dither-dark);background-size:5px 5px; }
+.qh-an-chart { display:flex;align-items:flex-end;height:118px;border-bottom:2px solid var(--ink-900);gap:2px;margin-top:8px; }
+.qh-an-day { flex:1;min-width:0;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:0;margin:0;border:0;border-radius:0;background:transparent;cursor:pointer; }
+.qh-an-day.is-selected { background:var(--dither-light); }
+.qh-an-column { width:min(9px,40%);display:block;background:var(--ink-900);transform-origin:bottom; }
+.qh-an-column--birds { background:var(--dither-dark);background-size:5px 5px;border:1px solid var(--ink-900); }
+.qh-an-dates { display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-num);font-size:9px;color:var(--ink-400); }
+.qh-an-chart.is-month .qh-an-day { gap:0; }
+.qh-an-chart.is-month .qh-an-column { width:45%; }
+.qh-an-birdbars .nm { background:transparent;border:0;padding:0;color:var(--ink-900);text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px; }
+.qh-an-birdbars .nm:disabled { cursor:default; }
+.qh-an-hourchart { display:flex;align-items:flex-end;gap:2px;height:64px;border-bottom:2px solid var(--ink-900);margin-top:10px; }
+.qh-an-hourchart button { flex:1;min-width:0;padding:0;margin:0;border:0;border-radius:0;background:var(--ink-500);transform-origin:bottom;cursor:pointer; }
+.qh-an-hourchart button.is-peak { background:var(--ink-900); }
+.qh-an-hourchart button.is-selected { background:var(--accent);outline:2px solid var(--ink-900); }
+.qh-an-bignums--four > div { min-width:0;padding:8px 1px; }
+.qh-an-bignums--four b { font-size:16px; }
+.qh-an-sheet { padding:12px; }
+.qh-an-sheetlabel { display:block;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--ink-500);margin:10px 0 5px; }
+.qh-an-exportoption { width:100%;display:flex;align-items:center;justify-content:space-between;gap:4px;border:2px solid var(--ink-900);border-radius:0;margin:0 0 6px;padding:8px;background:var(--surface-card);color:var(--ink-900);font-size:11px;font-weight:700;text-align:left; }
+.qh-an-exportoption text { font-size:9px;font-weight:400; }
+.qh-an-exportoption.is-on { background:var(--ink-900);color:var(--surface-card); }
+.qh-an-exportsubmit { margin:12px 0 6px;width:100%; }
+@media (prefers-reduced-motion:no-preference) {
+  .qh-an-hero.is-animated b { animation:qhAnAppear .6s ease-out both; }
+  .qh-an-chart.is-animated .qh-an-column,.qh-an-hourchart.is-animated button { animation:qhAnGrow .65s cubic-bezier(.22,.61,.36,1) both; }
+  .qh-an-birdbars.is-animated .fl { animation:qhAnWiden .7s cubic-bezier(.22,.61,.36,1) both; }
+  .qh-an-hourchart.is-animated button.is-peak { animation:qhAnGrow .65s both,qhAnPeak 1.5s steps(2) infinite 1s; }
+}
+@keyframes qhAnAppear { from { opacity:0;transform:translateY(5px); } to { opacity:1;transform:translateY(0); } }
+@keyframes qhAnGrow { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+@keyframes qhAnWiden { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes qhAnPeak { 50% { opacity:.5; } }
+
 /* ==========================================================================
    登录/注册/找回(AuthView)
    ========================================================================== */
