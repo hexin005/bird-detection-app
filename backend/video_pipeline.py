@@ -1,5 +1,6 @@
 import os
 import contextlib
+import json
 import shutil
 import subprocess
 import time
@@ -14,11 +15,34 @@ def encoder_path():
     return os.getenv('BIRD_FFMPEG') or shutil.which('ffmpeg') or ''
 
 
+def build_task_summary(store, task_id, status):
+    """任务完成时的复现快照(WS last_task):物种×峰值 + 每物种首条告警 bbox,供 3D 场景按结果落鸟。
+    仅存于后端内存(重启不恢复,场景不自动复现旧任务);无检出/无档案的任务返回 None。"""
+    rows = store.rows('SELECT t.status,t.duration,v.name FROM tasks t JOIN videos v ON v.id=t.video_id WHERE t.id=?', (task_id,))
+    if not rows:
+        return None
+    species_rows = store.rows('SELECT species,MAX(count) peak FROM samples WHERE task_id=? GROUP BY species', (task_id,))
+    if not species_rows:
+        return None
+    conf = {r['species']: r['conf'] for r in store.rows('SELECT species,MAX(confidence) conf FROM alarms WHERE task_id=? GROUP BY species', (task_id,))}
+    boxes = {}
+    for row in store.rows('SELECT species,bbox FROM alarms WHERE task_id=? AND bbox IS NOT NULL ORDER BY video_time', (task_id,)):
+        boxes.setdefault(row['species'], row['bbox'])
+    species = []
+    for row in species_rows:
+        raw = boxes.get(row['species'])
+        bbox = json.loads(raw) if raw else None
+        species.append({'species': row['species'], 'peak': row['peak'], 'confidence': conf.get(row['species']), 'bbox': bbox})
+    return {'task_id': task_id, 'status': status, 'at': time.time(), 'name': rows[0]['name'],
+            'duration': rows[0]['duration'], 'total': sum(s['peak'] for s in species), 'species': species}
+
+
 class VideoPipeline(VideoMonitor):
     def __init__(self, settings, store):
         super().__init__(settings, store)
         self.library = VideoLibrary(settings, store)
         self.selected = None
+        self.last_task = None
 
     def start(self, video_id=None):
         with self.lock:
@@ -163,6 +187,8 @@ class VideoPipeline(VideoMonitor):
                 if completed.returncode or not result.is_file():
                     raise RuntimeError('结果视频合成失败；已生成片段仍可回看')
                 self.library.progress(task_id, 100 if status == 'ended' else min(99, frame_no/fps/video['duration']*100), True)
+            if status in ('ended', 'stopped'):
+                self.last_task = build_task_summary(self.store, task_id, status)
             self.set_status(status, message)
         except Exception as exc:
             self.set_status('error', f'视频处理失败：{str(exc)[:200]}')

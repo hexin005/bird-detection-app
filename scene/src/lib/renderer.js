@@ -32,12 +32,14 @@ import {
   createAlarmMarker,
   mulberry32,
 } from './orchard.js'
+import { createTerrain, createCrops } from './terrain.js'
+import { NODES, STATIONS, STATION_LABEL, nearestNode, bfsPath, nodePoints, neighborsOf } from './patrol.js'
 
 
 const MAX_BIRDS = 6
 
 export function createOrchardScene(canvas, options = {}) {
-  const { onReady, onCrewAlertReady, onCrewArrived, onAutoRotateChange } = options
+  const { onReady, onCrewAlertReady, onCrewArrived, onCrewReturned, onAutoRotateChange } = options
 
   /* ---------- 基础三件套 ---------- */
   const renderer = new THREE.WebGLRenderer({
@@ -56,9 +58,9 @@ export function createOrchardScene(canvas, options = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(PALETTE.sky)
-  scene.fog = new THREE.Fog(PALETTE.fog, 65, 145)
+  scene.fog = new THREE.Fog(PALETTE.fog, 80, 190)
 
-  const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 260)
+  const camera = new THREE.PerspectiveCamera(46, 1, 0.5, 260)
   // 正对果园中心，带一定俯视角度，让果树、摄像头、驱鸟器都进画面
   camera.position.set(26, 24, 37)
   camera.lookAt(0, 1.45, 0)
@@ -68,13 +70,15 @@ export function createOrchardScene(canvas, options = {}) {
   controls.enableDamping = true
   controls.dampingFactor = 0.06
   controls.minDistance = 9
-  controls.maxDistance = 58
+  controls.maxDistance = 92
   controls.maxPolarAngle = Math.PI * 0.475
   controls.minPolarAngle = Math.PI * 0.12
   controls.autoRotate = false
   controls.autoRotateSpeed = 0.18
   controls.enablePan = false
   controls.update()
+  // CDP 验证钩子:俯视/全景截图与阶段 2 巡逻调试用
+  if (typeof window !== 'undefined') window.__orchardView = { camera, controls, scene }
 
   // 克制的辉光只托起检测框和驱鸟设备指示灯，保留果园材质与鸟体细节。
   const composer = new EffectComposer(renderer)
@@ -91,14 +95,14 @@ export function createOrchardScene(canvas, options = {}) {
   const sun = new THREE.DirectionalLight(0xffdfae, 2.15)
   sun.position.set(-18, 26, 16)
   sun.castShadow = true
-  sun.shadow.mapSize.set(compactDevice ? 1024 : 2048, compactDevice ? 1024 : 2048)
+  sun.shadow.mapSize.set(compactDevice ? 1024 : 4096, compactDevice ? 1024 : 4096)
   sun.shadow.normalBias = 0.035
   sun.shadow.camera.near = 1
-  sun.shadow.camera.far = 70
-  sun.shadow.camera.left = -26
-  sun.shadow.camera.right = 26
-  sun.shadow.camera.top = 26
-  sun.shadow.camera.bottom = -26
+  sun.shadow.camera.far = 130
+  sun.shadow.camera.left = -50
+  sun.shadow.camera.right = 50
+  sun.shadow.camera.top = 50
+  sun.shadow.camera.bottom = -50
   sun.shadow.bias = -0.0012
   scene.add(sun)
 
@@ -143,6 +147,8 @@ export function createOrchardScene(canvas, options = {}) {
   const rand = mulberry32(20261105)
   const ground = createGround(rand)
   scene.add(ground)
+  scene.add(createTerrain(rand))
+  scene.add(createCrops(rand))
 
   // 远景林带（低多边形树环绕，增加纵深）
   const treeGroup = new THREE.Group()
@@ -170,12 +176,20 @@ export function createOrchardScene(canvas, options = {}) {
     }
   }
 
-  // 外围林带
-  for (let i = 0; i < 26; i += 1) {
-    const angle = (i / 26) * Math.PI * 2 + rand() * 0.2
-    const radius = 24 + rand() * 7
+  // 外围林带:外移至 ±44~48,避开田块/路廊/大门走廊(布局图 v1)
+  const beltBlocks = (x, z) =>
+    (x > -49 && x < -21 && z > -47 && z < -15) ||   // 麦田+过渡
+    (x > 21 && x < 49 && z > -16 && z < 16) ||      // 菜地+过渡
+    (Math.abs(z + 20.5) < 3 && x < -20) ||          // 西北支路
+    (Math.abs(z) < 3 && x > 20) ||                  // 东支路
+    (Math.abs(x) < 3.5 && z > 20)                   // 南向土路延伸
+  for (let i = 0; i < 40; i += 1) {
+    const angle = (i / 40) * Math.PI * 2 + rand() * 0.16
+    const radius = 43.5 + rand() * 4.5
     const x = Math.cos(angle) * radius
     const z = Math.sin(angle) * radius
+    if (beltBlocks(x, z)) continue
+    if (!tryPlace(x, z, 4.2)) continue
     const tree = createTree(rand, 0.85 + rand() * 0.5)
     tree.position.set(x, 0, z)
     tree.rotation.y = rand() * Math.PI * 2
@@ -228,9 +242,9 @@ export function createOrchardScene(canvas, options = {}) {
 
   /* ---------- 果农协作组：待命在房屋内，发现鸟后经大门进入果园 ---------- */
   const crew = [
-    { name: '巡园果农', role: 'inspect', home: houseInterior(-0.45), muster: [-0.82, 0, 14.15], task: [-6.1, 0, -2.3], lookAt: [-4.2, 0, -2.3], shirt: 0x668452, hat: 0xc6a66d },
-    { name: '红外设备员', role: 'infrared', home: houseInterior(0.15), muster: [0, 0, 14.15], task: [8.0, 0, 9.2], lookAt: [8.35, 0, 8.85], shirt: 0x4f7e86, hat: 0xb58e59 },
-    { name: '声波设备员', role: 'acoustic', home: houseInterior(0.75), muster: [0.82, 0, 14.15], task: [11.15, 0, -2], lookAt: [11.8, 0, -2], shirt: 0xa56b48, hat: 0xd1b171 },
+    { name: '巡园果农', role: 'inspect', home: houseInterior(-0.45), muster: [-0.82, 0, 14.15], task: [-6.1, 0, -2.3], lookAt: [-4.2, 0, -2.3], shirt: 0x668452, hat: 0xc6a66d, speed: 0.95, gaitOffset: 0.4, stationLabel: STATION_LABEL.orchard },
+    { name: '红外设备员', role: 'infrared', home: houseInterior(0.15), muster: [0, 0, 14.15], task: [8.0, 0, 9.2], lookAt: [8.35, 0, 8.85], shirt: 0x4f7e86, hat: 0xb58e59, speed: 0.85, gaitOffset: 2.1, stationLabel: STATION_LABEL.wheat },
+    { name: '声波设备员', role: 'acoustic', home: houseInterior(0.75), muster: [0.82, 0, 14.15], task: [11.15, 0, -2], lookAt: [11.8, 0, -2], shirt: 0xa56b48, hat: 0xd1b171, speed: 0.9, gaitOffset: 4.3, stationLabel: STATION_LABEL.veg },
   ]
   crew.forEach((person) => {
     person.mesh = createFarmer({ shirt: person.shirt, hat: person.hat })
@@ -466,26 +480,32 @@ export function createOrchardScene(canvas, options = {}) {
     offline: false,
     detTime: 0,
     repelMode: 'both',   // acoustic | infrared | both：驱离方式，决定点亮哪些设备动效
-    crewPhase: 'home',
+    crewPhase: 'patrol', // patrol=分区巡逻(常驻空闲态) alert/working/positioned/actuating/waiting/returning=响应流程
     night: false,        // 昼夜光照的夜间标志:设备灯/束流在暗景中增强
   }
 
-  const crewMotion = { phase: '', started: 0, duration: 0, paths: [], alertReadySent: false, arrivalSent: false }
+  const crewMotion = { phase: '', started: 0, duration: 0, durations: [], paths: [], alertReadySent: false, arrivalSent: false, returnedSent: false }
   const worldUp = new THREE.Vector3(0, 1, 0)
 
+  /** 响应行进:从当前位置沿路点图 BFS 到集结点(距离定时长,不再用固定秒数) */
   function makeCrewRoute(person, phase) {
     const start = person.mesh.position.clone()
     if (phase === 'alert') {
-      if (!person.mesh.visible) start.set(...person.home)
-      return [
-        start,
-        houseDoorInside.clone(),
-        houseDoorOutside.clone(), // 从正门离开房屋
-        new THREE.Vector3(3.4, 0, 18.35), // 沿围栏外侧走向大门
-        new THREE.Vector3(0, 0, 18.35),
-        new THREE.Vector3(person.muster[0], 0, 16.05), // 从唯一大门进入
-        new THREE.Vector3(...person.muster),
-      ]
+      if (!person.mesh.visible) {
+        start.set(...person.home)
+        return [
+          start,
+          houseDoorInside.clone(),
+          houseDoorOutside.clone(),
+          new THREE.Vector3(3.4, 0, 18.35),
+          new THREE.Vector3(0, 0, 18.35),
+          new THREE.Vector3(person.muster[0], 0, 16.05),
+          new THREE.Vector3(...person.muster),
+        ]
+      }
+      const from = nearestNode(start.x, start.z)
+      const ids = bfsPath(from, 'o6')
+      return [start, ...nodePoints(ids).map((p) => new THREE.Vector3(p.x, 0, p.z)), new THREE.Vector3(...person.muster)]
     }
     if (phase === 'working') {
       const enabled = person.role === 'inspect'
@@ -500,18 +520,19 @@ export function createOrchardScene(canvas, options = {}) {
       return [start, ...lane, new THREE.Vector3(...person.task)]
     }
     if (phase === 'returning') {
-      return [
-        start,
-        new THREE.Vector3(...person.muster),
-        new THREE.Vector3(person.muster[0], 0, 16.05),
-        new THREE.Vector3(0, 0, 18.35),
-        new THREE.Vector3(3.4, 0, 18.35),
-        houseDoorOutside.clone(),
-        houseDoorInside.clone(),
-        new THREE.Vector3(...person.home),
-      ]
+      // 沿路点图返回所属巡逻区,走到驻点节点后恢复巡逻(不再回小屋消失)
+      const from = nearestNode(start.x, start.z)
+      const station = STATIONS[person.role]
+      const ids = bfsPath(from, station)
+      return [start, ...nodePoints(ids).map((p) => new THREE.Vector3(p.x, 0, p.z))]
     }
     return [start]
+  }
+
+  function routeLength(points) {
+    let total = 0
+    for (let i = 1; i < points.length; i += 1) total += points[i - 1].distanceTo(points[i])
+    return total
   }
 
   function routePoint(points, progress) {
@@ -536,17 +557,22 @@ export function createOrchardScene(canvas, options = {}) {
   function beginCrewPhase(phase, elapsed) {
     crewMotion.phase = phase
     crewMotion.started = elapsed
-    crewMotion.duration = phase === 'alert' ? 4.2 : phase === 'working' ? 3.4 : phase === 'returning' ? 5.4 : 0
     crewMotion.paths = []
+    crewMotion.durations = []
+    crewMotion.duration = 0
     crewMotion.alertReadySent = false
     crewMotion.arrivalSent = false
+    crewMotion.returnedSent = false
+    // 响应步速:集结小跑 2.6 / 前往作业 1.6 / 返回巡逻区 1.8(巡逻闲速见 person.speed)
+    const speed = phase === 'alert' ? 2.6 : phase === 'working' ? 1.6 : phase === 'returning' ? 1.8 : 0
     crew.forEach((person) => {
-      const isHome = phase === 'home'
-      person.mesh.visible = !isHome
+      person.mesh.visible = phase !== 'home'
       person.mesh.userData.exclamation.visible = phase === 'alert'
-      if (phase === 'alert' && !person.mesh.visible) person.mesh.position.set(...person.home)
       const path = makeCrewRoute(person, phase)
       crewMotion.paths.push(path)
+      const dur = routeLength(path) / (speed || 1)
+      crewMotion.durations.push(dur)
+      crewMotion.duration = Math.max(crewMotion.duration, dur)
       if (phase === 'working' && path.length > 1) {
         person.trail.geometry.dispose()
         person.trail.geometry = new THREE.BufferGeometry().setFromPoints(path.map((point) => point.clone().setY(0.12)))
@@ -556,15 +582,81 @@ export function createOrchardScene(canvas, options = {}) {
     })
   }
 
+  /** 巡逻:每人独立在所属区域路点环上随机走动,停留时环顾四周 */
+  function patrolTick(person, elapsed) {
+    const mesh = person.mesh
+    if (!person.patrol) {
+      const node = STATIONS[person.role]
+      const n = NODES[node]
+      mesh.position.set(n.x, 0, n.z)
+      person.patrol = { node, last: null, leg: null, waitUntil: elapsed + 0.5 + Math.random() * 2 }
+    }
+    const p = person.patrol
+    if (p.leg) {
+      const t = Math.min((elapsed - p.leg.started) / p.leg.duration, 1)
+      const prev = mesh.position.clone()
+      mesh.position.copy(routePoint(p.leg.path, t))
+      const dx = mesh.position.x - prev.x
+      const dz = mesh.position.z - prev.z
+      if (Math.abs(dx) + Math.abs(dz) > 0.0001) mesh.rotation.y = Math.atan2(dx, dz)
+      const gait = Math.sin(elapsed * 9 + person.gaitOffset)
+      mesh.position.y = Math.abs(gait) * 0.05
+      mesh.userData.legs.forEach((leg, li) => { leg.rotation.x = (li === 0 ? 1 : -1) * gait * 0.46 })
+      mesh.userData.arms.forEach((arm, ai) => { arm.rotation.x = (ai === 0 ? -1 : 1) * gait * 0.3; arm.rotation.z = 0 })
+      if (t >= 1) {
+        p.last = p.node
+        p.node = p.leg.to
+        p.leg = null
+        p.waitUntil = elapsed + 2 + Math.random() * 2.5
+      }
+      return
+    }
+    const n = NODES[p.node]
+    mesh.position.set(n.x, 0, n.z)
+    mesh.userData.legs.forEach((leg) => { leg.rotation.x = 0 })
+    mesh.userData.arms.forEach((arm) => { arm.rotation.x = 0; arm.rotation.z = 0 })
+    // 停留环顾:身体缓慢左右转
+    mesh.rotation.y += Math.sin(elapsed * 0.6 + person.gaitOffset * 2) * 0.004
+    if (elapsed >= p.waitUntil) {
+      const to = neighborsOf(p.node, p.last)[Math.floor(Math.random() * neighborsOf(p.node, p.last).length)]
+      const toN = NODES[to]
+      const len = Math.hypot(toN.x - n.x, toN.z - n.z)
+      p.leg = { path: [new THREE.Vector3(n.x, 0, n.z), new THREE.Vector3(toN.x, 0, toN.z)], started: elapsed, duration: len / person.speed, to }
+    }
+  }
+
   function updateCrew(elapsed) {
+    if (visual.crewPhase === 'patrol' || visual.crewPhase === 'home') {
+      // 响应流程结束回到巡逻:从当前位置最近节点续走,不瞬移回旧节点
+      if (crewMotion.phase !== 'patrol' && crewMotion.phase !== '') {
+        crewMotion.phase = 'patrol'
+        crew.forEach((person) => {
+          if (person.patrol) {
+            person.patrol.node = nearestNode(person.mesh.position.x, person.mesh.position.z)
+            person.patrol.leg = null
+            person.patrol.waitUntil = elapsed + 1 + Math.random() * 2
+          }
+        })
+      }
+      crew.forEach((person) => {
+        person.mesh.visible = true
+        person.mesh.userData.exclamation.visible = false
+        person.trail.visible = false
+        patrolTick(person, elapsed)
+      })
+      return
+    }
     if (crewMotion.phase !== visual.crewPhase) beginCrewPhase(visual.crewPhase, elapsed)
-    const moving = crewMotion.duration > 0 && elapsed - crewMotion.started < crewMotion.duration
-    const raw = crewMotion.duration ? Math.min((elapsed - crewMotion.started) / crewMotion.duration, 1) : 1
-    const progress = raw * raw * (3 - 2 * raw)
+    let anyMoving = false
+    let allSettled = true
     crew.forEach((person, index) => {
       const mesh = person.mesh
       if (!mesh.visible) return
       const path = crewMotion.paths[index]
+      const dur = crewMotion.durations[index] || 0
+      const moving = dur > 0 && elapsed - crewMotion.started < dur
+      const raw = dur ? Math.min((elapsed - crewMotion.started) / dur, 1) : 1
+      const progress = raw * raw * (3 - 2 * raw)
       const previous = mesh.position.clone()
       if (moving && path?.length > 1) mesh.position.copy(routePoint(path, progress))
       if (moving && path?.length > 1) {
@@ -597,15 +689,20 @@ export function createOrchardScene(canvas, options = {}) {
       })
       const marker = mesh.userData.exclamation
       if (marker.visible) marker.position.y = 2.42 + Math.sin(elapsed * 4.5 + index) * 0.08
-      if (visual.crewPhase === 'returning' && !moving) mesh.visible = false
+      if (moving) anyMoving = true
+      if (dur > 0 && moving) allSettled = false
     })
-    if (visual.crewPhase === 'alert' && !moving && !crewMotion.alertReadySent) {
+    if (visual.crewPhase === 'alert' && !anyMoving && !crewMotion.alertReadySent) {
       crewMotion.alertReadySent = true
       if (onCrewAlertReady) onCrewAlertReady()
     }
-    if (visual.crewPhase === 'working' && !moving && !crewMotion.arrivalSent) {
+    if (visual.crewPhase === 'working' && !anyMoving && !crewMotion.arrivalSent) {
       crewMotion.arrivalSent = true
       if (onCrewArrived) onCrewArrived()
+    }
+    if (visual.crewPhase === 'returning' && allSettled && !crewMotion.returnedSent) {
+      crewMotion.returnedSent = true
+      if (onCrewReturned) onCrewReturned()
     }
   }
 
@@ -896,7 +993,7 @@ export function createOrchardScene(canvas, options = {}) {
   if (onReady) onReady({ scene, camera, renderer, controls })
 
   /* ---------- 对外接口 ---------- */
-  return {
+  const api = {
     /** 注入最新业务状态 */
     setState({ running, detections, alarms, executing, offline, detTime, snapshots, server, ticket, repelMode, crewPhase }) {
       visual.running = !!running
@@ -974,7 +1071,18 @@ export function createOrchardScene(canvas, options = {}) {
     },
     /** 供开发验证读取果农演示状态，不参与业务数据持久化。 */
     crewState() {
-      return { phase: crewMotion.phase, people: crew.map((person) => ({ name: person.name, visible: person.mesh.visible, position: person.mesh.position.toArray(), alert: person.mesh.userData.exclamation.visible })) }
+      return {
+        phase: crewMotion.phase,
+        motionDuration: +crewMotion.duration.toFixed(2),
+        people: crew.map((person) => ({
+          name: person.name,
+          visible: person.mesh.visible,
+          position: person.mesh.position.toArray(),
+          alert: person.mesh.userData.exclamation.visible,
+          station: person.stationLabel,
+          region: person.patrol ? (STATION_LABEL[NODES[person.patrol.node].r] || person.stationLabel) : person.stationLabel,
+        })),
+      }
     },
     /** 清空居留鸟群（重新开始检测时调用） */
     clearOccupants() {
@@ -1010,7 +1118,7 @@ export function createOrchardScene(canvas, options = {}) {
     },
     /** 重置视角（回到俯瞰全景，保留环绕选择） */
     resetView() {
-      flightPosition.set(26, 24, 37)
+      flightPosition.set(34, 30, 50)
       flightTarget.set(0, 1.45, 0)
       cameraFlight = true
     },
@@ -1062,4 +1170,10 @@ export function createOrchardScene(canvas, options = {}) {
       renderer.dispose()
     },
   }
+  // CDP 调试/验收钩子:停飞行动画、定位、场景图检查
+  if (typeof window !== 'undefined') {
+    window.__orchardApi = api
+    window.__orchardApi.__stopFlight = () => { cameraFlight = null }
+  }
+  return api
 }

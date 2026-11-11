@@ -70,6 +70,33 @@ class LibraryTests(unittest.TestCase):
         row=self.lib.summary()
         self.assertEqual(row['tasks_total'],2);self.assertEqual(row['birds_total'],6)
 
+    def test_build_task_summary_peaks_bbox_and_empty_task(self):
+        # 场景复现快照:物种×峰值 + 每物种首条告警 bbox(解析为列表);无检出/不存在 → None
+        from backend.video_pipeline import build_task_summary
+        self.lib.samples('task-1',[{'species':'八哥','confidence':.9},{'species':'八哥','confidence':.8},{'species':'树麻雀','confidence':.95}],1,30)
+        self.store.alarm('task-1','八哥',2,.9,'a.jpg',1,30,20,bbox=[10,20,60,80])
+        summary=build_task_summary(self.store,'task-1','ended')
+        self.assertEqual(summary['status'],'ended');self.assertEqual(summary['total'],3)
+        self.assertEqual(summary['name'],'多鸟录像');self.assertEqual(summary['duration'],20)
+        by={s['species']:s for s in summary['species']}
+        self.assertEqual(by['八哥']['peak'],2);self.assertEqual(by['树麻雀']['peak'],1)
+        self.assertEqual(by['八哥']['bbox'],[10,20,60,80]);self.assertIsNone(by['树麻雀']['bbox'])
+        self.assertIsNone(build_task_summary(self.store,'missing','ended'))
+        # 无检出任务:不需要场景复现
+        with self.store.tx() as db:
+            db.execute("INSERT INTO videos (id,name,path,duration,fps,at) VALUES ('v-empty','空','e.mp4',5,25,3)")
+        self.store.task('task-empty','ended');self.lib.attach('task-empty',self.lib.video('v-empty'))
+        self.assertIsNone(build_task_summary(self.store,'task-empty','ended'))
+
+    def test_pipeline_snapshot_carries_last_task_field(self):
+        # 快照带 last_task 字段(默认 None;由 VideoPipeline 在任务 ended/stopped 时写入)
+        from backend.video_pipeline import build_task_summary
+        self.lib.samples('task-1',[{'species':'八哥','confidence':.9}],1,30)
+        self.store.alarm('task-1','八哥',1,.9,'a.jpg',1,30,20,bbox=[10,20,60,80])
+        summary=build_task_summary(self.store,'task-1','ended')
+        self.assertEqual(summary['total'],1)
+        self.assertEqual(summary['species'][0]['bbox'],[10,20,60,80])
+
 
 class VideoApiTests(unittest.TestCase):
     def setUp(self):
@@ -86,7 +113,9 @@ class VideoApiTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/videos',content=b'x').status_code,401)
         self.assertEqual(self.client.post('/api/videos',content=b'x',headers={**self.headers,'X-Filename':'test.exe'}).status_code,415)
         self.assertEqual(self.client.post('/api/videos',content=b'invalid',headers=self.headers).status_code,409)
-        self.assertEqual(list((Path(self.tmp.name)/'videos').iterdir()),[])
+        video_root = Path(self.tmp.name) / 'videos'
+        self.assertEqual([path for path in video_root.iterdir() if path.is_file()], [])
+        self.assertFalse((video_root / 'result').exists())
 
     def test_same_video_content_is_registered_once_and_completed_analysis_is_rejected(self):
         import cv2
@@ -108,7 +137,84 @@ class VideoApiTests(unittest.TestCase):
         library.progress('finished', 100, True)
         with self.assertRaisesRegex(Conflict, '已经识别'):
             library.already_processed(second)
-        self.assertEqual(library.jobs, Path(self.tmp.name) / 'video' / 'result')
+        self.assertEqual(library.jobs, Path(self.tmp.name) / 'jobs')
+        self.assertTrue(library.jobs.is_dir())
+
+    def test_upload_reuses_identical_file_already_in_video_directory(self):
+        import cv2
+        import numpy as np
+        library = self.app.state.monitor.library
+        original = library.root / 'in-library.avi'
+        writer = cv2.VideoWriter(str(original), cv2.VideoWriter_fourcc(*'MJPG'), 10, (64, 64))
+        for _ in range(3):
+            writer.write(np.zeros((64, 64, 3), dtype=np.uint8))
+        writer.release()
+        payload = original.read_bytes()
+        headers = {**self.headers, 'X-Filename': original.name}
+        first = self.client.post('/api/videos', content=payload, headers=headers)
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(library.video(first.json()['id'])['path'], str(original.resolve()))
+        second = self.client.post('/api/videos', content=payload, headers=headers)
+        self.assertEqual(second.json()['id'], first.json()['id'])
+        self.assertEqual([file for file in library.root.iterdir() if file.is_file()], [original])
+
+    def test_concurrent_identical_uploads_keep_one_source_file(self):
+        import cv2
+        import numpy as np
+        from concurrent.futures import ThreadPoolExecutor
+        source = Path(self.tmp.name) / 'concurrent.avi'
+        writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 10, (64, 64))
+        for _ in range(3):
+            writer.write(np.zeros((64, 64, 3), dtype=np.uint8))
+        writer.release()
+        payload = source.read_bytes()
+        headers = {**self.headers, 'X-Filename': source.name}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(lambda _: self.client.post('/api/videos', content=payload, headers=headers), range(2)))
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+        self.assertEqual(responses[0].json()['id'], responses[1].json()['id'])
+        self.assertEqual(len([file for file in self.app.state.monitor.library.root.iterdir() if file.is_file()]), 1)
+
+    def test_previous_result_paths_remain_readable(self):
+        library = self.app.state.monitor.library
+        ticket = self.client.get('/api/state', headers=self.headers).json()['media_ticket']
+        for index, root in enumerate((library.previous_result_jobs, library.legacy_jobs)):
+            task_id = f'old-task-{index}'
+            folder = root / task_id
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / 'result.mp4').write_bytes(b'previous result')
+            self.assertEqual(library.job_dir(task_id), folder)
+            response = self.client.get(f'/api/media/{task_id}/result.mp4?ticket={ticket}')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content, b'previous result')
+        self.assertEqual(library.job_dir('new-task'), library.jobs / 'new-task')
+
+    def test_state_snapshot_includes_last_task_field(self):
+        data = self.client.get('/api/state', headers=self.headers).json()
+        self.assertIn('last_task', data)
+        self.assertIsNone(data['last_task'])
+
+    def test_custom_species_photo_is_listed_and_served_with_media_ticket(self):
+        import cv2
+        import numpy as np
+        self.assertNotIn('八哥', self.client.get('/api/library', headers=self.headers).json()['guide_images'])
+        folder = Path(self.tmp.name) / 'species'
+        self.assertEqual(len([path for path in folder.iterdir() if path.is_dir()]), 13)
+        image = cv2.imencode('.jpg', np.zeros((16, 16, 3), dtype=np.uint8))[1].tobytes()
+        photo_path = folder / '八哥' / '我的八哥照片.jpg'
+        photo_path.write_bytes(image)
+        self.assertIn('八哥', self.client.get('/api/library', headers=self.headers).json()['guide_images'])
+        self.assertEqual(self.client.get('/api/species-images/八哥').status_code, 401)
+        ticket = self.client.get('/api/state', headers=self.headers).json()['media_ticket']
+        photo = self.client.get('/api/species-images/八哥?ticket=' + ticket)
+        self.assertEqual(photo.status_code, 200)
+        self.assertEqual(photo.headers['content-type'], 'image/jpeg')
+        self.assertEqual(photo.content, image)
+        self.assertEqual(self.client.get('/api/species-images/未知鸟?ticket=' + ticket).status_code, 404)
+        photo_path.unlink()
+        self.assertNotIn('八哥', self.client.get('/api/library', headers=self.headers).json()['guide_images'])
+        (folder / '八哥.jpg').write_bytes(image)
+        self.assertIn('八哥', self.client.get('/api/library', headers=self.headers).json()['guide_images'])
 
     def test_upload_library_and_scoped_media_range(self):
         import cv2

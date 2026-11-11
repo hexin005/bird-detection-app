@@ -1,0 +1,169 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>农场布局 · 俯视图 v1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1d211c;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#e7e5dd;padding:26px 18px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+h1{font-size:20px;letter-spacing:2px;margin-bottom:4px}
+.sub{color:#98a292;font-size:12.5px;margin-bottom:16px}
+.map{background:#242a22;border:2px solid #394236;padding:14px}
+svg{display:block}
+.side{flex:1;min-width:320px;max-width:430px}
+.card{background:#242a22;border:1px solid #394236;padding:14px 16px;margin-bottom:14px}
+.card h3{font-size:13px;letter-spacing:1px;color:#f2d94a;margin-bottom:8px}
+.card p,.card li{font-size:12.5px;line-height:1.85;color:#c9cfc2}
+.card b{color:#fff}
+ul{padding-left:18px}
+.tag{display:inline-block;font-size:10px;border:1px solid #5a6657;color:#a8b3a4;padding:0 6px;margin-left:6px;vertical-align:1px}
+table{width:100%;border-collapse:collapse;font-size:11.5px;line-height:1.7}
+td{border-top:1px dashed #394236;padding:5px 2px;vertical-align:top;color:#c9cfc2}
+td:first-child{color:#f2d94a;white-space:nowrap;padding-right:8px}
+.grid-label{font-family:Consolas,monospace;fill:#6d7a68;font-size:9px}
+</style></head><body>
+<div class="wrap">
+<div class="map">
+<!-- 坐标系:+x 向东(右) +z 向南(下,大门在下方);1 单位 = 6.2px;地面 ±48 → 595px;原点居中 -->
+<svg width="640" height="640" viewBox="-320 -320 640 640">
+  <defs>
+    <pattern id="grid" width="62" height="62" patternUnits="userSpaceOnUse"><path d="M62 0H0V62" fill="none" stroke="#2c342a" stroke-width="1"/></pattern>
+  </defs>
+  <!-- 地面 96×96 -->
+  <rect x="-297.6" y="-297.6" width="595.2" height="595.2" fill="#39442f"/>
+  <rect x="-297.6" y="-297.6" width="595.2" height="595.2" fill="url(#grid)"/>
+  <text class="grid-label" x="-292" y="-286">地面 96×96 (±48)</text>
+  <text class="grid-label" x="-292" y="308">z+ 向南(大门侧) · 单位:米 · 虚线=现有围栏 ±16</text>
+
+  <!-- 外围林带(调整后):散点在 ±44 一圈 -->
+  <g fill="#243b1e">
+    <circle cx="-46" cy="-46" r="7"/><circle cx="-30" cy="-47" r="6"/><circle cx="0" cy="-46" r="7"/><circle cx="30" cy="-47" r="6"/><circle cx="46" cy="-46" r="7"/>
+    <circle cx="-47" cy="-14" r="6"/><circle cx="-47" cy="8" r="6"/><circle cx="-47" cy="30" r="7"/>
+    <circle cx="47" cy="-30" r="6"/><circle cx="47" cy="30" r="7"/><circle cx="47" cy="14" r="6"/>
+    <circle cx="-40" cy="47" r="7"/><circle cx="-12" cy="46" r="6"/><circle cx="16" cy="47" r="7"/><circle cx="42" cy="46" r="7"/>
+  </g>
+  <text x="-52" y="-52" fill="#8fae7c" font-size="9">林带(外移至 ±44~47)</text>
+
+  <!-- 过渡带:草带+排水沟(围栏外一圈) -->
+  <rect x="-138" y="-138" width="276" height="276" fill="none" stroke="#55703f" stroke-width="14" opacity=".45"/>
+
+  <!-- 麦田(西北) x[-46,-24] z[-44,-18] -->
+  <g>
+    <rect x="-285.2" y="-272.8" width="136.4" height="161.2" fill="#b98f3e" opacity=".85"/>
+    <!-- 麦垄(方向:沿 x 东西向垄) -->
+    <g stroke="#8f6c28" stroke-width="2" opacity=".7">
+      <line x1="-280" y1="-254" x2="-154" y2="-254"/><line x1="-280" y1="-236" x2="-154" y2="-236"/><line x1="-280" y1="-218" x2="-154" y2="-218"/>
+      <line x1="-280" y1="-200" x2="-154" y2="-200"/><line x1="-280" y1="-182" x2="-154" y2="-182"/><line x1="-280" y1="-164" x2="-154" y2="-164"/>
+      <line x1="-280" y1="-146" x2="-154" y2="-146"/><line x1="-280" y1="-128" x2="-154" y2="-128"/>
+    </g>
+    <text x="-268" y="-260" fill="#3d2f10" font-size="11" font-weight="700">麦田 22×26</text>
+    <!-- 稻草人/草垛 -->
+    <circle cx="-200" cy="-230" r="4" fill="#e8d9a0"/><text x="-195" y="-226" fill="#4a3a12" font-size="8.5">稻草人</text>
+    <circle cx="-168" cy="-190" r="5" fill="#c9a95c"/><circle cx="-176" cy="-181" r="5" fill="#c9a95c"/><text x="-160" y="-184" fill="#4a3a12" font-size="8.5">草垛</text>
+    <!-- 麦田巡逻路点(田内田埂环) -->
+    <g fill="#ffdf6b"><circle cx="-270" cy="-238" r="3.4"/><circle cx="-220" cy="-238" r="3.4"/><circle cx="-172" cy="-238" r="3.4"/><circle cx="-172" cy="-146" r="3.4"/><circle cx="-220" cy="-146" r="3.4"/><circle cx="-270" cy="-146" r="3.4"/></g>
+    <path d="M-270 -238 L-172 -238 L-172 -146 L-270 -146 Z" fill="none" stroke="#ffdf6b" stroke-width="1.4" stroke-dasharray="5 4" opacity=".8"/>
+    <text x="-268" y="-130" fill="#ffdf6b" font-size="9">麦田巡逻环(田埂) · 果农乙驻点</text>
+  </g>
+
+  <!-- 菜地(东) x[26,46] z[-13,13] -->
+  <g>
+    <rect x="161.2" y="-80.6" width="124" height="161.2" fill="#4f7d3a" opacity=".9"/>
+    <!-- 菜畦(南北向畦) -->
+    <g stroke="#33582a" stroke-width="3" opacity=".8">
+      <line x1="176" y1="-74" x2="176" y2="74"/><line x1="196" y1="-74" x2="196" y2="74"/><line x1="216" y1="-74" x2="216" y2="74"/><line x1="236" y1="-74" x2="236" y2="74"/><line x1="256" y1="-74" x2="256" y2="74"/><line x1="274" y1="-74" x2="274" y2="74"/>
+    </g>
+    <text x="180" y="-64" fill="#dff0d0" font-size="11" font-weight="700">菜地 20×26</text>
+    <!-- 大棚 -->
+    <rect x="216" y="10" width="52" height="24" rx="10" fill="#bfe0ea" opacity=".55" stroke="#8fb8c4" stroke-width="1.5"/>
+    <text x="222" y="46" fill="#d6ecda" font-size="8.5">大棚 ×2</text>
+    <circle cx="185" cy="30" r="3" fill="#cfe6c0"/><text x="150" y="34" fill="#d6ecda" font-size="8.5">工具角</text>
+    <!-- 菜地巡逻路点 -->
+    <g fill="#8fe08f"><circle cx="170" cy="-30" r="3.4"/><circle cx="170" cy="30" r="3.4"/><circle cx="286" cy="-30" r="3.4"/><circle cx="286" cy="30" r="3.4"/></g>
+    <path d="M170 -30 L170 30 L286 30 L286 -30 Z" fill="none" stroke="#8fe08f" stroke-width="1.4" stroke-dasharray="5 4" opacity=".85"/>
+    <text x="176" y="66" fill="#8fe08f" font-size="9">菜地巡逻环(畦沟)</text>
+  </g>
+
+  <!-- 环园道路 ±20.5 宽 2.4 -->
+  <g fill="#5d5b4d">
+    <rect x="-132" y="-132" width="264" height="15" rx="4"/>
+    <rect x="-132" y="117" width="264" height="15" rx="4"/>
+    <rect x="-132" y="-132" width="15" height="264" rx="4"/>
+    <rect x="117" y="-132" width="15" height="264" rx="4"/>
+  </g>
+  <text x="-96" y="-121" fill="#d9d6c2" font-size="9">环园道路(±20.5 · 宽 2.4)</text>
+
+  <!-- 支路:西北进麦田 / 东进菜地 -->
+  <rect x="-279" y="-132" width="150" height="13" fill="#5d5b4d" rx="4"/>
+  <rect x="132" y="-8" width="130" height="13" fill="#5d5b4d" rx="4"/>
+  <text x="-262" y="-104" fill="#d9d6c2" font-size="9">西北支路 → 麦田南缘</text>
+  <text x="150" y="-12" fill="#d9d6c2" font-size="9">东支路 → 菜地</text>
+
+  <!-- 果园围栏 ±16 -->
+  <rect x="-99.2" y="-99.2" width="198.4" height="198.4" fill="#3f5233" opacity=".92"/>
+  <g stroke="#a8c686" stroke-width="2" stroke-dasharray="7 5" fill="none">
+    <rect x="-99.2" y="-99.2" width="198.4" height="198.4"/>
+  </g>
+  <text x="-88" y="-86" fill="#cfe3b8" font-size="11" font-weight="700">果园(现有 · 围栏 ±16)</text>
+  <text x="-88" y="-74" fill="#9fb98a" font-size="9">内部道路/设备/小屋全部保留不动</text>
+
+  <!-- 大门(南 z+) -->
+  <rect x="-14" y="92" width="28" height="16" fill="#7a6a3a"/>
+  <text x="18" y="104" fill="#f2d94a" font-size="10" font-weight="700">唯一大门 (0, +16.5)</text>
+  <!-- 门廊走廊(现有 crew 路径) -->
+  <path d="M0 100 L0 127" stroke="#f2d94a" stroke-width="2" stroke-dasharray="4 3"/>
+  <!-- 房屋(现状保留) -->
+  <rect x="34" y="76" width="34" height="22" fill="#8a6a4a" stroke="#5d4630" stroke-width="1.5"/>
+  <text x="72" y="90" fill="#e8cfae" font-size="9">小屋(现有)</text>
+
+  <!-- 环园路点 -->
+  <g fill="#9fd0ff">
+    <circle cx="0" cy="127" r="3.4"/><circle cx="-124" cy="124" r="3.4"/><circle cx="-124" cy="0" r="3.4"/><circle cx="-124" cy="-124" r="3.4"/>
+    <circle cx="0" cy="-124" r="3.4"/><circle cx="124" cy="-124" r="3.4"/><circle cx="124" cy="0" r="3.4"/><circle cx="124" cy="60" r="3.4"/>
+  </g>
+  <path d="M0 127 L-124 124 L-124 0 L-124 -124 L0 -124 L124 -124 L124 0 L124 60" fill="none" stroke="#9fd0ff" stroke-width="1.4" stroke-dasharray="5 4" opacity=".75"/>
+  <text x="-30" y="-140" fill="#9fd0ff" font-size="9">环园巡逻线(8 节点)</text>
+
+  <!-- 位置标注:三人驻点 -->
+  <g font-size="10" font-weight="700">
+    <text x="-88" y="60" fill="#9fd0ff">果农甲 · 果园驻点</text>
+    <text x="150" y="-52" fill="#8fe08f">果农丙 · 菜地驻点</text>
+  </g>
+
+  <!-- 相机全景范围示意 -->
+  <circle cx="0" cy="0" r="294" fill="none" stroke="#ff7b6b" stroke-width="1" stroke-dasharray="3 6" opacity=".5"/>
+  <text x="204" y="-250" fill="#ff9d90" font-size="9">相机全景需覆盖 ±48</text>
+
+  <!-- 比例尺 -->
+  <g transform="translate(180,300)"><rect x="0" y="0" width="62" height="4" fill="#d9d6c2"/><rect x="62" y="0" width="62" height="4" fill="#6d7a68"/><text x="0" y="20" class="grid-label">0        10m       20m</text></g>
+  <!-- 指北 -->
+  <g transform="translate(-290,-290)"><path d="M0 -14 L5 6 L0 2 L-5 6 Z" fill="#e7e5dd"/><text x="-4" y="18" fill="#a8b3a4" font-size="9">N</text><text x="12" y="2" fill="#a8b3a4" font-size="8">(场景 z- 方向)</text></g>
+</svg>
+</div>
+
+<div class="side">
+<h1>农场布局 · 俯视图 v1</h1>
+<div class="sub">地形先行 · 坐标按代码实测(地面 60→96,围栏 ±16,大门南 z=+16.5,小屋保留)</div>
+
+<div class="card"><h3>① 布局要点</h3><ul>
+<li><b>地面 60×96→96×96</b>:现 ±30 只剩 14m 余量,麦田菜地各需 ~24m → 扩到 ±48,林带整体外移到 ±44~47</li>
+<li><b>环园路 ±20.5</b>:贴围栏外侧,南接现有大门走廊(crew 现有门廊路径 (0,0,18.35) 原样保留为图中黄虚线)</li>
+<li><b>麦田 22×26(西北)</b>:沿 x 东西向麦垄;稻草人在田中,草垛靠田边;田埂南缘接西北支路</li>
+<li><b>菜地 20×26(东)</b>:南北向菜畦;大棚靠南;畦沟 = 巡逻步道;东支路平接环园路</li>
+<li><b>过渡带 4m</b>:草带+排水沟(图中深绿描边),围栏外一圈 + 田块四周,不做直线切边</li>
+</ul></div>
+
+<div class="card"><h3>② 三处纠错的落地方式</h3><table>
+<tr><td>固定 4.2s</td><td>routePoint 已按弧长插值,只改 beginCrewPhase:时长 = 路线长度 ÷ 速度(0.9~1.1m/s 每人微差),不再用常数</td></tr>
+<tr><td>60×60 撞边</td><td>本图扩至 96×96;阴影盒 ±26→±48(renderer.js:98-101),mapSize 按 2048→4096 实测帧率决定;相机全景预设同步改</td></tr>
+<tr><td>闭环未成立</td><td>不宣称"自动闭环":巡逻是 3D 侧常驻行为;手机端巡逻计划仍只下发指令,触发时按现有 autoCommand 流程走,小人从当前位置沿路点图 BFS 到集结点(替换硬编码门廊数组)</td></tr>
+</table></div>
+
+<div class="card"><h3>③ 路点图(巡逻的骨架)</h3>
+<p>三层:环园线(蓝,8 点)+ 麦田环(黄,5 点,田埂)+ 菜地环(绿,4 点,畦沟),经大门走廊与两条支路连通成一张图。巡逻=各自环内随机走邻点;响应=BFS 最短路经环园线→大门→现有集结点(muster);返回原路回驻点。门廊是<b>唯一咽喉</b>,两任务并发时后到者在门口路点等待,不穿围栏。</p></div>
+
+<div class="card"><h3>④ 实施与验收(按你的四阶段)</h3>
+<p><b>1 地形道路</b> → 昼夜全景+俯视截图,无断路/穿模/截断<br>
+<b>2 巡逻</b> → 长跑 3 分钟:不出作物、不两点折返<br>
+<b>3 响应衔接</b> → 告警中途消失/重复告警/离线/取消/重开监测,收尾必回巡逻<br>
+<b>4 细节性能</b> → 桌面+手机帧率对比,风吹方向统一</p></div>
+</div>
+</div>
+</body></html>

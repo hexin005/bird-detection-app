@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import ROOT, Settings
+from .detector import NAMES
 from .emailer import MailSendError, send_code_mail
 from .video_pipeline import VideoPipeline
 from .security import check_media, digest, hash_password, media_ticket, verify_password
@@ -142,7 +143,29 @@ def _reencode_avatar(data):
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
+    store.recover()
     monitor = VideoPipeline(settings, store)
+    species_dir = settings.data_dir / 'species'
+    species_dir.mkdir(parents=True, exist_ok=True)
+    species_names = frozenset(NAMES.values())
+    image_types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
+    for species_name in species_names:
+        (species_dir / species_name).mkdir(exist_ok=True)
+
+    def species_image(name: str):
+        if name not in species_names:
+            return None
+        folder = species_dir / name
+        if folder.is_dir() and folder.resolve().parent == species_dir.resolve():
+            for path in sorted(folder.iterdir()):
+                if path.suffix.lower() in image_types and path.is_file() and path.resolve().parent == folder.resolve():
+                    return path
+        for suffix in image_types:
+            path = species_dir / (name + suffix)
+            if path.is_file() and path.resolve().parent == species_dir.resolve():
+                return path
+        return None
+
     verification = VerificationService()
     shutdown = threading.Event()
 
@@ -189,7 +212,8 @@ def create_app(settings=None):
 
     def snapshot(sid):
         return {**store.snapshot(), 'monitor': monitor.snapshot(), 'server_time': time.time(),
-                'media_ticket': media_ticket(sid, settings.secret), 'simulated_device': True}
+                'media_ticket': media_ticket(sid, settings.secret), 'simulated_device': True,
+                'last_task': getattr(monitor, 'last_task', None)}
 
     @app.get('/api/health')
     def health():
@@ -389,6 +413,7 @@ def create_app(settings=None):
             raise HTTPException(415, '请选择 MP4、MOV、AVI、MKV 或 WebM 视频')
         target = monitor.library.root / (secrets.token_hex(16) + '.' + suffix)
         size = 0
+        monitor.library.begin_upload(target)
         try:
             with target.open('wb') as output:
                 async for chunk in request.stream():
@@ -396,13 +421,15 @@ def create_app(settings=None):
                     if size > 500 * 1024 * 1024:
                         raise HTTPException(413, '视频不能超过 500 MB')
                     output.write(chunk)
-            video = await run_in_threadpool(monitor.library.register, target, name)
+            video = await run_in_threadpool(monitor.library.register, target, name, True)
             if video['path'] != str(target.resolve()):
                 target.unlink(missing_ok=True)
             return {key: value for key, value in video.items() if key != 'path'}
         except BaseException:
             target.unlink(missing_ok=True)
             raise
+        finally:
+            monitor.library.end_upload(target)
 
     @app.get('/api/videos')
     def videos(user=Depends(auth)):
@@ -410,7 +437,16 @@ def create_app(settings=None):
 
     @app.get('/api/library')
     def library(species: Optional[str] = None, offset: int = Query(0, ge=0), user=Depends(auth)):
-        return {'items': monitor.library.list(species, offset), 'species': monitor.library.species(), 'alarm_groups': monitor.library.alarm_groups()}
+        return {'items': monitor.library.list(species, offset), 'species': monitor.library.species(),
+                'alarm_groups': monitor.library.alarm_groups(),
+                'guide_images': [name for name in species_names if species_image(name)]}
+
+    @app.get('/api/species-images/{name}', dependencies=[Depends(media_auth)])
+    def guide_image(name: str):
+        path = species_image(name)
+        if path is None:
+            raise HTTPException(404, '图鉴图片不存在')
+        return FileResponse(path, media_type=image_types[path.suffix.lower()], headers={'Cache-Control': 'no-store'})
 
     # 注意:必须先于 /api/library/{task_id} 声明,否则 'summary' 会被路径参数捕获
     @app.get('/api/library/summary')
@@ -446,7 +482,7 @@ def create_app(settings=None):
                                 filename=rows[0]['name'] if download else None, headers={'Cache-Control':'private, max-age=0'})
         folder = monitor.library.job_dir(task_id).resolve()
         path = (folder / name).resolve()
-        if folder.parent not in (monitor.library.jobs.resolve(), monitor.library.legacy_jobs.resolve()) or path.parent != folder or not path.is_file():
+        if folder.parent not in (monitor.library.jobs.resolve(), monitor.library.previous_result_jobs.resolve(), monitor.library.legacy_jobs.resolve()) or path.parent != folder or not path.is_file():
             raise HTTPException(404, '视频仍在生成或文件不存在')
         if name == 'index.m3u8':
             # Only segment requests receive a scoped media ticket, never an API session token.

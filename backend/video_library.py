@@ -1,6 +1,7 @@
 """Persisted video jobs and species indexes; media files are never duplicated per species."""
 import hashlib
 import secrets
+import threading
 import time
 from pathlib import Path
 
@@ -12,14 +13,27 @@ class VideoLibrary:
         self.settings, self.store = settings, store
         self.root = settings.data_dir / 'videos'
         self.root.mkdir(exist_ok=True)
-        self.jobs = settings.data_dir / 'video' / 'result'
+        self.jobs = settings.data_dir / 'jobs'
         self.jobs.mkdir(parents=True, exist_ok=True)
-        self.legacy_jobs = settings.data_dir / 'jobs'
+        self.previous_result_jobs = settings.data_dir / 'videos' / 'result'
+        self.legacy_jobs = settings.data_dir / 'video' / 'result'
+        self.upload_lock = threading.Lock()
+        self.pending_uploads = set()
+
+    def begin_upload(self, path):
+        with self.upload_lock:
+            self.pending_uploads.add(path.resolve())
+
+    def end_upload(self, path):
+        with self.upload_lock:
+            self.pending_uploads.discard(path.resolve())
 
     def job_dir(self, task_id):
-        current = self.jobs / task_id
-        old = self.legacy_jobs / task_id
-        return current if current.exists() or not old.exists() else old
+        for root in (self.jobs, self.previous_result_jobs, self.legacy_jobs):
+            folder = root / task_id
+            if folder.exists():
+                return folder
+        return self.jobs / task_id
 
     def already_processed(self, video):
         rows = self.store.rows("""SELECT t.id FROM tasks t JOIN videos v ON v.id=t.video_id
@@ -29,7 +43,19 @@ class VideoLibrary:
         if rows:
             raise Conflict('该视频已经识别并归档，请在记录中查看结果，无需重复识别')
 
-    def register(self, path, name):
+    @staticmethod
+    def file_sha256(path):
+        digest = hashlib.sha256()
+        with path.open('rb') as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def register(self, path, name, reuse_local_source=False):
+        with self.upload_lock:
+            return self._register(path, name, reuse_local_source)
+
+    def _register(self, path, name, reuse_local_source):
         import cv2
         cap = cv2.VideoCapture(str(path))
         try:
@@ -37,19 +63,24 @@ class VideoLibrary:
             ok, frame = cap.read()
             if not ok or frame is None or not 1 <= fps <= 120 or frames < 1:
                 raise Conflict('无法读取视频，请选择有效的 MP4、MOV、AVI 或 WebM 文件')
-            digest = hashlib.sha256()
-            with path.open('rb') as source:
-                for chunk in iter(lambda: source.read(1024 * 1024), b''):
-                    digest.update(chunk)
-            sha = digest.hexdigest()
+            sha = self.file_sha256(path)
             existing = self.store.rows('SELECT * FROM videos WHERE sha256=? OR path=? ORDER BY at DESC LIMIT 1',
                 (sha, str(path.resolve())))
             if existing and Path(existing[0]['path']).is_file():
                 return existing[0]
+            source_path = path.resolve()
+            if reuse_local_source and path.parent.resolve() == self.root.resolve():
+                candidates = sorted(self.root.iterdir(), key=lambda item: item.name != name)
+                for candidate in candidates:
+                    if candidate.resolve() == source_path or candidate.resolve() in self.pending_uploads or not candidate.is_file():
+                        continue
+                    if candidate.stat().st_size == path.stat().st_size and self.file_sha256(candidate) == sha:
+                        source_path = candidate.resolve()
+                        break
             video_id = 'V' + secrets.token_hex(8)
             with self.store.tx() as db:
                 db.execute('INSERT INTO videos (id,name,path,duration,fps,at,sha256) VALUES (?,?,?,?,?,?,?)',
-                    (video_id, name[:160], str(path.resolve()), frames / fps, fps, time.time(), sha))
+                    (video_id, name[:160], str(source_path), frames / fps, fps, time.time(), sha))
             return self.video(video_id)
         finally:
             cap.release()

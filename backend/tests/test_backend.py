@@ -92,6 +92,26 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.snapshot()['commands'][0]['status'], 'unknown')
         self.assertEqual(self.store.snapshot()['alarms'][0]['status'], 'new')
 
+    def test_app_start_recovers_orphaned_monitor_and_stop_clears_stale_state(self):
+        self.store.task('old-monitor', 'starting')
+        self.store.close()
+        app = create_app(self.settings)
+        self.assertEqual(app.state.monitor.snapshot()['status'], 'interrupted')
+        self.assertEqual(app.state.store.rows('SELECT status FROM tasks WHERE id=?', ('old-monitor',))[0]['status'], 'interrupted')
+        app.state.store.task('orphan-monitor', 'starting')
+        app.state.monitor.current.update(task_id='orphan-monitor', status='starting')
+        class ActiveThread:
+            def is_alive(self):
+                return True
+        app.state.monitor.thread = ActiveThread()
+        self.assertEqual(app.state.monitor.stop()['status'], 'stopping')
+        self.assertTrue(app.state.monitor.stop_event.is_set())
+        app.state.monitor.thread = None
+        self.assertEqual(app.state.monitor.stop()['status'], 'stopped')
+        self.assertEqual(app.state.store.rows('SELECT status FROM tasks WHERE id=?', ('orphan-monitor',))[0]['status'], 'stopped')
+        app.state.store.close()
+        self.store = Store(self.settings)
+
     def test_alarm_merge_preserves_original_evidence(self):
         first = self.alarm(100)
         second, created = self.store.alarm('task-1', '八哥', 5, .99, 'later.jpg', 2, 40, 20, 110)

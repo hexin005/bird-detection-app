@@ -119,7 +119,7 @@ const responseMode = ref(localStorage.getItem('bird-scene-response-mode') === 'a
 const selectedRepelMode = ref('both')
 const effectiveRepelMode = computed(() => responseMode.value === 'auto' ? 'both' : selectedRepelMode.value)
 watch(executing, (now) => { now ? startRepelSound() : stopRepelSound() })
-const crewPhase = ref('home')
+const crewPhase = ref('patrol')
 const crewExpanded = ref(false)
 const daylightExpanded = ref(false)
 const controlCollapsed = ref(typeof window !== 'undefined' && window.innerWidth <= 640)
@@ -128,19 +128,19 @@ const crewTasks = computed(() => [
   { key: 'inspect', title: '检查果树', detail: '巡看果树与鸟害位置', enabled: true },
   { key: 'infrared', title: '开启红外驱鸟器', detail: '对准目标鸟类发射红色光束', enabled: effectiveRepelMode.value !== 'acoustic' },
   { key: 'acoustic', title: '开启声波驱鸟器', detail: '启动声波模拟驱离', enabled: effectiveRepelMode.value !== 'infrared' },
-].map((task) => ({
+].map((task, index) => ({
   ...task,
-  status: crewPhase.value === 'home' ? responseMode.value === 'manual' ? '手动模式 · 不出动' : '屋内待命'
+  status: crewPhase.value === 'patrol' ? `巡逻中 · ${['果园', '麦田', '菜地'][index]}` + (responseMode.value === 'manual' ? '（手动模式）' : '')
     : crewPhase.value === 'alert' ? '发现鸟类 · 正在集结'
       : crewPhase.value === 'working' ? task.enabled ? '前往作业点' : '本次未启用'
         : crewPhase.value === 'positioned' ? task.enabled ? '已抵达 · 等待启动' : '本次未启用'
           : crewPhase.value === 'actuating' ? task.enabled ? '正在执行' : '本次未启用'
             : crewPhase.value === 'waiting' ? task.enabled ? '已执行 · 等待复核' : '本次未启用'
-              : crewPhase.value === 'returning' ? '任务完成 · 返回小屋' : '待命',
+              : crewPhase.value === 'returning' ? '任务完成 · 返回巡逻区' : '待命',
 })))
 const crewPhaseLabel = computed(() => {
-  if (crewPhase.value === 'home' && responseMode.value === 'manual') return '手动控制 · 果农不出动'
-  return ({ home: '屋内待命', alert: '发现目标', working: '前往设备', positioned: '已抵达设备', actuating: '设备执行中', waiting: '等待复核', returning: '返回小屋' }[crewPhase.value] || '待命')
+  if (crewPhase.value === 'patrol' && responseMode.value === 'manual') return '手动控制 · 果农分区巡逻'
+  return ({ patrol: '三分区日常巡逻', alert: '发现目标 · 集结中', working: '前往设备', positioned: '已抵达设备', actuating: '设备执行中', waiting: '等待复核', returning: '返回巡逻区' }[crewPhase.value] || '待命')
 })
 
 /** 当前指令的驱离方式：acoustic / infrared / both */
@@ -203,20 +203,17 @@ watch(
         if (left === 0) {
           repelFail.value = false
           flash('模拟鸟群已散去 · 实际效果请复核监控画面')
-          crewPhase.value = autoCommand ? 'returning' : 'home'
-          if (autoCommand) {
-            clearTimeout(crewReturnTimer)
-            crewReturnTimer = setTimeout(() => { crewPhase.value = 'home' }, 5700)
-          }
+          crewPhase.value = autoCommand ? 'returning' : 'patrol'
+          // returning 的实际行走时长由路点图距离决定,renderer 走完经 onCrewReturned 回到 patrol
         } else if (left === before) {
           // 本次声波没有驱走任何一只（拟真：单只时有可能抵抗）
           repelFail.value = true
           flash('模拟鸟群仍停留 · 请复核监控画面')
-          crewPhase.value = autoCommand ? 'positioned' : 'home'
+          crewPhase.value = autoCommand ? 'positioned' : 'patrol'
         } else {
           repelFail.value = false
           flash(`模拟驱离后剩余 ${left} 只 · 实际效果待复核`)
-          crewPhase.value = autoCommand ? 'positioned' : 'home'
+          crewPhase.value = autoCommand ? 'positioned' : 'patrol'
         }
         if (left > 0 && autoCommand && responseMode.value === 'auto') scheduleAutomaticRetry()
       } else {
@@ -290,7 +287,7 @@ watch(
       handle.clearOccupants()
       birdCount.value = 0
       repelCount.value = 0
-      crewPhase.value = 'home'
+      crewPhase.value = 'patrol'
       lastDetectionSignature = ''
       monitorFrameBaseline = state.snapshot?.monitor?.frame?.frame_id || 0
       clearTimeout(autoResponseTimer)
@@ -329,14 +326,14 @@ watch(
   () => [state.monitorStatus, state.snapshot?.monitor?.frame?.frame_id || 0, detectionSignature(state.detections)],
   ([status, frameId, signature]) => {
     if (!signature) {
-      if (crewPhase.value === 'home') lastDetectionSignature = ''
+      if (crewPhase.value === 'patrol') lastDetectionSignature = ''
       return
     }
     if (frameId && frameId === monitorFrameBaseline) return
     if (!['running', 'ended'].includes(status) || signature === lastDetectionSignature) return
     lastDetectionSignature = signature
     if (responseMode.value !== 'auto') return
-    if (crewPhase.value !== 'home' || !handle?.occupantCount()) return
+    if (crewPhase.value !== 'patrol' || !handle?.occupantCount()) return
     crewPhase.value = 'alert'
   },
   { flush: 'post' },
@@ -381,6 +378,7 @@ onMounted(() => {
       onAutoRotateChange: (on) => { autoRotate.value = on },
       onCrewAlertReady,
       onCrewArrived,
+      onCrewReturned: () => { crewPhase.value = 'patrol' },
     })
     // 供自动化验证读取内部状态
     window.__sceneHandle = handle
@@ -509,14 +507,13 @@ function setResponseMode(mode) {
   responseMode.value = mode
   localStorage.setItem('bird-scene-response-mode', mode)
   clearTimeout(autoResponseTimer)
-  if (mode === 'auto' && crewPhase.value === 'home' && (handle?.occupantCount() || 0) > 0) {
+  if (mode === 'auto' && crewPhase.value === 'patrol' && (handle?.occupantCount() || 0) > 0) {
     birdCount.value = handle.occupantCount()
     crewPhase.value = 'alert'
   }
-  if (mode === 'manual' && crewPhase.value !== 'home') {
+  if (mode === 'manual' && crewPhase.value !== 'patrol') {
     crewPhase.value = 'returning'
-    clearTimeout(crewReturnTimer)
-    crewReturnTimer = setTimeout(() => { crewPhase.value = 'home' }, 5700)
+    // 返回巡逻区的行走时长按距离计算,走完由 onCrewReturned 回到 patrol
   }
 }
 
@@ -660,14 +657,14 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
             <button :class="{ 'is-active': responseMode === 'manual' }" :disabled="executing || repelling" @click="setResponseMode('manual')">手动控制</button>
             <button :class="{ 'is-active': responseMode === 'auto' }" :disabled="executing || repelling" @click="setResponseMode('auto')">自动响应</button>
           </div>
-          <p class="response-help">{{ responseMode === 'auto' ? '发现鸟类后果农出动；到达设备旁才启动驱离。' : '手动模式下果农留在小屋，由你选择设备直接驱离。' }}</p>
+          <p class="response-help">{{ responseMode === 'auto' ? '发现鸟类后果农沿道路出动；到达设备旁才启动驱离。' : '手动模式下果农在三个区块日常巡逻，由你选择设备直接驱离。' }}</p>
           <div v-if="responseMode === 'manual'" class="repel-modes">
             <button :class="{ 'is-selected': selectedRepelMode === 'acoustic' }" :disabled="executing || repelling" @click="selectRepelMode('acoustic')">声波</button>
             <button :class="{ 'is-selected': selectedRepelMode === 'infrared' }" :disabled="executing || repelling" @click="selectRepelMode('infrared')">红外</button>
             <button :class="{ 'is-selected': selectedRepelMode === 'both' }" :disabled="executing || repelling" @click="selectRepelMode('both')">双模</button>
           </div>
           <button class="hud-action hud-action--repel hud-control-submit" :class="{ 'is-done': repelDone, 'is-executing': executing }" :disabled="responseMode === 'auto' || !birdCount || executing || repelling || offline || !state.token" @click="repel(effectiveRepelMode, false)">
-            {{ repelDone ? '指令完成 · 待复核' : responseMode === 'auto' ? crewPhase === 'home' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `模拟驱离 · ${birdCount} 只示意鸟` : '等待检测到鸟类' }}
+            {{ repelDone ? '指令完成 · 待复核' : responseMode === 'auto' ? crewPhase === 'patrol' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `模拟驱离 · ${birdCount} 只示意鸟` : '等待检测到鸟类' }}
           </button>
           <div class="control-footnote">{{ responseMode === 'auto' ? '设备抵达判定已开启 · 模拟执行器' : '手动触发不派出果农 · 模拟执行器' }}</div>
         </div>
@@ -691,7 +688,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
           </div>
           <div v-if="crewExpanded" class="crew-step__status-line">
             <span>{{ crewPhaseLabel }}</span>
-            <span class="crew-step__detail">{{ crewTasks[Math.max(0, Math.min(crewStepIndex, 2))]?.detail || '三名果农屋内待命' }}</span>
+            <span class="crew-step__detail">{{ crewTasks[Math.max(0, Math.min(crewStepIndex, 2))]?.detail || '三名果农分区巡逻中' }}</span>
           </div>
         </div>
 

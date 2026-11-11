@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 果园害鸟图鉴(大视图,预览批次 docs/ui-flow/guide.html 方案):
-// 两列图片网格,封面优先取本园真实抓拍(/api/library 的 alarm_groups.cover),从未检出物种用剪影占位;
+// 两列图片网格,封面依次取自选图、本园抓拍和剪影;
 // 点卡片开详情浮层(影响/识别/时段/应对);「查看该鸟告警」跳告警页并按物种过滤(host.alarmSpecies)。
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useHost } from '../hostContext'
 import { useOrchard } from '../../../store'
 import { SPECIES_GUIDE, LEVEL_META, type GuideLevel, type SpeciesInfo } from '../../../data/speciesGuide'
@@ -10,22 +10,36 @@ import { SPECIES_GUIDE, LEVEL_META, type GuideLevel, type SpeciesInfo } from '..
 const host = useHost()
 const store = useOrchard()
 const groups = ref<Record<string, { cover?: string; total: number }>>({})
+const customImages = ref<string[]>([])
+const customFailed = ref<Record<string, boolean>>({})
+const captureFailed = ref<Record<string, boolean>>({})
 const openInfo = ref<SpeciesInfo | null>(null)
 
 const grouped = computed(() => (['high', 'mid', 'low'] as GuideLevel[]).map(level => ({
   level, ...LEVEL_META[level], items: SPECIES_GUIDE.filter(s => s.level === level),
 })))
 
-onMounted(async () => {
+async function loadCovers() {
+  customFailed.value = {}
+  captureFailed.value = {}
   try {
-    const data = await store.request<{ alarm_groups: { species: string; total: number; cover?: string }[] }>('/library?offset=0')
+    const data = await store.request<{ alarm_groups: { species: string; total: number; cover?: string }[]; guide_images: string[] }>('/library?offset=0')
     const map: Record<string, { cover?: string; total: number }> = {}
     for (const g of data.alarm_groups || []) map[g.species] = { cover: g.cover, total: g.total }
     groups.value = map
+    customImages.value = data.guide_images || []
   } catch { /* 拉不到分组时全部走剪影占位 */ }
-})
+}
+watch(() => host.page, page => { if (page === 'guide') void loadCovers() }, { immediate: true })
 
-const coverOf = (s: SpeciesInfo) => groups.value[s.name]?.cover ? store.media('captures/' + groups.value[s.name].cover) : ''
+const hasCustom = (s: SpeciesInfo) => customImages.value.includes(s.name) && !customFailed.value[s.name]
+const coverOf = (s: SpeciesInfo) => hasCustom(s) ? store.media('species-images/' + encodeURIComponent(s.name))
+  : groups.value[s.name]?.cover && !captureFailed.value[s.name] ? store.media('captures/' + groups.value[s.name].cover) : ''
+const coverLabel = (s: SpeciesInfo) => hasCustom(s) ? '自选图鉴照片' : '本园抓拍'
+function imageFailed(s: SpeciesInfo) {
+  if (hasCustom(s)) customFailed.value = { ...customFailed.value, [s.name]: true }
+  else captureFailed.value = { ...captureFailed.value, [s.name]: true }
+}
 const totalOf = (s: SpeciesInfo) => groups.value[s.name]?.total ?? 0
 
 function viewAlarms(s: SpeciesInfo) {
@@ -38,7 +52,7 @@ function viewAlarms(s: SpeciesInfo) {
   <view class="qh-header">
     <view class="qh-header__brand">
       <text class="qh-page-title">果园害鸟图鉴</text>
-      <text class="qh-page-subtitle">模型可识别 13 种 · 封面优先取本园最近抓拍</text>
+      <text class="qh-page-subtitle">模型可识别 13 种 · 自选照片优先，其次本园抓拍</text>
     </view>
   </view>
 
@@ -47,9 +61,9 @@ function viewAlarms(s: SpeciesInfo) {
     <view class="sg-grid">
       <view v-for="s in group.items" :key="s.name" class="sg-card" :class="{ 'sg-card--dim': s.level === 'low' }" @click="openInfo = s">
         <view class="sg-photo" :class="{ 'sg-photo--empty': !coverOf(s) }">
-          <image v-if="coverOf(s)" class="sg-img" :src="coverOf(s)" mode="aspectFill"/>
+          <image v-if="coverOf(s)" class="sg-img" :src="coverOf(s)" mode="aspectFill" @error="imageFailed(s)"/>
           <svg v-else width="46" height="46" viewBox="0 0 52 52" class="sg-bird"><path d="M14 38 C11 24 22 17 30 19 C32 11 42 9 46 13 L52 15 46 19 C48 28 42 37 31 38 L22 43 24 37 Z"/><circle cx="38" cy="15" r="1.6" fill="#111"/></svg>
-          <text v-if="coverOf(s)" class="sg-photo__cap">本园抓拍</text>
+          <text v-if="coverOf(s)" class="sg-photo__cap">{{ coverLabel(s) }}</text>
           <text v-else class="sg-photo__none">暂无抓拍</text>
         </view>
         <view class="sg-card__row">
@@ -61,7 +75,7 @@ function viewAlarms(s: SpeciesInfo) {
     </view>
   </template>
 
-  <text class="sg-note">分级与介绍为科普参考 · 封面来自本园告警抓拍，检出后会自动更新</text>
+  <text class="sg-note">分级与介绍为科普参考 · 封面优先使用自选照片，未设置时使用告警抓拍</text>
 
   <!-- 详情浮层 -->
   <view v-if="openInfo" class="qh-mask qh-mask--bottom is-open" @click.self="openInfo = null">
@@ -74,9 +88,9 @@ function viewAlarms(s: SpeciesInfo) {
       </view>
 
       <view class="sg-big" :class="{ 'sg-big--empty': !coverOf(openInfo) }">
-        <image v-if="coverOf(openInfo)" class="sg-big__img" :src="coverOf(openInfo)" mode="aspectFill"/>
+        <image v-if="coverOf(openInfo)" class="sg-big__img" :src="coverOf(openInfo)" mode="aspectFill" @error="imageFailed(openInfo)"/>
         <svg v-else width="96" height="96" viewBox="0 0 52 52" class="sg-bird"><path d="M14 38 C11 24 22 17 30 19 C32 11 42 9 46 13 L52 15 46 19 C48 28 42 37 31 38 L22 43 24 37 Z"/><circle cx="38" cy="15" r="1.6" fill="#111"/></svg>
-        <text v-if="coverOf(openInfo)" class="sg-big__cap">本园最近抓拍</text>
+        <text v-if="coverOf(openInfo)" class="sg-big__cap">{{ coverLabel(openInfo) }}</text>
       </view>
 
       <view class="sg-sec"><text class="sg-sec__h">对果园的影响</text><text class="sg-sec__p">{{ openInfo.harm }}</text></view>

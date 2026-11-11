@@ -30,10 +30,10 @@ export const PALETTE = {
 }
 
 /* Procedural surfaces: deterministic, tiled, no network or image dependencies. */
-function surfaceTexture(kind, repeats = 1) {
+export function surfaceTexture(kind, repeats = 1) {
   const size = 128
   const data = new Uint8Array(size * size * 4)
-  const random = mulberry32(kind === 'bark' ? 421 : kind === 'soil' ? 933 : 711)
+  const random = mulberry32(kind === 'bark' ? 421 : kind === 'soil' ? 933 : kind === 'wheat' ? 517 : kind === 'bed' ? 628 : 711)
   const noiseGrid = Array.from({ length: 64 }, () => random() - .5)
   const smoothNoise = (x, y) => {
     const gx = x / 16, gy = y / 16
@@ -45,14 +45,16 @@ function surfaceTexture(kind, repeats = 1) {
     const bottom = at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx
     return top * (1 - sy) + bottom * sy
   }
-  const base = kind === 'bark' ? [111, 91, 69] : kind === 'soil' ? [152, 130, 99] : [112, 133, 77]
+  const base = kind === 'bark' ? [111, 91, 69] : kind === 'soil' ? [152, 130, 99] : kind === 'wheat' ? [178, 140, 68] : kind === 'bed' ? [86, 69, 48] : [112, 133, 77]
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const grain = (random() - .5) * 22
       const broad = smoothNoise(x, y) * 12
       const furrow = kind === 'bark' ? -Math.pow(.5 + .5 * Math.sin(x * Math.PI / 8 + Math.sin(y * Math.PI / 64)), 12) * 43 : 0
+      // 麦垄沿 x 方向条播,菜畦沿 z 方向起垄(与布局图种植方向一致)
+      const rows = kind === 'wheat' ? Math.sin(x * Math.PI / 9) * 15 : kind === 'bed' ? Math.sin(y * Math.PI / 11) * 20 : 0
       const i = (y * size + x) * 4
-      for (let c = 0; c < 3; c++) data[i + c] = Math.max(0, Math.min(255, base[c] + grain + broad + furrow))
+      for (let c = 0; c < 3; c++) data[i + c] = Math.max(0, Math.min(255, base[c] + grain + broad + furrow + rows))
       data[i + 3] = 255
     }
   }
@@ -152,19 +154,39 @@ export function createTree(rand, scale = 1) {
 export function createGround(rand) {
   const group = new THREE.Group()
 
-  // 主地面：细分平面 + 顶点扰动，做出起伏
-  const size = 60
-  const seg = 40
+  // 农场地面 96×96:果园居中,麦田(西北)/菜地(东)为平整区,过渡带保持缓坡起伏。
+  const size = 96
+  const seg = 76
   const geo = new THREE.PlaneGeometry(size, size, seg, seg)
+  // 平整区(布局图 v1):果园+环园路走廊 / 麦田 / 菜地 / 两条支路 / 南向土路
+  const FLAT_ZONES = [
+    { x1: -23.5, x2: 23.5, z1: -23.5, z2: 23.5 },
+    { x1: -47.5, x2: -23, z1: -45.5, z2: -17.5 },
+    { x1: 24.5, x2: 47.5, z1: -14.5, z2: 14.5 },
+    { x1: -48, x2: -20, z1: -22.5, z2: -18.5 },
+    { x1: 19, x2: 48, z1: -2, z2: 2 },
+    { x1: -2, x2: 2, z1: 19, z2: 48 },
+  ]
+  const zoneDamp = (x, y) => {
+    let d = 0
+    for (const z of FLAT_ZONES) {
+      const dx = Math.max(z.x1 - x, 0, x - z.x2)
+      const dz = Math.max(z.z1 - y, 0, y - z.z2)
+      d = Math.max(d, 1 - Math.min(Math.hypot(dx, dz) / 3, 1))
+    }
+    return d
+  }
   const pos = geo.attributes.position
   for (let i = 0; i < pos.count; i += 1) {
     const x = pos.getX(i)
-    const y = pos.getY(i)
-    const dist = Math.sqrt(x * x + y * y)
-    // 围栏内保持平整，地形起伏从果园外缘开始，避免角柱被地面吞没。
-    const lift = Math.pow(Math.min(Math.max((dist - 21.5) / 8.5, 0), 1), 2.2) * 1.8
-    const noise = Math.sin(x * 0.35) * Math.cos(y * 0.31) * (dist < 21.5 ? 0.008 : 0.12)
-    pos.setZ(i, lift + noise)
+    const yLocal = pos.getY(i)
+    const zWorld = -yLocal // rotation.x=-π/2 后:世界 z = -局部 y(平整区坐标是世界系,必须换算)
+    const dist = Math.sqrt(x * x + yLocal * yLocal)
+    // 果园内平整;外围缓升(最高 1.6m),田块与路廊内压平,边缘 3m 过渡
+    const baseLift = Math.pow(Math.min(Math.max((dist - 21.5) / 26, 0), 1), 2.2) * 1.6
+    const damp = zoneDamp(x, zWorld)
+    const noise = Math.sin(x * 0.35) * Math.cos(yLocal * 0.31) * (dist < 21.5 ? 0.008 : 0.12) * (1 - 0.85 * damp)
+    pos.setZ(i, baseLift * (1 - damp) + noise)
   }
   geo.computeVertexNormals()
 
@@ -193,12 +215,15 @@ export function createGround(rand) {
     group.add(pipe)
   }
 
-  // 少量草丛集中在空地边缘，避免装饰遮住树木、设备和鸟类目标。
+  // 草丛散布全农场,但不进田块(田块自有植被,阶段 4 再加)。
   const grassMat = new THREE.MeshLambertMaterial({ color: 0x718951, flatShading: true })
-  for (let i = 0; i < 18; i += 1) {
-    const x = (rand() - 0.5) * 34
-    const z = (rand() - 0.5) * 34
+  const inFieldRect = (x, z) =>
+    (x > -25 && x < -22.5 && z > -46 && z < -16) || (x > 23.5 && x < 48.5 && z > -15.5 && z < 15.5)
+  for (let i = 0; i < 34; i += 1) {
+    const x = (rand() - 0.5) * 92
+    const z = (rand() - 0.5) * 92
     if ([-11.4, -5.6, 0.2, 6.0].some((rowZ) => Math.abs(z - rowZ) < 2.2) || Math.abs(x) < 2.8) continue
+    if (inFieldRect(x, z)) continue
     const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.16 + rand() * 0.12, 0.48 + rand() * 0.26, 4), grassMat)
     tuft.position.set(x, 0.27, z)
     tuft.rotation.y = rand() * Math.PI
@@ -206,13 +231,13 @@ export function createGround(rand) {
     group.add(tuft)
   }
 
-  // 中央土路
-  const roadGeo = new THREE.PlaneGeometry(3.8, 34, 1, 8)
+  // 中央土路(延长至环园路 z≈21.7)
+  const roadGeo = new THREE.PlaneGeometry(3.8, 41, 1, 8)
   const roadTexture = surfaceTexture('soil', 9)
   const roadMat = new THREE.MeshStandardMaterial({ color: 0xe0cfac, map: roadTexture, roughness: 1, bumpMap: roadTexture, bumpScale: .008 })
   const road = new THREE.Mesh(roadGeo, roadMat)
   road.rotation.x = -Math.PI / 2
-  road.position.set(0, 0.035, 2)
+  road.position.set(0, 0.035, 3.5)
   road.receiveShadow = true
   group.add(road)
 

@@ -77,6 +77,8 @@ class VideoMonitor:
             if self.thread and self.thread.is_alive():
                 self.stop_event.set()
                 self.set_status('stopping', '等待当前帧结束')
+            elif self.current['status'] in ('starting', 'running', 'stopping'):
+                self.set_status('stopped', '检测进程已中断，任务已停止')
         return self.snapshot()
 
     def get_frame(self, frame_key):
