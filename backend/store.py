@@ -8,6 +8,7 @@ import time
 from contextlib import contextmanager
 from datetime import date, timedelta
 
+from .knowledge import KNOWLEDGE_FIELDS, KNOWLEDGE_SPECIES
 from .security import digest, hash_password, verify_password
 
 
@@ -100,6 +101,12 @@ class Store:
           mode TEXT NOT NULL DEFAULT 'acoustic',
           duration INTEGER NOT NULL DEFAULT 3,
           last_fired_at REAL)''')
+        # 鸟类知识库:种子见 backend/knowledge.py,name 与 detector.NAMES 中文名一致
+        self.db.execute('''CREATE TABLE IF NOT EXISTS species_knowledge (
+          name TEXT PRIMARY KEY, en TEXT, scientific_name TEXT, family TEXT,
+          domestic_protection TEXT, iucn_status TEXT, level TEXT,
+          desc TEXT, harm TEXT, traits TEXT, voice TEXT, diet TEXT, ecology TEXT,
+          hours TEXT, advice TEXT, sort INTEGER NOT NULL DEFAULT 0)''')
         self.db.commit()
         with self.tx() as db:
             if not db.execute('SELECT 1 FROM users').fetchone():
@@ -109,6 +116,13 @@ class Store:
             defaults = {'scenario': 'normal', 'confidence': settings.confidence,
                         'consecutive': settings.consecutive, 'cooldown': settings.cooldown}
             db.execute('INSERT OR IGNORE INTO settings VALUES (1,?)', (json.dumps(defaults),))
+            # 知识库 UPSERT:代码即权威版本,旧库升级自动补种,代码修订后下次启动自动对齐
+            for item in KNOWLEDGE_SPECIES:
+                values = [item[field] for field in KNOWLEDGE_FIELDS]
+                updates = ','.join(f'{field}=excluded.{field}' for field in KNOWLEDGE_FIELDS if field != 'name')
+                db.execute(f'''INSERT INTO species_knowledge ({','.join(KNOWLEDGE_FIELDS)})
+                               VALUES ({','.join('?' * len(KNOWLEDGE_FIELDS))})
+                               ON CONFLICT(name) DO UPDATE SET {updates}''', values)
         self.recover()
 
     @contextmanager
@@ -502,6 +516,19 @@ class Store:
                 'exec': {'total': total, 'completed': completed, 'failed': failed,
                          'avg_start_seconds': avg_start, 'avg_done_seconds': avg_done,
                          'dual_share': round(dual / completed, 2) if completed else None}}
+
+    def knowledge_rows(self):
+        """知识库原始行(不含本园统计);统计由路由层合并现有聚合,保证口径一致。"""
+        return self.rows('SELECT * FROM species_knowledge ORDER BY sort')
+
+    def knowledge_hours(self):
+        """全历史告警按一天 0-23 时聚合(服务器本地时间,口径同 stats 的 hourly),
+        供知识卡展示各鸟种活动规律;返回 {species: [24 桶]}。"""
+        buckets = {}
+        for row in self.rows("SELECT species, CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms GROUP BY species, h"):
+            if 0 <= row['h'] < 24:
+                buckets.setdefault(row['species'], [0] * 24)[row['h']] = row['n']
+        return buckets
 
     def close(self):
         with self.lock:

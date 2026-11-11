@@ -77,14 +77,14 @@ const host = useHost()
     <view class="page__content"><BRecordsPage /></view>
   </view>
 
-  <!-- 害鸟图鉴(从我的页进入的次级页,dock 不高亮) -->
+  <!-- 鸟类知识库(从我的页进入的次级页,dock 不高亮) -->
   <view class="page" :class="{ 'is-current': host.page === 'guide' }">
     <view class="statusbar">
       <view class="qh-menubar">
         <text class="qh-menubar__back" @click="host.nav('me')">◂ 返回</text>
         <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="currentColor"/><rect x="6" y="4" width="2" height="2" style="fill:var(--surface-card)"/></svg>
         <text class="qh-menubar__ttl">果园守护</text>
-        <text class="qh-menubar__item">害鸟图鉴</text>
+        <text class="qh-menubar__item">鸟类知识库</text>
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>

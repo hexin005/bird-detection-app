@@ -28,3 +28,22 @@ export type State = {
   monitor: { status: string; task_id: string | null; message: string; frame: Frame | null; source: string; model: string; device: string; sample_fps: number; source_ready: boolean; model_ready: boolean; progress?: number; result_ready?: boolean; stream_ready?: boolean; video_id?: string };
   media_ticket: string; server_time: number;
 }
+
+// ===== 鸟类知识库(/api/knowledge,种子见 backend/knowledge.py) =====
+export type SpeciesRecords = {
+  total: number; pending: number; last_seen: number | null;
+  cover: string | null; best_confidence: number | null;
+  videos: number; peak_count: number; first_seen: number | null;
+  hour_buckets: number[]; // 全历史告警按本地时间一天 0-23 时聚合
+}
+export type SpeciesKnowledge = {
+  name: string; en: string;
+  scientific_name: string | null; family: string | null;
+  domestic_protection: string | null; iucn_status: string | null;
+  level: 'high' | 'mid' | 'low';
+  desc: string; harm: string; traits: string; hours: string; advice: string;
+  voice?: string | null; diet?: string | null; ecology?: string | null;
+  records: SpeciesRecords;
+}
+// api=接口数据;fallback=请求失败回落内置静态数据,此时本园统计不可用(不得当 0 展示)
+export type KnowledgeSource = 'loading' | 'api' | 'fallback'

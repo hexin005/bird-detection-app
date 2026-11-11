@@ -247,6 +247,15 @@ ipconfig   # 找到 IPv4 地址，例如 192.168.1.10
 
 图鉴封面依次使用自选照片、该鸟种的告警抓拍、默认剪影。替换图片后重新进入图鉴即可刷新；告警抓拍仍保留在 `.runtime/captures/`，不会被自选照片覆盖。
 
+### 鸟类知识库
+
+「我的 → 鸟类知识库」提供 13 种园内鸟种的科普档案与本园记录联动：
+
+- **科普档案**：中英文名、拉丁学名、科属、保护信息（国家“三有”保护动物 / IUCN 受威胁等级，分开呈现）、危害分级、对果园的影响、识别特征、鸣声特点、食性、生态价值、活动时段与本园应对。种子数据在 `backend/knowledge.py`，随代码维护（启动时 UPSERT 对齐，库内手改会在下次启动被覆盖）。
+- **本园记录**：每种鸟的累计告警、待处理、最近出现时间、最佳置信度、涉及视频档案数、单帧峰值，以及按历史告警聚合的 24 小时活动时段分布图；卡片封面角标显示本园告警条数。
+- **搜索**：按中文名 / 英文名 / 拉丁学名 / 科属即时过滤，忽略大小写与首尾空格。
+- **数据来源**：`GET /api/knowledge`（列表）与 `GET /api/knowledge/{name}`（详情），告警聚合与 `/api/library` 同源。接口不可用时页面回落内置静态知识，本园记录显示“暂不可用”而非 0。
+
 ---
 
 ## 七、开发与验证
@@ -262,6 +271,9 @@ npm run build:app    # uni-app Android 应用资源（非 APK）
 
 # 视频档案/媒体授权测试
 .venv\Scripts\python -m unittest discover -s backend/tests -p test_video_library.py -v
+
+# 鸟类知识库测试（种子 UPSERT、聚合口径、边界与鉴权）
+.venv\Scripts\python -m unittest discover -s backend/tests -p test_knowledge.py -v
 
 # 原交互 Demo 回归测试
 npm test
@@ -311,6 +323,7 @@ bird-detection-app/
 │   ├── detector.py         # YOLO 推理、标注、告警门控
 │   ├── video_pipeline.py   # FFmpeg HLS 编码 + MP4 合成管线
 │   ├── video_library.py    # 视频档案与鸟类索引
+│   ├── knowledge.py        # 鸟类知识库种子数据（代码即权威版本）
 │   ├── store.py            # SQLite 存储、事务、模拟执行器
 │   └── tests/              # 后端单元/集成测试
 ├── scripts/

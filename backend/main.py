@@ -458,6 +458,38 @@ def create_app(settings=None):
     def video_detail(task_id: str, user=Depends(auth)):
         return monitor.library.detail(task_id)
 
+    def knowledge_items():
+        """知识行 + 本园记录:聚合直接复用 /api/library 同源数据(alarm_groups/species),
+        列表与详情共用本函数,统计口径必然一致。"""
+        hours = store.knowledge_hours()
+        alarm_map = {r['species']: r for r in monitor.library.alarm_groups()}
+        sample_map = {r['species']: r for r in monitor.library.species()}
+        last_seen = {r['species']: r['last_seen'] for r in store.rows('SELECT species, MAX(at) last_seen FROM alarms GROUP BY species')}
+        items = []
+        for row in store.knowledge_rows():
+            a, s = alarm_map.get(row['name'], {}), sample_map.get(row['name'], {})
+            items.append({**row, 'records': {
+                'total': a.get('total', 0), 'pending': a.get('pending', 0) or 0,
+                'last_seen': last_seen.get(row['name']),
+                'cover': a.get('cover'), 'best_confidence': a.get('best_confidence'),
+                'videos': s.get('videos', 0), 'peak_count': s.get('peak_count', 0),
+                'first_seen': s.get('first_seen'),
+                'hour_buckets': hours.get(row['name'], [0] * 24),
+            }})
+        return items
+
+    @app.get('/api/knowledge')
+    def knowledge_list(user=Depends(auth)):
+        return {'items': knowledge_items(),
+                'guide_images': [name for name in species_names if species_image(name)]}
+
+    @app.get('/api/knowledge/{name}')
+    def knowledge_detail(name: str, user=Depends(auth)):
+        for item in knowledge_items():
+            if item['name'] == name:
+                return item
+        raise HTTPException(404, '知识卡不存在')
+
     @app.get('/api/alarm-list')
     def alarm_list(species: Optional[str] = None, pending: bool = False, before: Optional[float] = None, user=Depends(auth)):
         clauses, values = [], []

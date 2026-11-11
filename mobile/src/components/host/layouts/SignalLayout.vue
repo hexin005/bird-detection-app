@@ -70,7 +70,7 @@ const tabs = [
     <view class="statusbar">
       <view class="qh-menubar">
         <text class="qh-menubar__back" @click="host.nav('me')">◂ 返回我的</text>
-        <text class="qh-menubar__ttl">鸟类图鉴</text>
+        <text class="qh-menubar__ttl">鸟类知识库</text>
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>

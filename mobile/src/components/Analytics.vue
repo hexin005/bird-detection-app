@@ -319,7 +319,7 @@ function onPieBg() { selectedSlice.value = null }
           </view>
         </view>
         <text v-else class="qh-an-sub">范围内暂无已归档视频的鸟类记录</text>
-        <text class="qh-an-sub">每场每物种只取峰值 · 点物种名称查看图鉴</text>
+        <text class="qh-an-sub">每场每物种只取峰值 · 点物种名称查看知识卡</text>
       </view>
     </view>
     <view class="qh-window">
@@ -397,7 +397,7 @@ function onPieBg() { selectedSlice.value = null }
               </view>
             </view>
             <text v-else class="cap empty">本范围没有告警物种记录。</text>
-            <text v-if="rankRows.length" class="cap">点物种名可跳转图鉴 · 头名挂警示纹</text>
+            <text v-if="rankRows.length" class="cap">点物种名可跳转知识卡 · 头名挂警示纹</text>
           </view>
         </view>
 

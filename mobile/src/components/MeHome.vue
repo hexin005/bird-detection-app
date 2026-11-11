@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useOrchard } from '../store'
 import type { Me } from '../types'
 import { THEMES, normalizeTheme } from '../theme'
+import { alertRemindEnabled, setAlertRemind } from '../utils/alertNotify'
 import ChangePassword from './ChangePassword.vue'
 
 const emit = defineEmits<{ nav: [page: 'themes' | 'analytics' | 'guide'] }>()
@@ -15,6 +16,13 @@ const usernameSheet = ref(false), usernameValue = ref('')
 const usernameError = ref('')
 const changeSheet = ref(false)
 const currentTheme = computed(() => normalizeTheme(me.value?.theme))
+const remindOn = ref(alertRemindEnabled())
+function onRemindChange(e: unknown) {
+  const on = Boolean((e as { detail: { value: boolean } }).detail.value)
+  setAlertRemind(on)
+  remindOn.value = on
+  notify(on ? '新告警提醒已开启' : '新告警提醒已关闭')
+}
 const themeMeta = computed(() => THEMES.find(t => t.id === currentTheme.value))
 const avatarSrc = computed(() => me.value?.avatar ? store.server + me.value.avatar + '?ticket=' + encodeURIComponent(store.state?.media_ticket || '') : '')
 const notify = (m: string) => uni.showToast({ title: m, icon: 'none', duration: 3000 })
@@ -167,14 +175,14 @@ function onPasswordChanged() {
     </view>
   </view>
 
-  <!-- 害鸟图鉴入口 -->
+  <!-- 鸟类知识库入口 -->
   <view class="qh-window" style="cursor:pointer" @click="emit('nav', 'guide')">
-    <view class="qh-tbar"><text class="qh-tbar__t">害鸟图鉴</text></view>
+    <view class="qh-tbar"><text class="qh-tbar__t">鸟类知识库</text></view>
     <view class="qh-window__bd">
       <view class="qh-me-row">
         <view style="flex:1;min-width:0">
-          <view class="qh-alarmcard__title">果园害鸟图鉴</view>
-          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">13 种可识别鸟类 · 危害分级 · 识别特征与应对</text>
+          <view class="qh-alarmcard__title">鸟类知识库</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">13 种园内鸟种 · 科普档案 + 本园记录 · 可搜索</text>
         </view>
         <text class="qh-chevron">›</text>
       </view>
@@ -192,6 +200,20 @@ function onPasswordChanged() {
         </view>
         <svg class="qh-spark" width="72" height="26" viewBox="0 0 72 26"><polyline points="2,20 13,14 24,17 35,8 46,12 57,4 70,10" fill="none" stroke="currentColor" stroke-width="2"/><rect x="0" y="24" width="72" height="2" fill="currentColor"/></svg>
         <text class="qh-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提醒设置(跨主题通用) -->
+  <view class="qh-window">
+    <view class="qh-tbar"><text class="qh-tbar__t">提醒 · ALERTS</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-row">
+        <view style="flex:1;min-width:0">
+          <view class="qh-alarmcard__title">新告警提醒</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">提示音 + 桌面通知 + 标题闪烁 · 桌面通知需浏览器授权</text>
+        </view>
+        <switch :checked="remindOn" :color="currentTheme === 'signal' ? '#d3212c' : '#111111'" @change="onRemindChange" />
       </view>
     </view>
   </view>
