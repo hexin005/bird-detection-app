@@ -31,6 +31,8 @@ export const state = reactive({
   scenario: 'normal',
   /** 当前活动指令 */
   activeCommand: null,
+  /** 最近一次完成的检测任务汇总(检测完成后按它出鸟,见 App.vue adoptTaskSummary) */
+  lastTask: null,
   /** 媒体票据 */
   mediaTicket: '',
 })
@@ -65,6 +67,7 @@ function syncFromSnapshot(data) {
   state.counts = data.counts || { total: 0, pending: 0, completed: 0 }
   state.scenario = (data.settings && data.settings.scenario) || 'normal'
   state.mediaTicket = data.media_ticket || ''
+  state.lastTask = data.last_task ?? null
   state.activeCommand = state.commands.find((c) => c.status === 'pending' || c.status === 'running') || null
 }
 

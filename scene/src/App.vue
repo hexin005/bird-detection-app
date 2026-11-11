@@ -159,6 +159,13 @@ const irDesc = computed(() => {
 
 /** 待驱离鸟数（由 3D 场景回报） */
 const birdCount = ref(0)
+/** 最近一次完成的检测任务汇总(「一检一记」:出鸟与 HUD 本次检测卡的数据源) */
+const taskSummary = ref(null)
+/** 已采纳过的任务 id:快照每 0.6 秒重发 last_task,防止重复出鸟 */
+const seenTaskId = ref('')
+/** 深链复现:/scene/?task=Txxx → 连接后拉取该任务档案并按汇总落鸟 */
+const deepTaskId = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('task') || '') : ''
+const deepTaskDone = ref(false)
 /** 本次演示的驱离次数 */
 const repelCount = ref(0)
 /** 上一次已结算的驱离指令 id，避免重复触发 */
@@ -287,6 +294,7 @@ watch(
       handle.clearOccupants()
       birdCount.value = 0
       repelCount.value = 0
+      taskSummary.value = null
       crewPhase.value = 'patrol'
       lastDetectionSignature = ''
       monitorFrameBaseline = state.snapshot?.monitor?.frame?.frame_id || 0
@@ -295,6 +303,64 @@ watch(
     }
   },
   { flush: 'post' },
+)
+
+/** 任务档案(深链 /api/library/{id}) → 与快照 last_task 同构的汇总对象 */
+function taskFromDetail(detail) {
+  const alarms = detail.alarms || []
+  const species = (detail.species || [])
+    .map((s) => {
+      const hit = alarms.find((a) => a.species === s.species && a.bbox)
+      let bbox = null
+      try { bbox = typeof hit?.bbox === 'string' ? JSON.parse(hit.bbox) : (hit?.bbox || null) } catch { bbox = null }
+      return { species: s.species, peak: s.peak_count, confidence: hit?.confidence, bbox }
+    })
+    .filter((s) => s.peak > 0)
+  return {
+    task_id: detail.id, status: detail.status, at: detail.at,
+    total: species.reduce((sum, s) => sum + s.peak, 0), species,
+  }
+}
+
+/** 检测完成 → 按任务汇总出鸟;自动模式下果农随即集结(后续走既有作业/驱离/返回链) */
+function adoptTaskSummary(task) {
+  if (!handle || !task || !Array.isArray(task.species) || !task.species.length) return
+  if (task.task_id && task.task_id === seenTaskId.value) return
+  seenTaskId.value = task.task_id || ''
+  pushStateToScene() // 先同步抓拍表,落鸟时就能用上真实照片贴图
+  const count = handle.adoptFromSummary(task.species)
+  birdCount.value = count
+  taskSummary.value = task
+  flash(`检测完成复现 · ${task.species.length} 种 · ${count} 只鸟已落位`)
+  if (responseMode.value === 'auto' && crewPhase.value === 'patrol' && count > 0) {
+    crewPhase.value = 'alert' // 集结 → onCrewAlertReady → 前往设备 → 自动驱离
+  }
+}
+
+// 后端快照每 0.6 秒重发 last_task;seenTaskId 去重,深链任务优先不被覆盖
+watch(
+  () => state.lastTask,
+  (lt) => {
+    if (!lt || !lt.task_id || seenTaskId.value === lt.task_id) return
+    if (deepTaskId) return // 显式深链复现历史任务时,忽略最新任务快照
+    adoptTaskSummary(lt)
+  },
+  { flush: 'post' },
+)
+
+// 深链:WebSocket 连接建立后拉取任务档案(登录/恢复两种路径都会经过 connected)
+watch(
+  () => state.connected,
+  (up) => {
+    if (!up || !deepTaskId || deepTaskDone.value) return
+    deepTaskDone.value = true
+    fetch(`${state.server}/api/library/${encodeURIComponent(deepTaskId)}`, {
+      headers: { Authorization: 'Bearer ' + state.token },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((detail) => { if (detail) adoptTaskSummary(taskFromDetail(detail)) })
+      .catch(() => {})
+  },
 )
 
 function detectionSignature(detections) {
@@ -410,6 +476,7 @@ onMounted(() => {
           state.counts = data.counts || state.counts
           state.scenario = data.settings?.scenario || 'normal'
           state.activeCommand = state.commands.find((c) => c.status === 'pending' || c.status === 'running') || null
+          state.lastTask = data.last_task ?? null // 立即触发汇总出鸟,不等 WS 首帧
           pushStateToScene()
         }
       })
@@ -728,6 +795,20 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
             <div class="hud-stat"><span class="hud-stat__num">{{ state.counts.total }}</span><span class="hud-stat__label">检测事件</span></div>
             <div class="hud-stat"><span class="hud-stat__num">{{ state.counts.completed }}</span><span class="hud-stat__label">模拟执行</span></div>
           </div>
+        </div>
+
+        <!-- 本次检测:一检一记汇总(时间 + 物种×峰值),与 H5 记录页同口径 -->
+        <div v-if="taskSummary" class="hud-card">
+          <div class="hud-card__title">本次检测 · {{ timeText(taskSummary.at) }}</div>
+          <p class="detection-count">共 {{ taskSummary.total }} 只 · {{ taskSummary.species.length }} 种<template v-if="birdCount"> · 场景复现 {{ birdCount }} 只</template></p>
+          <div v-for="s in taskSummary.species" :key="s.species" class="hud-detect">
+            <i class="hud-detect__dot" />
+            <div class="hud-detect__body">
+              <span class="hud-detect__name">{{ s.species }} ×{{ s.peak }}</span>
+              <span class="hud-detect__meta">{{ s.bbox ? '按抓拍定位落鸟' : '按峰值示意分布' }}</span>
+            </div>
+          </div>
+          <div class="hud-empty">逐帧明细与结果回放在 H5「检测记录」内查看</div>
         </div>
 
         <div class="hud-card">

@@ -32,11 +32,12 @@ import {
   createAlarmMarker,
   mulberry32,
 } from './orchard.js'
-import { createTerrain, createCrops } from './terrain.js'
+import { createTerrain } from './terrain.js'
 import { NODES, STATIONS, STATION_LABEL, nearestNode, bfsPath, nodePoints, neighborsOf } from './patrol.js'
 
 
-const MAX_BIRDS = 6
+/* 同时在场鸟数上限:按任务汇总落鸟时的硬顶(超出按比例缩放,性能实测 12 只流畅) */
+const MAX_BIRDS = 12
 
 export function createOrchardScene(canvas, options = {}) {
   const { onReady, onCrewAlertReady, onCrewArrived, onCrewReturned, onAutoRotateChange } = options
@@ -148,7 +149,7 @@ export function createOrchardScene(canvas, options = {}) {
   const ground = createGround(rand)
   scene.add(ground)
   scene.add(createTerrain(rand))
-  scene.add(createCrops(rand))
+  // 作物已包含在 createTerrain 内(terrain.js),这里不再重复种植
 
   // 远景林带（低多边形树环绕，增加纵深）
   const treeGroup = new THREE.Group()
@@ -732,29 +733,56 @@ export function createOrchardScene(canvas, options = {}) {
    * 检测结束后鸟不立即飞走，而是留在场景作为"待驱离目标"。
    * 每次驱离成功按概率驱散一部分，可能需要 2~3 次才能清空。
    */
-  const occupants = []   // 当前留在场景里的鸟 { species, confidence, bbox, scared, snap }
-  let lastDetKey = ''    // 当前采纳的物种签名，识别"新的检测帧"
-  let noRespawn = false  // 驱离清空后置位：本轮禁止再从旧检测数据复活鸟群
+  const occupants = []   // 当前留在场景里的鸟 { species, confidence, bbox, scared, snap, homeX, homeZ }
+  let noRespawn = false  // 驱离清空后置位：本轮禁止再复活鸟群
   let scareBoost = 0     // 驱离瞬间的惊飞强度 0~1，随时间衰减
   let captureCtx = { server: '', ticket: '' }   // 抓拍贴图所需上下文
   let snapTable = {}     // 物种 -> 抓拍文件名，随时可能更新
 
-  /** 从检测结果固化一批「居留鸟」 */
-  function adoptDetections(dets, snapshots) {
-    if (snapshots) snapTable = snapshots
+  /** 按任务汇总落鸟(物种×峰值,「一检一记」口径):
+   *  - 超过 MAX_BIRDS 时按比例缩放,每物种至少保留 1 只;
+   *  - 有 bbox 的物种按抓拍中心定位,同物种多只横向排开;无 bbox 的在果园内随机散布。 */
+  function adoptFromSummary(entries) {
     occupants.length = 0
-    dets.slice(0, MAX_BIRDS).forEach((d, i) => {
-      const info = snapTable[d.species] || null
-      occupants.push({
-        species: d.species || '',
-        confidence: d.confidence ?? 0.7,
-        bbox: Array.isArray(d.bbox) ? d.bbox.slice() : null,
-        scared: false,
-        // 抓拍图与该图自己的 bbox 成对使用（后端同帧保存）
-        snap: info ? info.name : null,
-        snapBbox: info ? info.bbox : null,
-      })
+    noRespawn = false
+    const list = (entries || []).filter((e) => e && e.species && (e.peak || 0) > 0)
+    if (!list.length) return 0
+    const total = list.reduce((sum, e) => sum + e.peak, 0)
+    const scale = total > MAX_BIRDS ? MAX_BIRDS / total : 1
+    const counts = list.map((e) => Math.max(1, Math.floor(e.peak * scale)))
+    let sum = counts.reduce((a, b) => a + b, 0)
+    while (sum > MAX_BIRDS) {
+      const idx = counts.indexOf(Math.max(...counts))
+      if (counts[idx] <= 1) break
+      counts[idx] -= 1
+      sum -= 1
+    }
+    list.forEach((e, i) => {
+      const info = snapTable[e.species] || null
+      const bbox = Array.isArray(e.bbox) && e.bbox.length === 4 ? e.bbox : null
+      let homeX = null
+      let homeZ = null
+      if (bbox) {
+        // 与帧检测同源的 960×540 → 果园映射(见 updateBirds)
+        homeX = ((bbox[0] + bbox[2]) / 2 / 960 - 0.5) * 26
+        homeZ = ((bbox[1] + bbox[3]) / 2 / 540 - 0.5) * 14
+      }
+      for (let k = 0; k < counts[i]; k += 1) {
+        const spread = counts[i] > 1 ? (k - (counts[i] - 1) / 2) * 2.4 : 0
+        occupants.push({
+          species: e.species,
+          confidence: e.confidence ?? 0.75,
+          bbox,
+          scared: false,
+          // 抓拍图与该图自己的 bbox 成对使用(后端同帧保存)
+          snap: info ? info.name : null,
+          snapBbox: info ? info.bbox : null,
+          homeX: homeX === null ? (Math.random() - 0.5) * 22 : Math.max(-12, Math.min(12, homeX + spread)),
+          homeZ: homeZ === null ? (Math.random() - 0.5) * 12 : Math.max(-6.5, Math.min(6.5, homeZ + (Math.random() - 0.5) * 1.2)),
+        })
+      }
     })
+    return occupants.length
   }
 
   /** 执行一次驱离:被移除的鸟播放逃散动画,剩余鸟进入惊飞状态;返回是否还有剩余 */
@@ -816,11 +844,16 @@ export function createOrchardScene(canvas, options = {}) {
       // 抓拍证据由面板展示；场景始终保留具有空间体积的鸟体。
       b.mesh.userData.sprite.visible = false
 
-      // ---- 用 bbox 映射鸟在果园中的位置 ----
+      // ---- 鸟在果园中的位置 ----
       // 画面坐标系：x 左→右（0~960），y 上→下（0~540）
-      // 映射到果园：bbox 中心 x 决定横向偏移（-14~+14），
-      //             bbox 中心 y 决定纵向位置（画面越靠下 = 离摄像头越近）
-      if (det && Array.isArray(det.bbox) && det.bbox.length === 4) {
+      // 汇总落鸟(adoptFromSummary)：homeX/homeZ 在采纳时已按 bbox 中心/随机点确定,
+      //   同物种多只横向排开,落位后不再随帧漂移;
+      // 兼容路径：若鸟没有 home(旧数据),仍按 bbox 中心跟随。
+      if (occ.homeX !== undefined) {
+        const lerp = Math.min(dt * 3, 1)
+        b.offsetX += (occ.homeX - b.offsetX) * lerp
+        b.offsetZ += (occ.homeZ - b.offsetZ) * lerp
+      } else if (det && Array.isArray(det.bbox) && det.bbox.length === 4) {
         const [x1, y1, x2, y2] = det.bbox
         const cx = (x1 + x2) / 2 / 960   // 0~1 归一化
         const cy = (y1 + y2) / 2 / 540
@@ -1021,32 +1054,14 @@ export function createOrchardScene(canvas, options = {}) {
       if (ticket) captureCtx.ticket = ticket
       if (snapshots) snapTable = snapshots
 
-      // 同步登记居留鸟群（仅在为空或物种集合变化时重建，避免贴图反复重置）
-      // noRespawn：本轮鸟群已被人工驱离清空，不再从旧检测数据复活；
-      // 新一轮检测由 clearOccupants() 复位该标志。
-      if (visual.detections.length) {
-        const sig = visual.detections.map((d) => d.species).join(',')
-        const needAdopt = (occupants.length === 0 && !noRespawn) || sig !== lastDetKey
-        if (needAdopt) {
-          lastDetKey = sig
-          noRespawn = false
-          adoptDetections(visual.detections, snapshots)
-        } else {
-          // 已驻留的鸟：补齐可能后到的抓拍图
-          const available = [...visual.detections]
-          for (const o of occupants) {
-            const index = available.findIndex((d) => d.species === o.species)
-            if (index >= 0) {
-              const d = available.splice(index, 1)[0]
-              o.bbox = Array.isArray(d.bbox) ? d.bbox.slice() : o.bbox
-              o.confidence = d.confidence ?? o.confidence
-            }
-            const info = snapTable[o.species]
-            if (!o.snap && info) {
-              o.snap = info.name
-              o.snapBbox = info.bbox
-            }
-          }
+      // 一检一记:检测帧不再直接生成居留鸟——检测完成后由 adoptFromSummary 按任务汇总落鸟
+      // (触发链:后端快照 last_task → App.vue watch → api.adoptFromSummary);
+      // 这里只负责为已驻留的鸟补齐可能后到的抓拍图。
+      for (const o of occupants) {
+        const info = snapTable[o.species]
+        if (!o.snap && info) {
+          o.snap = info.name
+          o.snapBbox = info.bbox
         }
       }
     },
@@ -1069,6 +1084,10 @@ export function createOrchardScene(canvas, options = {}) {
     occupantCount() {
       return occupants.length
     },
+    /** 按检测完成的任务汇总(物种×峰值)落鸟,返回实际落位数;见 adoptFromSummary */
+    adoptFromSummary(entries) {
+      return adoptFromSummary(entries)
+    },
     /** 供开发验证读取果农演示状态，不参与业务数据持久化。 */
     crewState() {
       return {
@@ -1087,7 +1106,6 @@ export function createOrchardScene(canvas, options = {}) {
     /** 清空居留鸟群（重新开始检测时调用） */
     clearOccupants() {
       occupants.length = 0
-      lastDetKey = ''
       noRespawn = false
       scareBoost = 0
     },
