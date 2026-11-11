@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>记录 B · 观测时间轴（含档案视图）</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:56px}
+.hgroup{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 10px}
+.hgroup b{font-size:19px;font-weight:900;letter-spacing:3px}
+.hgroup .tagy{background:var(--y);border:2px solid var(--ink);font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 rgba(25,25,25,.25)}
+.hgroup .vol{font-size:9px;color:var(--grey);letter-spacing:1px;text-align:right}
+.obs{display:flex;border:2px solid var(--ink);background:#fbfaf4;margin:0 14px}
+.obs div{flex:1;text-align:center;padding:9px 0 8px;border-right:2px solid var(--ink)}
+.obs div:last-child{border-right:0}
+.obs b{font-size:19px;font-weight:900}
+.obs span{display:block;font-size:8.5px;letter-spacing:2px;color:var(--grey);margin-top:2px;font-weight:700}
+/* 日分隔 */
+.day{display:flex;align-items:center;gap:8px;margin:16px 14px 10px}
+.day .sq{width:14px;height:14px;background:var(--r);border:2px solid var(--ink)}
+.day.grey .sq{background:var(--paper)}
+.day b{font-size:12px;font-weight:900;letter-spacing:2px;white-space:nowrap}
+.day .ln{flex:1;height:2px;background:var(--ink)}
+.day span{font-size:9px;color:var(--grey)}
+/* 时间轴:胶片孔 + 事件 */
+.tl{position:relative;margin:0 14px;padding-left:26px}
+.tl::before{content:'';position:absolute;left:8px;top:2px;bottom:2px;width:8px;
+  background-image:repeating-linear-gradient(180deg,var(--paper) 0 10px,var(--ink) 10px 14px);border:2px solid var(--ink)}
+.ev{position:relative;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22);margin-bottom:10px;padding:9px 11px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.ev:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(25,25,25,.3)}
+.ev::before{content:'';position:absolute;left:-24px;top:14px;width:10px;height:10px;background:var(--y);border:2px solid var(--ink)}
+.ev .r1{display:flex;align-items:center;gap:8px}
+.ev .r1 b{font-size:13px;font-weight:900}
+.ev .r1 .x{font-size:10px;font-weight:900;background:var(--ink);color:var(--y);padding:1px 6px}
+.ev .r1 .play{margin-left:auto;width:24px;height:24px;flex-shrink:0;background:var(--ink);color:var(--y);display:flex;align-items:center;justify-content:center;font-size:10px}
+.ev .meta{display:flex;gap:8px;margin-top:5px;font-size:8.5px;color:var(--grey);flex-wrap:wrap}
+.ev .meta i{font-style:normal}
+.ev .conf{display:flex;align-items:center;gap:5px;margin-top:7px}
+.ev .conf .track{flex:1;height:8px;border:2px solid var(--ink);background:var(--paper)}
+.ev .conf .track i{display:block;height:100%;background:var(--y)}
+.ev .conf span{font-size:9px;font-weight:900}
+.merge{display:inline-flex;align-items:center;gap:6px;border:2px dashed var(--grey);color:var(--grey);font-size:9px;font-weight:800;padding:4px 9px;margin:0 0 10px 26px}
+.merge i{font-style:normal;width:8px;height:8px;background:var(--grey)}
+/* 底部入口 */
+.librow{display:flex;align-items:center;justify-content:space-between;border:2px solid var(--ink);background:var(--ink);color:var(--y);margin:14px 14px 8px;padding:11px 12px;font-size:12.5px;font-weight:900;letter-spacing:2px;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:3px 3px 0 rgba(25,25,25,.3)}
+.librow:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(25,25,25,.35)}
+.librow span{font-size:9px;color:#9a9a92;letter-spacing:1px;font-weight:700}
+.note{font-size:9px;color:var(--grey);text-align:center;margin:6px 14px 12px;line-height:1.7}
+/* ============ 档案视图(点底部入口进入) ============ */
+.backrow{display:flex;align-items:center;gap:8px;margin:12px 14px 0;font-size:11px;font-weight:900;letter-spacing:1px;cursor:pointer}
+.backrow .bk{border:2px solid var(--ink);background:#fbfaf4;padding:4px 9px;box-shadow:2px 2px 0 rgba(25,25,25,.25)}
+.asub{display:flex;border:2px solid var(--ink);background:var(--paper);margin:10px 14px 0}
+.asub div{flex:1;text-align:center;padding:8px 0;font-size:12px;font-weight:800;letter-spacing:2px;border-right:2px solid var(--ink);opacity:.55;cursor:pointer}
+.asub div:last-child{border-right:0}
+.asub div.on{background:var(--ink);color:var(--y);opacity:1}
+.card{position:relative;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 4px 0 rgba(25,25,25,.22);margin:10px 14px 10px;padding:10px 10px 9px 12px}
+.card .tape{position:absolute;left:-6px;top:-7px;width:52px;height:12px;background:var(--y);border:2px solid var(--ink);transform:rotate(-6deg)}
+.card .r1{display:flex;align-items:center;gap:9px}
+.card .play{width:30px;height:30px;flex-shrink:0;background:var(--ink);color:var(--y);display:flex;align-items:center;justify-content:center;font-size:12px}
+.card .nm{flex:1;min-width:0}
+.card .nm b{display:block;font-size:12.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .nm span{display:block;font-size:8.5px;color:var(--grey);margin-top:2px}
+.card .st{flex-shrink:0;font-size:9px;font-weight:900;border:2px solid var(--ink);padding:1px 6px;transform:rotate(-3deg)}
+.card .st.ok{color:var(--grey);border-color:var(--grey)}
+.card .st.run{background:var(--y)}
+.card .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;align-items:center}
+.card .chips i{font-style:normal;border:1px solid var(--ink);font-size:9px;padding:1px 6px;font-weight:700}
+.card .back{margin-left:auto;font-size:10px;font-weight:900;text-decoration:underline;cursor:pointer}
+.folder{display:flex;align-items:center;gap:9px;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22);margin:10px 14px 8px;padding:9px 11px;cursor:pointer}
+.folder .ic{width:26px;height:26px;border:2px solid var(--ink);background:var(--y);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900}
+.folder .t b{display:block;font-size:12px;font-weight:900}
+.folder .t span{font-size:9px;color:var(--grey)}
+.folder .chev{margin-left:auto;font-size:14px;font-weight:900;color:var(--grey)}
+.alllink{display:block;text-align:center;font-size:11px;font-weight:900;text-decoration:underline;margin:4px 0 12px;cursor:pointer}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:13px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+.hidden{display:none}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl" id="barTtl">记 录</span><span class="item" id="barSub">观测时间轴 · 只记鸟情</span><span class="time mono">9:41</span></div>
+  <div class="content">
+
+    <!-- ===== 视图一:观测时间轴 ===== -->
+    <div id="viewTimeline">
+      <div class="hgroup"><b>观测时间轴</b><span class="tagy">TIMELINE</span><span class="vol">ST.01 东区<br>发现即记录</span></div>
+      <div class="obs">
+        <div><b>3</b><span>今日检测</span></div>
+        <div><b>12</b><span>本周新增</span></div>
+        <div><b>76</b><span>累计档案</span></div>
+      </div>
+
+      <div class="day"><span class="sq"></span><b>11月11日 · 今天</b><div class="ln"></div><span>3 次发现</span></div>
+      <div class="tl">
+        <div class="ev">
+          <div class="r1"><b>珠颈斑鸠</b><span class="x mono">×2</span><div class="play">▶</div></div>
+          <div class="meta"><i class="mono">09:41</i><i>东南果树区</i><i>片段 42.0–47.5 秒</i></div>
+          <div class="conf"><div class="track"><i style="width:93%"></i></div><span class="mono">93%</span></div>
+        </div>
+        <div class="ev">
+          <div class="r1"><b>八哥</b><span class="x mono">×1</span><div class="play">▶</div></div>
+          <div class="meta"><i class="mono">09:12</i><i>东侧通道</i><i>片段 08.0–11.2 秒</i></div>
+          <div class="conf"><div class="track"><i style="width:88%"></i></div><span class="mono">88%</span></div>
+        </div>
+        <div class="merge"><i></i>麻雀群 ×6 掠过树冠 · 同群活动已合并 ×3</div>
+        <div class="ev">
+          <div class="r1"><b>黑领椋鸟</b><span class="x mono">×2</span><div class="play">▶</div></div>
+          <div class="meta"><i class="mono">07:56</i><i>北侧柿林</i><i>片段 03.5–06.9 秒</i></div>
+          <div class="conf"><div class="track"><i style="width:86%"></i></div><span class="mono">86%</span></div>
+        </div>
+      </div>
+
+      <div class="day grey"><span class="sq"></span><b>11月10日</b><div class="ln"></div><span>2 次发现</span></div>
+      <div class="tl">
+        <div class="ev">
+          <div class="r1"><b>大嘴乌鸦</b><span class="x mono">×1</span><div class="play">▶</div></div>
+          <div class="meta"><i class="mono">16:38</i><i>西区步道</i><i>片段 12.0–14.1 秒</i></div>
+          <div class="conf"><div class="track"><i style="width:82%"></i></div><span class="mono">82%</span></div>
+        </div>
+        <div class="ev">
+          <div class="r1"><b>白喉红臀鹎</b><span class="x mono">×2</span><div class="play">▶</div></div>
+          <div class="meta"><i class="mono">08:12</i><i>东南果树区</i><i>片段 21.0–24.8 秒</i></div>
+          <div class="conf"><div class="track"><i style="width:96%"></i></div><span class="mono">96%</span></div>
+        </div>
+      </div>
+
+      <div class="librow" id="openArchive">打开视频档案 · 76 卷<span>按视频 / 按鸟类检索 ›</span></div>
+      <div class="note">时间轴只记鸟情发现，驱离操作以信号台播报为准 · 点 ▶ 回看检测片段<br>「按视频 / 按鸟类检索」点开后在页内切换视图，可随时返回时间轴</div>
+    </div>
+
+    <!-- ===== 视图二:视频档案(页内切换) ===== -->
+    <div id="viewArchive" class="hidden">
+      <div class="backrow"><span class="bk" id="backTl">◂ 返回时间轴</span><span style="color:#6f6f68;font-weight:700;font-size:10px">视频档案 · 76 卷</span></div>
+
+      <div class="asub"><div class="on" id="tabVideo">按视频</div><div id="tabSpecies">按鸟类</div></div>
+
+      <!-- 按视频:时间倒序卡片 -->
+      <div id="listVideo">
+        <div style="height:10px"></div>
+        <div class="card"><i class="tape"></i>
+          <div class="r1"><div class="play">▶</div><div class="nm"><b>大嘴乌鸦识别 · 结果视频</b><span class="mono">11/11 15:16 · 13.5 秒 · 结果已保存</span></div><span class="st ok">已归档</span></div>
+          <div class="chips"><i>大嘴乌鸦</i><span class="back">回看 ›</span></div>
+        </div>
+        <div class="card"><i class="tape"></i>
+          <div class="r1"><div class="play">▶</div><div class="nm"><b>东区果园巡航 02</b><span class="mono">11/11 11:14 · 8.4 秒 · 结果已保存</span></div><span class="st ok">已归档</span></div>
+          <div class="chips"><i>东方喜鹊</i><i>大嘴乌鸦</i><span class="back">回看 ›</span></div>
+        </div>
+        <div class="card"><i class="tape"></i>
+          <div class="r1"><div class="play">▶</div><div class="nm"><b>好柿临头，柿柿如意.mp4</b><span class="mono">11/11 10:55 · 9.9 秒 · 模型分析中 62%</span></div><span class="st run">分析中</span></div>
+          <div class="chips"><i class="more" style="border-style:dashed;color:#6f6f68;border-color:#6f6f68">等待识别结果</i></div>
+        </div>
+        <div class="note">时间倒序 · 点卡片回看，可跳到目标鸟出现的秒位</div>
+      </div>
+
+      <!-- 按鸟类:物种目录 -->
+      <div id="listSpecies" class="hidden">
+        <div style="height:10px"></div>
+        <div class="folder"><div class="ic">鸠</div><div class="t"><b>珠颈斑鸠</b><span>出现在 12 次视频检测中</span></div><span class="chev">›</span></div>
+        <div class="folder"><div class="ic">鹎</div><div class="t"><b>白喉红臀鹎</b><span>出现在 7 次视频检测中</span></div><span class="chev">›</span></div>
+        <div class="folder"><div class="ic">鸦</div><div class="t"><b>大嘴乌鸦</b><span>出现在 5 次视频检测中</span></div><span class="chev">›</span></div>
+        <span class="alllink">查看全部 5 类鸟类目录 ›</span>
+        <div class="note">点物种进入该鸟的视频列表 · 与图鉴页数据同源</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="dock"><span>最近发现 <b class="mono">09:41</b> · 数据来自果园服务</span><div class="nav"><span>信号台</span><span>告警</span><span>升降</span><span class="on">记录</span><span>我的</span></div></div>
+</div>
+<script>
+// 底部入口:时间轴 ⇄ 档案视图(页内切换)
+(function(){
+  const tl=document.getElementById('viewTimeline'),av=document.getElementById('viewArchive');
+  const ttl=document.getElementById('barTtl'),sub=document.getElementById('barSub');
+  document.getElementById('openArchive').addEventListener('click',()=>{
+    tl.classList.add('hidden');av.classList.remove('hidden');
+    ttl.textContent='视 频 档 案';sub.textContent='按视频 / 按鸟类检索';
+  });
+  document.getElementById('backTl').addEventListener('click',()=>{
+    av.classList.add('hidden');tl.classList.remove('hidden');
+    ttl.textContent='记 录';sub.textContent='观测时间轴 · 只记鸟情';
+  });
+  const tv=document.getElementById('tabVideo'),ts=document.getElementById('tabSpecies');
+  const lv=document.getElementById('listVideo'),ls=document.getElementById('listSpecies');
+  tv.addEventListener('click',()=>{tv.classList.add('on');ts.classList.remove('on');lv.classList.remove('hidden');ls.classList.add('hidden')});
+  ts.addEventListener('click',()=>{ts.classList.add('on');tv.classList.remove('on');ls.classList.remove('hidden');lv.classList.add('hidden')});
+})();
+</script>
+</body></html>

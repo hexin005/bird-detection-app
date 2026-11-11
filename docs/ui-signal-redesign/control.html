@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>升降 · 远程控制台</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:56px}
+.hgroup{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 10px}
+.hgroup b{font-size:19px;font-weight:900;letter-spacing:3px}
+.hgroup .hztag{border:2px solid var(--ink);font-size:9px;font-weight:900;letter-spacing:1px;padding:3px 6px;background:repeating-linear-gradient(-45deg,var(--y) 0 8px,var(--ink) 8px 16px);color:var(--ink);text-shadow:0 0 3px var(--paper)}
+.hgroup .vol{font-size:9px;color:var(--grey);letter-spacing:1px;text-align:right}
+/* 设备牌桌 */
+.plates{display:flex;gap:10px;margin:0 14px}
+.plate{flex:1;background:#fbfaf4;border:2px solid var(--ink);box-shadow:3px 4px 0 rgba(25,25,25,.22);position:relative;padding:15px 8px 10px;text-align:center}
+.plate::before{content:'';position:absolute;left:50%;top:4px;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:var(--paper);border:2px solid var(--ink)}
+.plate b{display:block;font-size:12.5px;font-weight:900;letter-spacing:1px}
+.plate .en{font-size:8px;color:var(--grey);letter-spacing:2px;margin-top:2px}
+.plate .lamp{display:inline-flex;align-items:center;gap:5px;margin-top:7px;border:2px solid var(--ink);padding:2px 8px;font-size:9px;font-weight:900}
+.plate .lamp i{width:8px;height:8px;border-radius:50%;background:var(--y);border:1px solid var(--ink)}
+.plate .lamp.off i{background:var(--r)}
+.plate .bars{margin-top:6px;font-size:9px;letter-spacing:2px;color:var(--ink)}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:16px 14px 8px}
+.sec b{font-size:12.5px;font-weight:900;letter-spacing:2px}
+.sec span{font-size:9px;color:var(--grey)}
+/* 方式旗 */
+.flags{display:flex;gap:8px;margin:0 14px 9px}
+.flag{flex:1;border:2px solid var(--ink);background:#fbfaf4;padding:9px 0 8px;text-align:center;font-size:12px;font-weight:900;box-shadow:3px 3px 0 rgba(25,25,25,.22);cursor:pointer}
+.flag small{display:block;font-size:8px;color:var(--grey);letter-spacing:1px;margin-top:2px}
+.flag.on{background:var(--ink);color:var(--y);transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(25,25,25,.3)}
+.flag.on small{color:#9a9a92}
+/* 时长拨盘 */
+.durs{display:flex;gap:8px;margin:0 14px}
+.dur{flex:1;border:2px solid var(--ink);background:#fbfaf4;text-align:center;padding:9px 0;box-shadow:3px 3px 0 rgba(25,25,25,.22);cursor:pointer}
+.dur b{font-size:17px;font-weight:900}
+.dur span{display:block;font-size:8px;color:var(--grey);letter-spacing:2px;margin-top:1px}
+.dur.on{background:var(--y)}
+.dur.on span{color:var(--ink)}
+/* 升起主杆 */
+.raise{margin:14px 14px 0;border:2px solid var(--ink);background:var(--ink);position:relative;cursor:pointer}
+.raise .hz{height:8px;background:repeating-linear-gradient(-45deg,var(--y) 0 10px,var(--ink) 10px 20px);border-bottom:2px solid var(--y)}
+.raise .t{color:var(--y);font-size:15px;font-weight:900;letter-spacing:5px;text-align:center;padding:12px 0 2px}
+.raise .s{display:block;text-align:center;font-size:9px;color:#9a9a92;letter-spacing:1px;padding-bottom:11px}
+.raise .rivet{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--y);top:14px}
+.raise .rivet.l{left:9px}.raise .rivet.r{right:9px}
+/* 策略 */
+.rule{display:flex;align-items:center;gap:9px;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22);margin:0 14px 8px;padding:10px 11px}
+.rule .no{width:24px;height:24px;flex-shrink:0;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+.rule .t{flex:1;min-width:0}
+.rule .t b{display:block;font-size:11.5px;font-weight:900}
+.rule .t span{display:block;font-size:8.5px;color:var(--grey);margin-top:2px}
+.rule .mode{flex-shrink:0;border:1px solid var(--ink);font-size:8.5px;font-weight:900;padding:2px 6px}
+/* 拨动开关 */
+.sw{flex-shrink:0;width:40px;height:20px;border:2px solid var(--ink);background:var(--paper);position:relative;cursor:pointer}
+.sw i{position:absolute;top:1px;left:1px;width:14px;height:12px;background:var(--grey);border:2px solid var(--ink)}
+.sw.on{background:var(--y)}
+.sw.on i{left:auto;right:1px;background:var(--ink)}
+.note{font-size:9px;color:var(--grey);text-align:center;margin:8px 14px 12px;letter-spacing:.5px}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:13px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl">升 降</span><span class="item">远程控制 · 人工确认后执行</span><span class="time mono">9:41</span></div>
+  <div class="content">
+    <div class="hgroup"><b>升降控制台</b><span class="hztag">REMOTE</span><span class="vol">双设备联动<br>定时自动降下</span></div>
+
+    <div class="plates">
+      <div class="plate"><b>声学驱鸟器 01</b><span class="en mono">ACOUSTIC 01 · 东区</span><span class="lamp"><i></i>在线</span><div class="bars">▲▲▲</div></div>
+      <div class="plate"><b>红外驱鸟器 02</b><span class="en mono">INFRARED 02 · 东区</span><span class="lamp"><i></i>在线</span><div class="bars">▲▲▲</div></div>
+    </div>
+
+    <div class="sec"><b>驱离方式</b><span>单次执行 · 不连续运行</span></div>
+    <div class="flags">
+      <div class="flag">▲ 声波<small>ACOUSTIC 01</small></div>
+      <div class="flag">▲ 红外<small>INFRARED 02</small></div>
+      <div class="flag on">▲▲ 双模联挂<small>DUAL-MODE</small></div>
+    </div>
+
+    <div class="sec"><b>单次时长</b><span>定时结束自动降下</span></div>
+    <div class="durs">
+      <div class="dur"><b class="mono">3</b><span>秒 · 快速</span></div>
+      <div class="dur on"><b class="mono">5</b><span>秒 · 标准</span></div>
+      <div class="dur"><b class="mono">8</b><span>秒 · 加强</span></div>
+    </div>
+
+    <div class="raise"><i class="rivet l"></i><i class="rivet r"></i>
+      <div class="hz"></div>
+      <div class="t">升起驱离信号</div>
+      <span class="s mono">关联 告警 #A-1027 · 珠颈斑鸠 · 人工确认后执行</span>
+    </div>
+
+    <div class="sec"><b>自动策略</b><span>触发条件满足时自动升牌</span></div>
+    <div class="rule">
+      <span class="no">1</span>
+      <div class="t"><b>告警出现即自动驱离</b><span>任一待处理告警 · 触发后冷却 60 秒</span></div>
+      <span class="mode">双模 5 秒</span>
+      <div class="sw on"><i></i></div>
+    </div>
+    <div class="rule">
+      <span class="no">2</span>
+      <div class="t"><b>鸟情突发升级</b><span>10 分钟内 ≥3 报 · 自动切换双模</span></div>
+      <span class="mode">双模 8 秒</span>
+      <div class="sw"><i></i></div>
+    </div>
+    <div class="rule">
+      <span class="no">◆</span>
+      <div class="t"><b>定时巡逻计划</b><span class="mono">06:00 – 19:00 · 每 45 分钟 · 双模 5 秒</span></div>
+      <span class="mode">运行中</span>
+      <div class="sw on"><i></i></div>
+    </div>
+
+    <div class="note">模拟执行器 · 不会控制真实硬件 · 每次执行均写入操作记录</div>
+  </div>
+  <div class="dock"><span>下次巡逻 <b class="mono">10:30</b> · 数据来自果园服务</span><div class="nav"><span>信号台</span><span>告警</span><span class="on">升降</span><span>记录</span><span>我的</span></div></div>
+</div>
+</body></html>

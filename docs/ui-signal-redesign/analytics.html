@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>数据分析 · 信号站统计板 V2（含聚焦动效）</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:56px}
+.hgroup{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 10px}
+.hgroup b{font-size:19px;font-weight:900;letter-spacing:3px}
+.hgroup .tagy{background:var(--y);border:2px solid var(--ink);font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 rgba(25,25,25,.25)}
+.hgroup .vol{font-size:9px;color:var(--grey);letter-spacing:1px;text-align:right}
+.ranges{display:flex;gap:8px;margin:0 14px 12px}
+.ranges span{flex:1;text-align:center;border:2px solid var(--ink);background:#fbfaf4;font-size:11px;font-weight:800;padding:7px 0;box-shadow:2px 2px 0 rgba(25,25,25,.22);cursor:pointer;transition:transform .1s,box-shadow .1s}
+.ranges span:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(25,25,25,.3)}
+.ranges span.on{background:var(--ink);color:var(--y)}
+/* 翻牌数板:悬停轻抬 */
+.flips{display:flex;flex-wrap:wrap;gap:8px;margin:0 14px}
+.flip{width:calc(50% - 4px);background:var(--ink);color:var(--y);padding:10px 0 8px;text-align:center;position:relative;transition:transform .12s,box-shadow .12s;cursor:default}
+.flip:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 rgba(245,196,0,.55)}
+.flip::before{content:'';position:absolute;inset:3px;border:1px solid rgba(245,196,0,.45);pointer-events:none}
+.flip b{font-size:26px;font-weight:900;line-height:1.1}
+.flip b small{font-size:12px}
+.flip span{display:block;font-size:8.5px;letter-spacing:2px;color:#9a9a92;margin-top:3px;font-weight:700}
+/* 图表窗口 */
+.win{border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 4px 0 rgba(25,25,25,.22);margin:12px 14px 0}
+.tbar{height:22px;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:6px;padding:0 8px}
+.tbar .sq{width:10px;height:10px;border:2px solid var(--ink);background:var(--y)}
+.tbar b{font-size:10px;font-weight:900;letter-spacing:1px;background:var(--ink);color:var(--y);padding:1px 8px}
+.tbar span{margin-left:auto;font-size:8px;color:var(--grey);letter-spacing:1px}
+.bd{padding:10px}
+.cap{font-size:9px;color:var(--grey);margin-top:6px;min-height:12px}
+.cap b{color:var(--ink)}
+/* 折线:标记点悬停放大 */
+.linewrap svg{display:block;width:100%}
+.linewrap .mk{transition:transform .12s;transform-box:fill-box;transform-origin:center;cursor:pointer}
+.linewrap .mk:hover{transform:scale(1.8)}
+.linewrap .hot:hover{transform:scale(1.35)}
+/* 排行:整行聚焦 */
+.rank{display:flex;flex-direction:column;gap:8px}
+.rank .row{display:flex;align-items:center;gap:8px;padding:3px 4px;margin:-3px -4px;cursor:pointer;transition:background .12s}
+.rank .row:hover{background:#f1efe2;outline:2px solid var(--ink);outline-offset:-2px}
+.rank .nm{width:74px;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank .nm i{font-style:normal;color:var(--r)}
+.rank .track{flex:1;height:13px;border:2px solid var(--ink);background:var(--paper)}
+.rank .track i{display:block;height:100%;background:var(--ink);transition:background .12s,transform .12s}
+.rank .row:hover .track i{background:var(--y)}
+.rank .track i.hz{background:repeating-linear-gradient(-45deg,var(--y) 0 8px,var(--ink) 8px 16px)}
+.rank .row:hover .track i.hz{background:repeating-linear-gradient(-45deg,var(--r) 0 8px,var(--ink) 8px 16px)}
+.rank .v{width:34px;text-align:right;font-size:11px}
+/* 时段热力 */
+.heat{display:flex;gap:2px}
+.heat i{flex:1;height:20px;border:1px solid var(--ink);background:var(--paper);cursor:pointer;transition:transform .1s}
+.heat i:hover{transform:scale(1.18);outline:2px solid var(--r);outline-offset:1px}
+.heat i.l1{background:#f0dc7a}
+.heat i.l2{background:var(--y)}
+.heat i.l3{background:var(--r)}
+.heatx{display:flex;justify-content:space-between;font-size:7.5px;color:var(--grey);margin-top:3px;font-weight:700}
+/* 饼图:扇区聚焦 */
+.piewrap{display:flex;align-items:center;gap:12px}
+.pie{flex-shrink:0}
+.pie .slice{cursor:pointer;transition:opacity .16s ease}
+.pie .slice circle{transition:stroke-width .14s steps(3)}
+.pie.focus .slice{opacity:.22}
+.pie.focus .slice.cur{opacity:1}
+.pie.focus .slice.cur .ink{stroke-width:37}
+.pie.focus .slice.cur .fill{stroke-width:33}
+.plegend{flex:1;display:flex;flex-direction:column;gap:6px}
+.plegend .r{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700}
+.plegend .r i{width:10px;height:10px;border:2px solid var(--ink);flex-shrink:0}
+.plegend .r b{margin-left:auto}
+/* 仪表 */
+.gauge{display:flex;align-items:center;gap:12px}
+.gauge .num b{font-size:30px;font-weight:900}
+.gauge .num span{display:block;font-size:8.5px;color:var(--grey);letter-spacing:2px;margin-top:2px}
+.gauge .mini{flex:1;display:flex;flex-direction:column;gap:5px}
+.gauge .mini .r{display:flex;justify-content:space-between;font-size:9.5px;border-bottom:1px solid var(--grey);padding-bottom:3px}
+.gauge .mini .r b{font-weight:900}
+.foot{font-size:9px;color:var(--grey);text-align:center;margin:12px 14px;letter-spacing:.5px}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:13px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl">数据分析</span><span class="item">ST.01 东区 · 自然日口径</span><span class="time mono">9:41</span></div>
+  <div class="content">
+    <div class="hgroup"><b>鸟情统计板</b><span class="tagy">STATS BOARD V2.1</span><span class="vol">悬停 / 点选有聚焦动效<br>口径:告警条数</span></div>
+    <div class="ranges"><span>今日</span><span>近 7 天</span><span class="on">近 30 天</span></div>
+
+    <div class="flips">
+      <div class="flip"><b class="mono">119</b><span>检测告警 · 条</span></div>
+      <div class="flip"><b class="mono">87</b><span>驱离执行 · 次</span></div>
+      <div class="flip"><b class="mono">93<small>%</small></b><span>执行完成率</span></div>
+      <div class="flip"><b class="mono">0.1<small>s</small></b><span>平均启动响应</span></div>
+    </div>
+
+    <!-- 折线:每日告警趋势 -->
+    <div class="win">
+      <div class="tbar"><span class="sq"></span><b>每日告警 · 折线</b><span>2026-10-13 ~ 11-11 · 条</span></div>
+      <div class="bd linewrap">
+        <svg viewBox="0 0 336 110" width="336" height="110">
+          <line x1="6" y1="12" x2="330" y2="12" stroke="#c8c6ba" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="6" y1="56" x2="330" y2="56" stroke="#c8c6ba" stroke-width="1" stroke-dasharray="3 3"/>
+          <polygon fill="rgba(245,196,0,.18)" points="6,96 17,98 28,98 40,100 51,98 62,96 73,98 84,100 95,98 107,12 118,54 129,96 140,98 151,98 162,94 174,66 185,96 196,98 207,96 218,92 229,96 241,98 252,94 263,96 274,90 285,94 296,96 308,87 319,92 330,94 330,100 6,100"/>
+          <polyline fill="none" stroke="#191919" stroke-width="2.5" points="6,96 17,98 28,98 40,100 51,98 62,96 73,98 84,100 95,98 107,12 118,54 129,96 140,98 151,98 162,94 174,66 185,96 196,98 207,96 218,92 229,96 241,98 252,94 263,96 274,90 285,94 296,96 308,87 319,92 330,94"/>
+          <g fill="#191919">
+            <rect class="mk" x="4" y="94" width="4" height="4"><title>10-13 · 2 条</title></rect><rect class="mk" x="15" y="96" width="4" height="4"><title>10-14 · 1 条</title></rect><rect class="mk" x="26" y="96" width="4" height="4"><title>10-15 · 1 条</title></rect><rect class="mk" x="38" y="98" width="4" height="4"><title>10-16 · 0 条</title></rect><rect class="mk" x="49" y="96" width="4" height="4"><title>10-17 · 1 条</title></rect><rect class="mk" x="60" y="94" width="4" height="4"><title>10-18 · 2 条</title></rect><rect class="mk" x="71" y="96" width="4" height="4"><title>10-19 · 1 条</title></rect><rect class="mk" x="82" y="98" width="4" height="4"><title>10-20 · 0 条</title></rect><rect class="mk" x="93" y="96" width="4" height="4"><title>10-21 · 1 条</title></rect><rect class="mk" x="116" y="52" width="4" height="4"><title>11-06 · 22 条</title></rect><rect class="mk" x="127" y="94" width="4" height="4"><title>11-07 · 2 条</title></rect><rect class="mk" x="138" y="96" width="4" height="4"><title>11-08 · 1 条</title></rect><rect class="mk" x="149" y="96" width="4" height="4"><title>11-09 · 1 条</title></rect><rect class="mk" x="160" y="92" width="4" height="4"><title>11-10 · 3 条</title></rect><rect class="mk" x="183" y="94" width="4" height="4"><title>11-12 · 2 条</title></rect><rect class="mk" x="194" y="96" width="4" height="4"><title>11-13 · 1 条</title></rect><rect class="mk" x="205" y="94" width="4" height="4"><title>11-14 · 2 条</title></rect><rect class="mk" x="216" y="90" width="4" height="4"><title>11-15 · 4 条</title></rect><rect class="mk" x="227" y="94" width="4" height="4"><title>11-16 · 2 条</title></rect><rect class="mk" x="239" y="96" width="4" height="4"><title>11-17 · 1 条</title></rect><rect class="mk" x="250" y="92" width="4" height="4"><title>11-18 · 3 条</title></rect><rect class="mk" x="261" y="94" width="4" height="4"><title>11-19 · 2 条</title></rect><rect class="mk" x="272" y="88" width="4" height="4"><title>11-20 · 5 条</title></rect><rect class="mk" x="283" y="92" width="4" height="4"><title>11-21 · 3 条</title></rect><rect class="mk" x="294" y="94" width="4" height="4"><title>11-22 · 2 条</title></rect><rect class="mk" x="306" y="85" width="4" height="4"><title>11-23 · 6 条</title></rect><rect class="mk" x="317" y="90" width="4" height="4"><title>11-24 · 4 条</title></rect><rect class="mk" x="328" y="92" width="4" height="4"><title>11-25 · 3 条</title></rect>
+          </g>
+          <g fill="#d3212c">
+            <rect class="mk hot" x="104" y="9" width="7" height="7" stroke="#191919" stroke-width="1.5"><title>11-05 · 42 条 · 返场预警</title></rect>
+            <rect class="mk hot" x="115" y="51" width="7" height="7" stroke="#191919" stroke-width="1.5"><title>11-06 · 22 条</title></rect>
+            <rect class="mk hot" x="171" y="63" width="7" height="7" stroke="#191919" stroke-width="1.5"><title>11-11 · 16 条</title></rect>
+          </g>
+        </svg>
+        <div class="dates" style="display:flex;justify-content:space-between;font-size:7.5px;color:#6f6f68;margin-top:3px;font-weight:700"><span>10-13</span><span>10-20</span><span>10-27</span><span>11-03</span><span>11-11</span></div>
+        <div class="cap" id="lineCap">悬停折线上的方块查看当日条数 · 红色为峰值日</div>
+      </div>
+    </div>
+
+    <!-- 条形:物种排行 -->
+    <div class="win">
+      <div class="tbar"><span class="sq"></span><b>告警物种 · TOP5 条形</b><span>条数 · 高危标红</span></div>
+      <div class="bd">
+        <div class="rank" id="rankList">
+          <div class="row"><span class="nm"><i>●</i> 珠颈斑鸠</span><div class="track"><i class="hz" style="width:100%"></i></div><span class="v mono">49</span></div>
+          <div class="row"><span class="nm"><i>●</i> 白喉红臀鹎</span><div class="track"><i style="width:47%"></i></div><span class="v mono">23</span></div>
+          <div class="row"><span class="nm"><i>●</i> 黑领椋鸟</span><div class="track"><i style="width:18%"></i></div><span class="v mono">9</span></div>
+          <div class="row"><span class="nm">东方喜鹊</span><div class="track"><i style="width:14%"></i></div><span class="v mono">7</span></div>
+          <div class="row"><span class="nm">八哥</span><div class="track"><i style="width:8%"></i></div><span class="v mono">4</span></div>
+        </div>
+        <div class="cap">悬停整行聚焦 · 点物种名可跳转图鉴 · 头名挂警示纹</div>
+      </div>
+    </div>
+
+    <!-- 饼图:告警状态构成(聚焦动效) -->
+    <div class="win">
+      <div class="tbar"><span class="sq"></span><b>告警状态构成 · 饼图</b><span>119 条</span></div>
+      <div class="bd piewrap" id="pieZone">
+        <svg class="pie" id="pieSvg" width="140" height="140" viewBox="0 0 140 140">
+          <g class="slice" data-label="已处理" data-cap="74 条 · 占 62%">
+            <circle class="ink" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="30" pathLength="100" stroke-dasharray="62.2 37.8" stroke-dashoffset="0" transform="rotate(-90 70 70)" pointer-events="none"/>
+            <circle class="fill" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="26" pathLength="100" stroke-dasharray="62.2 37.8" stroke-dashoffset="0" transform="rotate(-90 70 70)"/>
+          </g>
+          <g class="slice" data-label="已忽略" data-cap="27 条 · 占 23%">
+            <circle class="ink" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="30" pathLength="100" stroke-dasharray="22.7 77.3" stroke-dashoffset="-62.2" transform="rotate(-90 70 70)" pointer-events="none"/>
+            <circle class="fill" cx="70" cy="70" r="40" fill="none" stroke="#cfcdbc" stroke-width="26" pathLength="100" stroke-dasharray="22.7 77.3" stroke-dashoffset="-62.2" transform="rotate(-90 70 70)"/>
+          </g>
+          <g class="slice" data-label="执行中" data-cap="14 条 · 占 12%">
+            <circle class="ink" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="30" pathLength="100" stroke-dasharray="11.8 88.2" stroke-dashoffset="-84.9" transform="rotate(-90 70 70)" pointer-events="none"/>
+            <circle class="fill" cx="70" cy="70" r="40" fill="none" stroke="#f5c400" stroke-width="26" pathLength="100" stroke-dasharray="11.8 88.2" stroke-dashoffset="-84.9" transform="rotate(-90 70 70)"/>
+          </g>
+          <g class="slice" data-label="待处理" data-cap="4 条 · 占 3%">
+            <circle class="ink" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="30" pathLength="100" stroke-dasharray="3.4 96.6" stroke-dashoffset="-96.7" transform="rotate(-90 70 70)" pointer-events="none"/>
+            <circle class="fill" cx="70" cy="70" r="40" fill="none" stroke="#d3212c" stroke-width="26" pathLength="100" stroke-dasharray="3.4 96.6" stroke-dashoffset="-96.7" transform="rotate(-90 70 70)"/>
+          </g>
+          <text x="70" y="68" text-anchor="middle" font-size="19" font-weight="900" font-family="Consolas,monospace" fill="#191919" pointer-events="none">119</text>
+          <text x="70" y="82" text-anchor="middle" font-size="8" letter-spacing="2" fill="#6f6f68" pointer-events="none">总条数</text>
+        </svg>
+        <div class="plegend">
+          <div class="r"><i style="background:#191919"></i>已处理<b class="mono">74 · 62%</b></div>
+          <div class="r"><i style="background:#cfcdbc"></i>已忽略<b class="mono">27 · 23%</b></div>
+          <div class="r"><i style="background:#f5c400"></i>执行中<b class="mono">14 · 12%</b></div>
+          <div class="r"><i style="background:#d3212c"></i>待处理<b class="mono">4 · 3%</b></div>
+        </div>
+      </div>
+      <div class="bd" style="padding-top:0"><div class="cap" id="pieCap">悬停或点选扇区:该扇区加粗放大、其余淡出 · 再点一次取消</div></div>
+    </div>
+
+    <!-- 时段热力 -->
+    <div class="win">
+      <div class="tbar"><span class="sq"></span><b>时段活动 · 24H</b><span>告警条数</span></div>
+      <div class="bd">
+        <div class="heat" id="heatRow">
+          <i title="00 时 · 0 条"></i><i title="01 时 · 0 条"></i><i title="02 时 · 0 条"></i><i title="03 时 · 0 条"></i><i title="04 时 · 0 条"></i><i class="l1" title="05 时 · 1 条"></i><i class="l2" title="06 时 · 3 条"></i><i class="l3" title="07 时 · 8 条"></i><i class="l3" title="08 时 · 9 条 · 峰值"></i><i class="l2" title="09 时 · 4 条"></i><i class="l1" title="10 时 · 1 条"></i><i class="l1" title="11 时 · 2 条"></i><i title="12 时 · 0 条"></i><i title="13 时 · 0 条"></i><i class="l1" title="14 时 · 1 条"></i><i class="l1" title="15 时 · 1 条"></i><i class="l2" title="16 时 · 3 条"></i><i class="l3" title="17 时 · 7 条 · 峰值"></i><i class="l2" title="18 时 · 3 条"></i><i class="l1" title="19 时 · 2 条"></i><i class="l1" title="20 时 · 1 条"></i><i title="21 时 · 0 条"></i><i title="22 时 · 0 条"></i><i title="23 时 · 0 条"></i>
+        </div>
+        <div class="heatx"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+        <div class="cap" id="heatCap">悬停格子查看该时段条数 · 峰值 08 时 / 17 时</div>
+      </div>
+    </div>
+
+    <!-- 驱离执行 -->
+    <div class="win">
+      <div class="tbar"><span class="sq"></span><b>驱离执行 · 读数</b><span>模拟执行器</span></div>
+      <div class="bd">
+        <div class="gauge">
+          <div class="num"><b class="mono">93%</b><span>完成率</span></div>
+          <div class="mini">
+            <div class="r"><span>执行 87 次</span><b class="mono">完成 81 · 失败 2 · 进行 4</b></div>
+            <div class="r"><span>双模占比</span><b class="mono">62%</b></div>
+            <div class="r" style="border:0"><span>平均完成耗时</span><b class="mono">8.4s</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">统计口径:告警按自然日计条,非逐帧识别次数 · 数据来自果园服务</div>
+  </div>
+  <div class="dock"><span>范围 <b class="mono">30D</b> · 119 条告警</span><div class="nav"><span>信号台</span><span>告警</span><span>升降</span><span>记录</span><span>我的</span></div></div>
+</div>
+<script>
+// 饼图聚焦:hover 预览,点击钉住;再点空白/重复点击取消
+(function(){
+  const svg=document.getElementById('pieSvg'),zone=document.getElementById('pieZone'),cap=document.getElementById('pieCap');
+  const base='悬停或点选扇区:该扇区加粗放大、其余淡出 · 再点一次取消';
+  const slices=[...svg.querySelectorAll('.slice')];
+  function focus(s){svg.classList.add('focus');slices.forEach(x=>x.classList.toggle('cur',x===s));cap.textContent=s.dataset.label+' · '+s.dataset.cap}
+  function reset(){svg.classList.remove('focus');slices.forEach(x=>x.classList.remove('cur'));cap.textContent=base}
+  slices.forEach(s=>{
+    s.addEventListener('mouseenter',()=>focus(s));
+    s.addEventListener('click',e=>{e.stopPropagation();svg.dataset.pinned=s.dataset.label;focus(s)});
+  });
+  svg.addEventListener('mouseleave',()=>{if(!svg.dataset.pinned)reset()});
+  zone.addEventListener('click',e=>{
+    const hit=e.target.closest('.slice');
+    if(!hit){delete svg.dataset.pinned;reset()}
+  });
+})();
+// 折线标记悬停更新说明
+(function(){
+  const cap=document.getElementById('lineCap');
+  const base='悬停折线上的方块查看当日条数 · 红色为峰值日';
+  document.querySelectorAll('.linewrap .mk').forEach(m=>{
+    m.addEventListener('mouseenter',()=>{cap.textContent='点选 '+m.querySelector('title').textContent.replace(' · 返场预警','')+'（点按可看当日明细）'});
+    m.addEventListener('mouseleave',()=>{cap.textContent=base});
+  });
+})();
+// 物种行聚焦说明
+(function(){
+  const list=document.getElementById('rankList');
+  const cap=list.parentElement.querySelector('.cap');
+  const base='悬停整行聚焦 · 点物种名可跳转图鉴 · 头名挂警示纹';
+  list.querySelectorAll('.row').forEach(r=>{
+    r.addEventListener('mouseenter',()=>{cap.textContent='聚焦 '+r.querySelector('.nm').textContent.trim()+' · '+r.querySelector('.v').textContent+' 条'});
+    r.addEventListener('mouseleave',()=>{cap.textContent=base});
+  });
+})();
+// 热力格悬停说明
+(function(){
+  const cap=document.getElementById('heatCap');
+  const base='悬停格子查看该时段条数 · 峰值 08 时 / 17 时';
+  document.querySelectorAll('#heatRow i').forEach(c=>{
+    c.addEventListener('mouseenter',()=>{cap.textContent=c.title});
+    c.addEventListener('mouseleave',()=>{cap.textContent=base});
+  });
+})();
+</script>
+</body></html>

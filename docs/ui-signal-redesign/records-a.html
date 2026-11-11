@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>记录 A · 观测档案柜</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c;--stamp:#3b55c4}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:56px}
+.pad{padding:0 14px}
+.hgroup{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 10px}
+.hgroup b{font-size:19px;font-weight:900;letter-spacing:3px}
+.hgroup .tagy{background:var(--y);border:2px solid var(--ink);font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 rgba(25,25,25,.25)}
+.hgroup .vol{font-size:9px;color:var(--grey);letter-spacing:1px;text-align:right}
+.obs{display:flex;border:2px solid var(--ink);background:#fbfaf4;margin:0 14px}
+.obs div{flex:1;text-align:center;padding:9px 0 8px;border-right:2px solid var(--ink)}
+.obs div:last-child{border-right:0}
+.obs b{font-size:19px;font-weight:900}
+.obs b.red{color:var(--r)}
+.obs span{display:block;font-size:8.5px;letter-spacing:2px;color:var(--grey);margin-top:2px;font-weight:700}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:16px 14px 8px}
+.sec b{font-size:12.5px;font-weight:900;letter-spacing:2px}
+.sec b i{font-style:normal;color:var(--r)}
+.sec span{font-size:9px;color:var(--grey)}
+/* 检测片段胶片条 */
+.strip{display:flex;gap:8px;margin:0 14px;overflow:hidden}
+.clip{width:110px;flex-shrink:0;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22)}
+.clip .screen{height:52px;background:var(--ink);position:relative;display:flex;align-items:center;justify-content:center}
+.clip .screen i{width:22px;height:22px;background:var(--y);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:900}
+.clip .screen em{position:absolute;left:4px;top:3px;font-style:normal;font-size:7.5px;color:var(--y);letter-spacing:1px}
+.clip .in{padding:6px 7px 7px}
+.clip .in b{display:block;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clip .in span{display:block;font-size:8.5px;color:var(--grey);margin-top:2px}
+/* 分段 */
+.seg{display:flex;border:2px solid var(--ink);background:var(--paper);margin:0 14px}
+.seg div{flex:1;text-align:center;padding:8px 0;font-size:12px;font-weight:800;letter-spacing:2px;border-right:2px solid var(--ink);opacity:.55;cursor:pointer}
+.seg div:last-child{border-right:0}
+.seg div.on{background:var(--ink);color:var(--y);opacity:1}
+/* 档案卡 */
+.card{position:relative;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 4px 0 rgba(25,25,25,.22);margin:0 14px 10px;padding:10px 10px 9px 12px}
+.card .tape{position:absolute;left:-6px;top:-7px;width:52px;height:12px;background:var(--y);border:2px solid var(--ink);transform:rotate(-6deg)}
+.card .r1{display:flex;align-items:center;gap:9px}
+.card .play{width:30px;height:30px;flex-shrink:0;background:var(--ink);color:var(--y);display:flex;align-items:center;justify-content:center;font-size:12px}
+.card .nm{flex:1;min-width:0}
+.card .nm b{display:block;font-size:12.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .nm span{display:block;font-size:8.5px;color:var(--grey);margin-top:2px}
+.card .st{flex-shrink:0;font-size:9px;font-weight:900;border:2px solid var(--ink);padding:1px 6px;transform:rotate(-3deg)}
+.card .st.ok{color:var(--grey);border-color:var(--grey)}
+.card .st.run{background:var(--y)}
+.card .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;align-items:center}
+.card .chips i{font-style:normal;border:1px solid var(--ink);font-size:9px;padding:1px 6px;font-weight:700}
+.card .chips .more{border-style:dashed;color:var(--grey);border-color:var(--grey)}
+.card .back{margin-left:auto;font-size:10px;font-weight:900;text-decoration:underline;cursor:pointer}
+/* 鸟类目录 */
+.folder{display:flex;align-items:center;gap:9px;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22);margin:0 14px 8px;padding:9px 11px}
+.folder .ic{width:26px;height:26px;border:2px solid var(--ink);background:var(--y);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900}
+.folder .t b{display:block;font-size:12px;font-weight:900}
+.folder .t span{font-size:9px;color:var(--grey)}
+.folder .chev{margin-left:auto;font-size:14px;font-weight:900;color:var(--grey)}
+.alllink{display:block;text-align:center;font-size:11px;font-weight:900;text-decoration:underline;margin:4px 0 12px;cursor:pointer}
+.note{font-size:9px;color:var(--grey);text-align:center;margin:2px 14px 10px;letter-spacing:.5px}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:13px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl">记 录</span><span class="item">观测档案 · 按视频回看</span><span class="time mono">9:41</span></div>
+  <div class="content">
+    <div class="hgroup"><b>观测档案</b><span class="tagy">ARCHIVE · 档案柜</span><span class="vol">ST.01 东区<br>自动归档</span></div>
+    <div class="obs">
+      <div><b>76</b><span>累计档案</span></div>
+      <div><b>5</b><span>检出物种</span></div>
+      <div><b>12</b><span>本周新增</span></div>
+      <div><b class="red">3</b><span>未出结果</span></div>
+    </div>
+
+    <div class="sec"><b>最新检测片段</b><span>点片段直接回看</span></div>
+    <div class="strip">
+      <div class="clip"><div class="screen"><em>LIVE-CAP</em><i>▶</i></div><div class="in"><b>大嘴乌鸦 ×1</b><span class="mono">11/11 15:16 · 88%</span></div></div>
+      <div class="clip"><div class="screen"><em>LIVE-CAP</em><i>▶</i></div><div class="in"><b>东方喜鹊 ×1</b><span class="mono">11/11 11:14 · 91%</span></div></div>
+      <div class="clip"><div class="screen"><em>LIVE-CAP</em><i>▶</i></div><div class="in"><b>黑领椋鸟 ×2</b><span class="mono">11/11 10:55 · 86%</span></div></div>
+    </div>
+
+    <div class="sec"><b>视频档案</b><span>76 卷 · 按时间倒序</span></div>
+    <div class="seg"><div class="on">按视频</div><div>按鸟类</div></div>
+    <div style="height:10px"></div>
+
+    <div class="card"><i class="tape"></i>
+      <div class="r1"><div class="play">▶</div><div class="nm"><b>大嘴乌鸦识别 · 结果视频</b><span class="mono">11/11 15:16 · 13.5 秒 · 结果已保存</span></div><span class="st ok">已归档</span></div>
+      <div class="chips"><i>大嘴乌鸦</i><span class="back">回看 ›</span></div>
+    </div>
+    <div class="card"><i class="tape"></i>
+      <div class="r1"><div class="play">▶</div><div class="nm"><b>东区果园巡航 02</b><span class="mono">11/11 11:14 · 8.4 秒 · 结果已保存</span></div><span class="st ok">已归档</span></div>
+      <div class="chips"><i>东方喜鹊</i><i>大嘴乌鸦</i><span class="back">回看 ›</span></div>
+    </div>
+    <div class="card"><i class="tape"></i>
+      <div class="r1"><div class="play">▶</div><div class="nm"><b>好柿临头，柿柿如意.mp4</b><span class="mono">11/11 10:55 · 9.9 秒 · 结果已保存</span></div><span class="st ok">已归档</span></div>
+      <div class="chips"><i>黑领椋鸟</i><span class="back">回看 ›</span></div>
+    </div>
+    <div class="card"><i class="tape"></i>
+      <div class="r1"><div class="play">▶</div><div class="nm"><b>flow2d-clip.mp4</b><span class="mono">11/11 07:56 · 8.0 秒 · 模型分析中 62%</span></div><span class="st run">分析中</span></div>
+      <div class="chips"><i class="more">等待识别结果</i></div>
+    </div>
+
+    <div class="sec"><b>鸟类目录</b><span>自动建立 · 点开按鸟查视频</span></div>
+    <div class="folder"><div class="ic">雀</div><div class="t"><b>珠颈斑鸠</b><span>出现在 12 次视频检测中</span></div><span class="chev">›</span></div>
+    <div class="folder"><div class="ic">鹎</div><div class="t"><b>白喉红臀鹎</b><span>出现在 7 次视频检测中</span></div><span class="chev">›</span></div>
+    <span class="alllink">查看全部 5 类鸟类目录 ›</span>
+    <div class="note">封面截取自检测结果 · 归档后可在任何时间回看</div>
+  </div>
+  <div class="dock"><span>观测档案 <b class="mono">76</b> 卷 · 数据来自果园服务</span><div class="nav"><span>信号台</span><span>告警</span><span>升降</span><span class="on">记录</span><span>我的</span></div></div>
+</div>
+</body></html>

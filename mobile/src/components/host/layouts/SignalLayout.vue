@@ -5,6 +5,7 @@ import SignalMonitor from '../../theme-pages/SignalMonitor.vue'
 import SignalAlarmPage from '../../theme-pages/SignalAlarmPage.vue'
 import SignalControlPage from '../../theme-pages/SignalControlPage.vue'
 import SignalRecordsPage from '../../theme-pages/SignalRecordsPage.vue'
+import SpeciesGuide from '../pages/SpeciesGuide.vue'
 
 const host = useHost()
 const tabs = [
@@ -58,17 +59,28 @@ const tabs = [
     <view class="statusbar">
       <view class="qh-menubar">
         <text class="qh-menubar__ttl">记录</text>
-        <text class="qh-menubar__item">按视频回看</text>
+        <text class="qh-menubar__item">观测时间轴 · 只记鸟情</text>
         <view class="qh-menubar__right"><text class="time">9:41</text></view>
       </view>
     </view>
     <view class="page__content"><SignalRecordsPage /></view>
   </view>
 
+  <view class="page" :class="{ 'is-current': host.page === 'guide' }">
+    <view class="statusbar">
+      <view class="qh-menubar">
+        <text class="qh-menubar__back" @click="host.nav('me')">◂ 返回我的</text>
+        <text class="qh-menubar__ttl">鸟类图鉴</text>
+        <view class="qh-menubar__right"><text class="time">9:41</text></view>
+      </view>
+    </view>
+    <view class="page__content"><SpeciesGuide /></view>
+  </view>
+
   <!-- 信号站 dock -->
   <view class="qh-tabbar">
     <view class="qh-tabbar__pill">
-      <button v-for="t in tabs" :key="t.id" class="qh-tab" :class="{ 'is-active': host.page === t.id || (t.id === 'me' && ['me','themes','analytics'].includes(host.page)) }" @click="host.nav(t.id)">
+      <button v-for="t in tabs" :key="t.id" class="qh-tab" :class="{ 'is-active': host.page === t.id || (t.id === 'me' && ['me','themes','analytics','guide'].includes(host.page)) }" @click="host.nav(t.id)">
         <text class="sgn-tab-cn">{{ t.label }}</text>
         <text v-if="t.id === 'alarms' && host.s?.counts.pending" class="qh-tab__badge">{{ host.s.counts.pending }}</text>
       </button>

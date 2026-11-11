@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>C 主题四页重设计 · 预览批次</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink);padding:34px 18px 60px}
+.wrap{max-width:860px;margin:0 auto}
+.head{background:var(--ink);color:var(--paper);padding:16px 20px;display:flex;justify-content:space-between;align-items:baseline}
+.head b{font-size:20px;font-weight:900;letter-spacing:4px}
+.head span{font-size:10px;color:#9a9a92;letter-spacing:2px}
+.card{border:2px solid var(--ink);background:var(--paper);box-shadow:4px 5px 0 rgba(25,25,25,.25);margin:14px 0;padding:14px 16px;display:flex;gap:14px;align-items:flex-start}
+.card .no{width:34px;height:34px;flex-shrink:0;background:var(--y);border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px}
+.card h3{font-size:14px;font-weight:900;letter-spacing:1px}
+.card h3 a{color:var(--ink)}
+.card p{font-size:11px;color:var(--grey);line-height:1.8;margin-top:5px}
+.card p b{color:var(--ink)}
+.card .go{margin-left:auto;flex-shrink:0;border:2px solid var(--ink);background:var(--ink);color:var(--y);font-size:11px;font-weight:900;letter-spacing:2px;padding:8px 12px;text-decoration:none;align-self:center}
+.scope{border:2px dashed var(--ink);background:#fbfaf4;margin:16px 0;padding:12px 16px;font-size:11px;line-height:2}
+.scope b{color:var(--r)}
+.tip{font-size:10px;color:var(--grey);margin-top:14px;line-height:1.9}
+</style></head><body>
+<div class="wrap">
+  <div class="head"><b>C 主题 · 四页重设计预览</b><span>QINGHE SIGNAL · REDESIGN BATCH 01</span></div>
+
+  <div class="scope">
+    本批次只重设计 <b>记录、升降(远程控制)、数据分析、告警</b> 四页；<b>监控主页保持已复刻的原样不动</b>。
+    全部方案沿用 C 主题既有语言：象牙白纸面 + 信号黄/信号红 + 黑色告示边框 + 硬偏移阴影 + 挂牌/警示纹意象（禁渐变、禁圆角容器、禁 emoji）。
+  </div>
+
+  <div class="card"><span class="no">A</span><div><h3><a href="records-a.html">记录 · 方案A「观测档案柜」<span style="font-size:10px;color:#6f6f68">（未选用）</span></a></h3>
+    <p>去掉执行日志，以<b>视频档案</b>为主体：顶部累计统计带 → 最新检测片段胶片条 → 按视频/按鸟类分段 → 带黄胶带的档案卡列表 → 鸟类目录入口。</p></div><a class="go" href="records-a.html">查看 ›</a></div>
+
+  <div class="card"><span class="no">B</span><div><h3><a href="records-b.html">记录 · 方案B「观测时间轴」<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">已选定</span></a></h3>
+    <p>去掉执行日志：改为<b>按日分组的时间轴</b>，左侧胶片孔 + 置信度条，同群活动合并标注。底部「打开视频档案」<b>页内切换</b>出档案视图：按视频（时间倒序卡片）/ 按鸟类（物种目录）两个子标签，可随时返回时间轴。事件卡与入口带悬停抬移动效。</p></div><a class="go" href="records-b.html">查看 ›</a></div>
+
+  <div class="card"><span class="no">C</span><div><h3><a href="control.html">升降 · 「远程控制台」</a></h3>
+    <p>设备<b>挂牌牌桌</b>（在线状态灯 + 信号格）→ 驱离方式旗 → 时长拨盘 → 警示纹主杆「升起驱离信号」→ 自动策略规则行（拨动开关 + 巡逻计划）。</p></div><a class="go" href="control.html">查看 ›</a></div>
+
+  <div class="card"><span class="no">D</span><div><h3><a href="analytics.html">数据分析 · 「鸟情统计板」V2<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">已加饼图/折线</span></a></h3>
+    <p>黑底翻牌数板 + 五种图表：<b>每日告警折线图</b>（峰值红色方块）、<b>物种排行条形</b>（头名警示纹）、<b>状态构成饼图</b>、<b>24H 时段热力</b>、<b>完成率读数</b>。全图带<b>聚焦动效</b>：饼图悬停/点选扇区加粗放大、其余淡出（可钉住）；折线标记、排行行、热力格均有同款聚焦与说明联动。口径统一为“告警条数”。</p></div><a class="go" href="analytics.html">查看 ›</a></div>
+
+  <div class="card"><span class="no">E</span><div><h3><a href="alarms.html">告警 · 「挂牌告警墙」<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">筛选改横滑+弹层</span></a></h3>
+    <p>待处理告警挂上<b>挂牌墙</b>：挂杆 + 吊绳 + 微倾斜牌面，牌内含置信度条与「升旗驱离 / 忽略」动作。物种筛选改为<b>一排横滑 chips + 行尾「全部物种 ▾」弹层</b>（13 类放得下），承接图鉴“查看该鸟告警”；历史处置为撕票工单行。</p></div><a class="go" href="alarms.html">查看 ›</a></div>
+
+  <div class="tip">反馈方式：直接说哪一页要改什么（如“记录用方案B，但统计带只留两个数字”）；确认后我再出实施计划，经你审核才动业务代码。</div>
+</div>
+</body></html>

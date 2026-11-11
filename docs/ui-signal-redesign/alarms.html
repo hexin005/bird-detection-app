@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>告警 · 挂牌墙（横滑筛选）</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:56px}
+.hgroup{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 8px}
+.hgroup b{font-size:19px;font-weight:900;letter-spacing:3px}
+.hgroup b em{font-style:normal;color:var(--r)}
+.hgroup .tagy{background:var(--r);border:2px solid var(--ink);color:#fff;font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 rgba(25,25,25,.25)}
+.hgroup .vol{font-size:9px;color:var(--grey);letter-spacing:1px;text-align:right}
+/* 物种筛选:横向滑动一排 */
+.chipstrip{position:relative;margin:0 14px 4px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;border:2px solid var(--ink);background:#fbfaf4;font-size:10px;font-weight:800;padding:4px 9px;cursor:pointer;white-space:nowrap}
+.chip small{font-size:8px;color:var(--grey);margin-left:3px}
+.chip.on{background:var(--ink);color:var(--y)}
+.chip.on small{color:#9a9a92}
+.chip.all{background:var(--y)}
+.fade{position:absolute;right:0;top:0;bottom:6px;width:26px;background:linear-gradient(90deg,rgba(242,241,234,0),var(--paper));pointer-events:none}
+.hint{font-size:8.5px;color:var(--grey);margin:0 14px 6px;letter-spacing:.5px}
+/* 挂牌墙 */
+.rail{margin:8px 14px 0;height:6px;background:var(--ink)}
+.wall{padding:0 18px;position:relative}
+.hang{margin:0 -4px 14px;position:relative}
+.hang .string{width:0;height:16px;border-left:2px dashed var(--ink);margin:0 auto}
+.tag{background:#fbfaf4;border:2px solid var(--ink);box-shadow:4px 5px 0 rgba(25,25,25,.25);position:relative;padding:15px 12px 11px;transform:rotate(-.6deg)}
+.hang:nth-child(odd) .tag{transform:rotate(.6deg)}
+.tag::before{content:'';position:absolute;left:50%;top:4px;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:var(--paper);border:2px solid var(--ink)}
+.tag .r1{display:flex;align-items:center;gap:8px}
+.tag .r1 b{font-size:15px;font-weight:900;letter-spacing:1px}
+.tag .r1 .x{font-size:11px;font-weight:900;background:var(--ink);color:var(--y);padding:1px 7px}
+.tag .r1 .st{margin-left:auto;font-size:10px;font-weight:900;border:2px solid var(--ink);padding:2px 8px;transform:rotate(-3deg);background:var(--r);border-color:var(--r);color:#fff}
+.tag .r1 .st.run{background:var(--y);border-color:var(--ink);color:var(--ink)}
+.tag .meta{font-size:9px;color:var(--grey);margin-top:4px;letter-spacing:.5px}
+.tag .conf{display:flex;align-items:center;gap:6px;margin-top:7px}
+.tag .conf .track{flex:1;height:8px;border:2px solid var(--ink);background:var(--paper)}
+.tag .conf .track i{display:block;height:100%;background:var(--y)}
+.tag .conf span{font-size:9.5px;font-weight:900}
+.tag .acts{display:flex;gap:8px;margin-top:10px}
+.tag .acts span{flex:1;text-align:center;font-size:11px;font-weight:900;border:2px solid var(--ink);padding:8px 0;cursor:pointer;background:var(--paper)}
+.tag .acts .main{background:var(--ink);color:var(--y)}
+/* 历史工单 */
+.sec{display:flex;justify-content:space-between;align-items:center;margin:14px 14px 8px}
+.sec b{font-size:12.5px;font-weight:900;letter-spacing:2px}
+.sec span{font-size:9px;color:var(--grey)}
+.ticket{display:flex;align-items:center;gap:9px;border:2px solid var(--ink);border-left-style:dashed;background:#fbfaf4;box-shadow:3px 3px 0 rgba(25,25,25,.22);margin:0 14px 8px;padding:9px 11px;cursor:pointer}
+.ticket b{font-size:12px;font-weight:900}
+.ticket .m{font-size:8.5px;color:var(--grey);margin-top:2px}
+.ticket .mid{flex:1;min-width:0}
+.ticket .st{flex-shrink:0;font-size:9px;font-weight:900;border:2px solid var(--ink);padding:1px 6px;transform:rotate(-2deg)}
+.ticket .st.dim{border-color:var(--grey);color:var(--grey)}
+.ticket .chev{color:var(--grey);font-weight:900}
+/* 全部物种弹层(示意) */
+.sheetdemo{margin:14px 14px 4px;border:2px dashed var(--grey);padding:10px}
+.sheetdemo .cap{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--grey);letter-spacing:1px;margin-bottom:8px}
+.sheetdemo .cap b{color:var(--ink);font-size:10px}
+.grid{display:flex;flex-wrap:wrap;gap:6px}
+.grid span{border:2px solid var(--ink);background:#fbfaf4;font-size:10px;font-weight:800;padding:5px 10px}
+.grid span.on{background:var(--ink);color:var(--y)}
+.sheetdemo .btns{display:flex;gap:8px;margin-top:9px}
+.sheetdemo .btns span{flex:1;text-align:center;font-size:10px;font-weight:900;border:2px solid var(--ink);padding:7px 0;cursor:pointer;background:var(--paper)}
+.sheetdemo .btns .ok{background:var(--ink);color:var(--y)}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:13px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl">告 警</span><span class="item">待人工确认后执行驱离</span><span class="time mono">9:41</span></div>
+  <div class="content">
+    <div class="hgroup"><b>挂牌告警墙</b><span class="tagy">待处理 <span class="mono">2</span></span><span class="vol">确认才会升牌<br>误报可忽略</span></div>
+
+    <!-- 物种筛选:横向滑动,行尾"全部"弹层 -->
+    <div class="chipstrip">
+      <div class="chips">
+        <span class="chip on">全部<small>4</small></span>
+        <span class="chip">珠颈斑鸠<small>1</small></span>
+        <span class="chip">八哥<small>1</small></span>
+        <span class="chip">白喉红臀鹎<small>1</small></span>
+        <span class="chip">大嘴乌鸦<small>1</small></span>
+        <span class="chip">黑领椋鸟<small>2</small></span>
+        <span class="chip">树麻雀<small>3</small></span>
+        <span class="chip">丝光椋鸟<small>1</small></span>
+        <span class="chip all">全部物种 ▾</span>
+      </div>
+      <div class="fade"></div>
+    </div>
+    <div class="hint">← 常用物种一排横滑 · 点「全部物种 ▾」弹层选满 13 类 →</div>
+
+    <div class="rail"></div>
+    <div class="wall">
+      <div class="hang">
+        <div class="string"></div>
+        <div class="tag">
+          <div class="r1"><b>珠颈斑鸠</b><span class="x mono">×2</span><span class="st">待处理</span></div>
+          <div class="meta mono">09:41 · 东南果树区 · 录像 42.0s · 置信 93%</div>
+          <div class="conf"><div class="track"><i style="width:93%"></i></div><span class="mono">93%</span></div>
+          <div class="acts"><span class="main">▶ 升旗驱离</span><span>忽略</span></div>
+        </div>
+      </div>
+      <div class="hang">
+        <div class="string"></div>
+        <div class="tag">
+          <div class="r1"><b>八哥</b><span class="x mono">×1</span><span class="st">待处理</span></div>
+          <div class="meta mono">09:12 · 东侧通道 · 录像 08.0s · 置信 88%</div>
+          <div class="conf"><div class="track"><i style="width:88%"></i></div><span class="mono">88%</span></div>
+          <div class="acts"><span class="main">▶ 升旗驱离</span><span>忽略</span></div>
+        </div>
+      </div>
+      <div class="hang">
+        <div class="string"></div>
+        <div class="tag">
+          <div class="r1"><b>白喉红臀鹎</b><span class="x mono">×2</span><span class="st run">执行中</span></div>
+          <div class="meta mono">08:12 · 东南果树区 · 双模联挂 · 信号升空剩余 3s</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec"><b>历史处置</b><span>已处理 / 已忽略</span></div>
+    <div class="ticket"><div class="mid"><b>大嘴乌鸦 ×1</b><div class="m mono">11/11 15:16 · 双模 5 秒 · 模拟完成</div></div><span class="st">已处理</span><span class="chev">›</span></div>
+    <div class="ticket"><div class="mid"><b>东方喜鹊 ×1</b><div class="m mono">11/11 11:14 · 双模 5 秒 · 模拟完成</div></div><span class="st">已处理</span><span class="chev">›</span></div>
+    <div class="ticket"><div class="mid"><b>黑领椋鸟 ×2</b><div class="m mono">11/11 10:55 · 人工忽略</div></div><span class="st dim">已忽略</span><span class="chev">›</span></div>
+
+    <!-- 示意:全部物种弹层 -->
+    <div class="sheetdemo">
+      <div class="cap"><b>示意 · 点「全部物种 ▾」后从底部弹出</b><span>CHOOSE SPECIES</span></div>
+      <div class="grid">
+        <span>珠颈斑鸠</span><span>八哥</span><span>白喉红臀鹎</span><span>大嘴乌鸦</span><span>黑领椋鸟</span><span>树麻雀</span><span>丝光椋鸟</span><span>红嘴蓝鹊</span><span>东方喜鹊</span><span>山斑鸠</span><span>栗腹文鸟</span><span>花蜜鸟</span><span class="on">白领翡翠</span>
+      </div>
+      <div class="btns"><span>清除筛选</span><span class="ok">查看该鸟告警</span></div>
+    </div>
+  </div>
+  <div class="dock"><span>待处理 <b class="mono">2</b> 条 · 数据来自果园服务</span><div class="nav"><span>信号台</span><span class="on">告警</span><span>升降</span><span>记录</span><span>我的</span></div></div>
+</div>
+</body></html>

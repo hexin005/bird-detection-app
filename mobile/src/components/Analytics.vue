@@ -16,6 +16,8 @@ const exportOpen = ref(false)
 const exportFormat = ref<'csv' | 'json'>('csv')
 const selectedDay = ref(-1)
 const selectedHour = ref(-1)
+const selectedSlice = ref<string | null>(null)
+const hoverSlice = ref<string | null>(null)
 const animate = ref(false)
 const displayNumbers = ref({ sessions: 0, birds: 0, alarms: 0, rate: 0 })
 let animationTimer: ReturnType<typeof setTimeout> | undefined
@@ -27,8 +29,8 @@ function animateNumbers(result: Stats) {
   const target = {
     sessions: (result.task_trend || []).reduce((sum, n) => sum + n, 0),
     birds: (result.bird_trend || []).reduce((sum, n) => sum + n, 0),
-    alarms: Object.values(result.breakdown).reduce((sum, n) => sum + n, 0),
-    rate: result.exec.total ? Math.round(result.exec.completed / result.exec.total * 100) : 0,
+    alarms: Object.values(result.breakdown || {}).reduce((sum, n) => sum + n, 0),
+    rate: result.exec?.total ? Math.round(result.exec.completed / result.exec.total * 100) : 0,
   }
   if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     displayNumbers.value = target
@@ -61,6 +63,7 @@ async function load() {
     animateNumbers(result)
     selectedDay.value = -1
     selectedHour.value = -1
+    selectedSlice.value = null
     animate.value = false
     clearTimeout(animationTimer)
     animationTimer = setTimeout(() => { animate.value = true }, 30)
@@ -81,6 +84,18 @@ const counts = computed(() => ({
   exec: stats.value?.exec?.completed ?? 0,
 }))
 const buckets = computed(() => stats.value?.range_days ?? 7)
+/** 兼容旧版 /stats:缺 dates 时按 range_days 倒推自然日 */
+function safeDates(data: Stats | null): string[] {
+  if (!data) return []
+  if (data.dates?.length) return data.dates
+  const n = data.range_days || (data.trend?.length ?? 1)
+  const out: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000)
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+  }
+  return out
+}
 const daily = computed(() => {
   const data = stats.value
   if (!data) return []
@@ -88,11 +103,11 @@ const daily = computed(() => {
   const birdTrend = data.bird_trend || []
   const maxSessions = Math.max(1, ...taskTrend)
   const maxBirds = Math.max(1, ...birdTrend)
-  return data.dates.map((date, index) => ({
+  return safeDates(data).map((date, index) => ({
     date, sessions: taskTrend[index] || 0, birds: birdTrend[index] || 0,
-    alarms: data.trend[index] || 0,
-    sessionHeight: data.task_trend[index] ? Math.max(6, Math.round(data.task_trend[index] / maxSessions * 100)) : 0,
-    birdHeight: data.bird_trend[index] ? Math.max(6, Math.round(data.bird_trend[index] / maxBirds * 100)) : 0,
+    alarms: data.trend?.[index] || 0,
+    sessionHeight: taskTrend[index] ? Math.max(6, Math.round(taskTrend[index] / maxSessions * 100)) : 0,
+    birdHeight: birdTrend[index] ? Math.max(6, Math.round(birdTrend[index] / maxBirds * 100)) : 0,
   }))
 })
 const birdBars = computed(() => {
@@ -106,7 +121,7 @@ const chartDetail = computed(() => {
 })
 const hourDetail = computed(() => selectedHour.value >= 0 ? `${String(selectedHour.value).padStart(2, '0')}:00—${String(selectedHour.value).padStart(2, '0')}:59 · ${stats.value?.hourly[selectedHour.value] || 0} 条告警` : peakHours.value)
 const rangeLabel = computed(() => ({ today: '今日', '7d': '近 7 天', '30d': '近 30 天' })[range.value])
-const rangeDates = computed(() => stats.value?.dates.length ? `${stats.value.dates[0]} ~ ${stats.value.dates[stats.value.dates.length - 1]}` : '')
+const rangeDates = computed(() => { const ds = safeDates(stats.value); return ds.length ? `${ds[0]} ~ ${ds[ds.length - 1]}` : '' })
 function openGuide(species: string) {
   if (SPECIES_GUIDE.some(item => item.name === species)) host.viewSpeciesGuide(species)
 }
@@ -117,7 +132,7 @@ function csvCell(value: string | number | null) {
 function exportData() {
   if (!stats.value || typeof document === 'undefined') { notify('暂无可导出的数据'); return }
   const data = stats.value
-  const filename = `orchard-stats-${range.value}-${data.dates[data.dates.length - 1]?.replace(/-/g, '') || 'today'}`
+  const filename = `orchard-stats-${range.value}-${data.dates?.[data.dates.length - 1]?.replace(/-/g, '') || 'today'}`
   let content: string, mime: string
   if (exportFormat.value === 'json') {
     content = JSON.stringify({ range: range.value, ...data }, null, 2)
@@ -126,11 +141,11 @@ function exportData() {
     const taskTrend = data.task_trend || [], birdTrend = data.bird_trend || []
     const rows: (string | number | null)[][] = [
       ['日期', '检测场次', '发现鸟数', '检测告警数'],
-      ...data.dates.map((date, i) => [date, taskTrend[i] || 0, birdTrend[i] || 0, data.trend[i] || 0]),
-      [], ['鸟种分布', '发现鸟数'], ...data.bird_species.map(item => [item.species, item.count]),
-      [], ['时段', '告警数'], ...data.hourly.map((count, hour) => [String(hour).padStart(2, '0') + ':00', count]),
-      [], ['告警状态', '数量'], ...Object.entries(data.breakdown),
-      [], ['驱离执行', '数值'], ...Object.entries(data.exec),
+      ...safeDates(data).map((date, i) => [date, taskTrend[i] || 0, birdTrend[i] || 0, data.trend?.[i] || 0]),
+      [], ['鸟种分布', '发现鸟数'], ...(data.bird_species || []).map(item => [item.species, item.count]),
+      [], ['时段', '告警数'], ...(data.hourly || []).map((count, hour) => [String(hour).padStart(2, '0') + ':00', count]),
+      [], ['告警状态', '数量'], ...Object.entries(data.breakdown || {}),
+      [], ['驱离执行', '数值'], ...Object.entries(data.exec || {}),
     ]
     content = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')
     mime = 'text/csv;charset=utf-8'
@@ -160,20 +175,6 @@ const bars = computed(() => {
   return data.map((d, i) => ({ ...d, pct: Math.round(d.count / max * 100), dim: i >= 2 }))
 })
 const heatLevel = (v: number): string => v === 0 ? 'l0' : v <= 1 ? 'l1' : v <= 3 ? 'l2' : 'l3'
-const alarmTotal = computed(() => stats.value ? Object.values(stats.value.breakdown).reduce((sum, value) => sum + value, 0) : 0)
-const signalDays = computed(() => {
-  const values = stats.value?.trend || []
-  const max = Math.max(1, ...values)
-  return (stats.value?.dates || []).map((date, index) => ({
-    date, count: values[index] || 0,
-    height: values[index] ? Math.max(7, Math.round(values[index] / max * 100)) : 0,
-  }))
-})
-const signalSpecies = computed(() => {
-  const values = stats.value?.species || []
-  const max = Math.max(1, ...values.map(item => item.count))
-  return values.map(item => ({ ...item, width: Math.round(item.count / max * 100) }))
-})
 const peakHours = computed(() => {
   const h = stats.value?.hourly ?? []
   const max = Math.max(...h)
@@ -204,6 +205,72 @@ const dateLabels = computed(() => {
   }
   return labels
 })
+
+/* ================= C 统计板(告警条数口径) ================= */
+const alarmTotal = computed(() => stats.value ? Object.values(stats.value.breakdown || {}).reduce((sum, value) => sum + value, 0) : 0)
+/** 折线数据:峰值=最大值日,红色方块标记 */
+const linePts = computed(() => {
+  const data = stats.value
+  if (!data) return []
+  const values = data.trend || []
+  const dates = safeDates(data)
+  const max = Math.max(1, ...values)
+  const step = values.length > 1 ? 324 / (values.length - 1) : 0
+  const peaks = new Set(values.map((v, i) => ({ v, i })).filter(x => x.v === max && x.v > 0).map(x => x.i))
+  return values.map((v, i) => ({ i, v, date: dates[i] || '', x: Math.round(6 + i * step), y: Math.round(100 - (v / max) * 88), peak: peaks.has(i) }))
+})
+const linePoly = computed(() => linePts.value.map(p => `${p.x},${p.y}`).join(' '))
+const lineArea = computed(() => linePts.value.length ? linePoly.value + ` ${linePts.value[linePts.value.length - 1].x},100 6,100` : '')
+const lineLabels = computed(() => {
+  const ds = safeDates(stats.value)
+  if (!ds.length) return []
+  if (ds.length <= 7) return ds.map(d => range.value === 'today' ? '今日' : d.slice(5))
+  return ds.map((d, i) => (i % 5 === 0 || i === ds.length - 1) ? d.slice(5) : '')
+})
+const lineCap = computed(() => {
+  if (selectedDay.value >= 0) {
+    const p = linePts.value[selectedDay.value]
+    return p ? `${p.date} · ${p.v} 条告警` : ''
+  }
+  const peaks = linePts.value.filter(p => p.peak)
+  return peaks.length ? `峰值 ${peaks.map(p => `${p.date.slice(5)} · ${p.v} 条`).join(' / ')}（红色方块）· 点选方块查看当日` : '本范围暂无峰值 · 点选方块查看当日条数'
+})
+/** 物种排行:头名警示纹,高危标红点 */
+const rankRows = computed(() => {
+  const data = stats.value?.species ?? []
+  const max = Math.max(1, ...data.map(d => d.count))
+  return data.map((d, i) => ({ ...d, pct: Math.round(d.count / max * 100), hz: i === 0, guide: SPECIES_GUIDE.some(s => s.name === d.species) }))
+})
+/** 饼图:已处理=墨黑/已忽略=灰/执行中=黄/待处理=红,pathLength=100 扇区 */
+const pieSlices = computed(() => {
+  const b = stats.value?.breakdown
+  if (!b) return []
+  const rows = [
+    { label: '已处理', v: b.handled, color: '#191919' },
+    { label: '已忽略', v: b.ignored, color: '#cfcdbc' },
+    { label: '执行中', v: b.processing, color: '#f5c400' },
+    { label: '待处理', v: b.new, color: '#d3212c' },
+  ].filter(r => r.v > 0)
+  const total = rows.reduce((sum, r) => sum + r.v, 0)
+  let cum = 0
+  return rows.map(r => {
+    const pct = r.v / total * 100
+    const seg = { ...r, pct: Math.round(pct), dash: pct, offset: -cum }
+    cum += pct
+    return seg
+  })
+})
+const activeSlice = computed(() => hoverSlice.value || selectedSlice.value)
+const pieCap = computed(() => {
+  const label = activeSlice.value
+  if (label) {
+    const row = pieSlices.value.find(r => r.label === label)
+    return row ? `${row.label} · ${row.v} 条 · 占 ${row.pct}%${selectedSlice.value === label ? '（再次点选取消）' : ''}` : ''
+  }
+  return '悬停或点选扇区:该扇区加粗放大、其余淡出'
+})
+function toggleSlice(label: string) { selectedSlice.value = selectedSlice.value === label ? null : label }
+function onPieBg() { selectedSlice.value = null }
 </script>
 
 <template>
@@ -266,69 +333,127 @@ const dateLabels = computed(() => {
       </view>
     </view>
   </template>
+
   <template v-else-if="isSignal">
-    <view class="field-analysis">
-      <view class="field-intro">
-        <text class="field-index">OBSERVATION / {{ rangeLabel }}<text v-if="!loading && !error && stats"> · {{ rangeDates }}</text></text>
-        <text class="field-title">鸟情观察</text>
-        <text class="field-caption">本页按检测告警事件统计，每条告警记一次；不计归档视频的鸟只数。</text>
+    <view class="sgb">
+      <view class="sgb-head">
+        <view class="hl"><text class="ttl">鸟情统计板</text><text class="tag">STATS BOARD</text></view>
+        <view class="vol"><text>按告警条数统计</text><text>不累计鸟只数</text></view>
       </view>
-      <view class="field-ranges" role="group" aria-label="统计时间范围">
-        <button :class="{ on: range === 'today' }" @click="pick('today')">今日</button>
-        <button :class="{ on: range === '7d' }" @click="pick('7d')">近 7 天</button>
-        <button :class="{ on: range === '30d' }" @click="pick('30d')">近 30 天</button>
+      <view class="sgb-ranges">
+        <text :class="{ on: range === 'today' }" @click="pick('today')">今日</text>
+        <text :class="{ on: range === '7d' }" @click="pick('7d')">近 7 天</text>
+        <text :class="{ on: range === '30d' }" @click="pick('30d')">近 30 天</text>
       </view>
-      <view v-if="loading" class="field-feedback">正在读取 {{ rangeLabel }} 的统计数据…</view>
-      <view v-else-if="error" class="field-feedback field-feedback--error">统计读取失败：{{ error }} <button @click="load">重试</button></view>
-      <template v-else-if="stats && !loading">
-        <view class="field-summary">
-          <view class="field-total"><text>检测告警</text><strong>{{ alarmTotal }}</strong><small>条 · {{ rangeLabel }}</small></view>
-          <view class="field-metrics">
-            <view><b>{{ stats.breakdown.new }}</b><text>待处理 · 条</text></view>
-            <view><b>{{ stats.exec.total }}</b><text>驱离执行 · 次</text></view>
-            <view><b>{{ stats.exec.total ? Math.round(stats.exec.completed / stats.exec.total * 100) + '%' : '暂无' }}</b><text>执行完成率</text></view>
-          </view>
+
+      <view v-if="loading" class="sgb-note">正在读取 {{ rangeLabel }} 的统计数据…</view>
+      <view v-else-if="error" class="sgb-note err">统计读取失败：{{ error }} <text class="retry" @click="load">重试</text></view>
+      <template v-else-if="stats">
+        <!-- 翻牌数板 -->
+        <view class="sgb-flips">
+          <view class="flip"><b class="mono">{{ alarmTotal }}</b><span>检测告警 · 条</span></view>
+          <view class="flip"><b class="mono">{{ stats.exec?.total ?? 0 }}</b><span>驱离执行 · 次</span></view>
+          <view class="flip"><b class="mono">{{ stats.exec?.total ? Math.round(stats.exec.completed / stats.exec.total * 100) + '%' : '—' }}</b><span>执行完成率</span></view>
+          <view class="flip"><b class="mono">{{ fmtSeconds(stats.exec?.avg_start_seconds) }}</b><span>平均启动响应</span></view>
         </view>
-        <view class="field-panel">
-          <view class="field-panel-head"><text>01 / 每日告警趋势</text><small>单位 · 条</small></view>
-          <view v-if="alarmTotal" class="field-daychart" :class="{ dense: range === '30d' }">
-            <button v-for="(day, index) in signalDays" :key="day.date" :class="{ picked: selectedDay === index }" :aria-label="`${day.date} ${day.count} 条告警`" @click="selectedDay = index">
-              <i :style="{ height: day.height + '%' }"/><span v-if="range !== '30d' || index % 5 === 0 || index === signalDays.length - 1">{{ range === 'today' ? '今日' : day.date.slice(5) }}</span>
-            </button>
-          </view>
-          <text v-else class="field-empty">本范围无告警；归档视频的检测记录可在“记录”页查看。</text>
-          <text v-if="alarmTotal" class="field-detail">{{ selectedDay >= 0 && signalDays[selectedDay] ? `${signalDays[selectedDay].date} · ${signalDays[selectedDay].count} 条告警` : '点按日期查看当日告警条数' }}</text>
-        </view>
-        <view class="field-panel">
-          <view class="field-panel-head"><text>02 / 告警物种</text><small>按告警条数 · TOP 5</small></view>
-          <view v-if="signalSpecies.length" class="field-species">
-            <view v-for="item in signalSpecies" :key="item.species" class="field-species-row">
-              <button :disabled="!SPECIES_GUIDE.some(s => s.name === item.species)" @click="openGuide(item.species)">{{ item.species }}</button>
-              <view class="track"><i :style="{ width: item.width + '%' }"/></view>
-              <text>{{ item.count }} 条</text>
+
+        <!-- 每日告警 · 折线 -->
+        <view class="sgb-win">
+          <view class="tbar"><i class="sq"/><text class="t">每日告警 · 折线</text><text class="sub">{{ rangeLabel }}{{ rangeDates ? ' · ' + rangeDates : '' }} · 条</text></view>
+          <view class="bd">
+            <view v-if="alarmTotal" class="linewrap">
+              <svg viewBox="0 0 336 110" width="336" height="110">
+                <line x1="6" y1="12" x2="330" y2="12" class="grid"/>
+                <line x1="6" y1="56" x2="330" y2="56" class="grid"/>
+                <polygon v-if="linePts.length" :points="lineArea" class="area"/>
+                <polyline :points="linePoly" class="ln"/>
+                <g fill="#191919">
+                  <rect v-for="p in linePts.filter(p => !p.peak)" :key="'m' + p.i" class="mk" :x="p.x - 2" :y="p.y - 2" width="4" height="4" @click="selectedDay = selectedDay === p.i ? -1 : p.i">
+                    <title>{{ p.date }} · {{ p.v }} 条</title>
+                  </rect>
+                </g>
+                <g fill="#d3212c">
+                  <rect v-for="p in linePts.filter(p => p.peak)" :key="'p' + p.i" class="mk hot" :x="p.x - 3.5" :y="p.y - 3.5" width="7" height="7" stroke="#191919" stroke-width="1.5" @click="selectedDay = selectedDay === p.i ? -1 : p.i">
+                    <title>{{ p.date }} · {{ p.v }} 条</title>
+                  </rect>
+                </g>
+              </svg>
+              <view class="dates"><text v-for="(l, i) in lineLabels" :key="i">{{ l }}</text></view>
+              <text class="cap">{{ lineCap }}</text>
             </view>
+            <text v-else class="cap empty">本范围无告警；归档视频的检测记录可在「记录」页查看。</text>
           </view>
-          <text v-else class="field-empty">本范围没有告警物种记录。</text>
-          <text v-if="signalSpecies.length" class="field-detail">物种名称可打开图鉴；这里统计告警条数，不代表鸟只数。</text>
         </view>
-        <view class="field-panel">
-          <view class="field-panel-head"><text>03 / 24 小时活动</text><small>告警发生时段 · 条</small></view>
-          <view v-if="alarmTotal" class="field-hours">
-            <button v-for="(value, hour) in stats.hourly" :key="hour" :class="[heatLevel(value), { picked: selectedHour === hour }]" :aria-label="`${hour} 时 ${value} 条告警`" @click="selectedHour = hour"/>
+
+        <!-- 告警物种 · 条形排行 -->
+        <view class="sgb-win">
+          <view class="tbar"><i class="sq"/><text class="t">告警物种 · TOP5 条形</text><text class="sub">条数 · 高危标红</text></view>
+          <view class="bd">
+            <view v-if="rankRows.length" class="rank">
+              <view v-for="r in rankRows" :key="r.species" class="row" @click="r.guide && openGuide(r.species)">
+                <text class="nm"><text v-if="r.guide" class="dot">●</text> {{ r.species }}</text>
+                <view class="track"><i :class="{ hz: r.hz }" :style="{ width: r.pct + '%' }"/></view>
+                <text class="v mono">{{ r.count }}</text>
+              </view>
+            </view>
+            <text v-else class="cap empty">本范围没有告警物种记录。</text>
+            <text v-if="rankRows.length" class="cap">点物种名可跳转图鉴 · 头名挂警示纹</text>
           </view>
-          <view v-if="alarmTotal" class="field-hours-label"><text>00</text><text>06</text><text>12</text><text>18</text><text>23</text></view>
-          <text class="field-detail">{{ alarmTotal ? hourDetail : '本范围暂无时段告警数据' }}</text>
         </view>
-        <view class="field-panel field-exec">
-          <view class="field-panel-head"><text>04 / 驱离执行</text><small>模拟执行器</small></view>
-          <view class="field-exec-row"><text>执行总数</text><b>{{ stats.exec.total }} 次</b></view>
-          <view class="field-exec-row"><text>完成 / 失败</text><b>{{ stats.exec.completed }} / {{ stats.exec.failed }} 次</b></view>
-          <view class="field-exec-row"><text>平均启动响应</text><b>{{ fmtSeconds(stats.exec.avg_start_seconds) }}</b></view>
-          <text class="field-detail">没有执行时，响应与完成率仅展示原始统计，不推断驱离效果。</text>
+
+        <!-- 告警状态构成 · 饼图 -->
+        <view class="sgb-win">
+          <view class="tbar"><i class="sq"/><text class="t">告警状态构成 · 饼图</text><text class="sub">{{ alarmTotal }} 条</text></view>
+          <view class="bd">
+            <view v-if="alarmTotal" class="piewrap" :class="{ focus: !!activeSlice }" @click="onPieBg">
+              <svg class="pie" viewBox="0 0 140 140" width="140" height="140">
+                <g v-for="s in pieSlices" :key="s.label" class="slice" :class="{ cur: activeSlice === s.label }" @click.stop="toggleSlice(s.label)" @mouseenter="hoverSlice = s.label" @mouseleave="hoverSlice = null">
+                  <circle class="ink" cx="70" cy="70" r="40" fill="none" stroke="#191919" stroke-width="30" pathLength="100" :stroke-dasharray="`${s.dash} ${100 - s.dash}`" :stroke-dashoffset="s.offset" transform="rotate(-90 70 70)" pointer-events="none"/>
+                  <circle class="fill" cx="70" cy="70" r="40" fill="none" :stroke="s.color" stroke-width="26" pathLength="100" :stroke-dasharray="`${s.dash} ${100 - s.dash}`" :stroke-dashoffset="s.offset" transform="rotate(-90 70 70)"/>
+                </g>
+                <text x="70" y="67" text-anchor="middle" font-size="19" font-weight="900" font-family="Consolas,monospace" fill="#191919" pointer-events="none">{{ alarmTotal }}</text>
+                <text x="70" y="81" text-anchor="middle" font-size="8" letter-spacing="2" fill="#6f6f68" pointer-events="none">总条数</text>
+              </svg>
+              <view class="plegend">
+                <view v-for="s in pieSlices" :key="s.label" class="r" @click.stop="toggleSlice(s.label)"><i :style="{ background: s.color }"/><text>{{ s.label }}</text><b class="mono">{{ s.v }} · {{ s.pct }}%</b></view>
+              </view>
+            </view>
+            <text v-else class="cap empty">本范围没有告警，暂无状态构成。</text>
+            <text v-if="alarmTotal" class="cap">{{ pieCap }}</text>
+          </view>
+        </view>
+
+        <!-- 时段活动 · 24H -->
+        <view class="sgb-win">
+          <view class="tbar"><i class="sq"/><text class="t">时段活动 · 24H</text><text class="sub">告警条数</text></view>
+          <view class="bd">
+            <view v-if="alarmTotal" class="heat">
+              <i v-for="(v, h) in (stats.hourly || [])" :key="h" :class="[heatLevel(v), { picked: selectedHour === h }]" :title="`${h} 时 · ${v} 条`" @click="selectedHour = selectedHour === h ? -1 : h"/>
+            </view>
+            <view v-if="alarmTotal" class="heatx"><text>0</text><text>6</text><text>12</text><text>18</text><text>23</text></view>
+            <text class="cap" :class="{ empty: !alarmTotal }">{{ alarmTotal ? hourDetail : '本范围暂无时段告警数据' }}</text>
+          </view>
+        </view>
+
+        <!-- 驱离执行 · 读数 -->
+        <view class="sgb-win">
+          <view class="tbar"><i class="sq"/><text class="t">驱离执行 · 读数</text><text class="sub">模拟执行器</text></view>
+          <view class="bd">
+            <view class="gauge">
+              <view class="num"><b class="mono">{{ stats.exec?.total ? Math.round(stats.exec.completed / stats.exec.total * 100) + '%' : '—' }}</b><span>完成率</span></view>
+              <view class="mini">
+                <view class="r"><text>执行 {{ stats.exec?.total ?? 0 }} 次</text><b class="mono">完成 {{ stats.exec?.completed ?? 0 }} · 失败 {{ stats.exec?.failed ?? 0 }}</b></view>
+                <view class="r"><text>双模占比</text><b class="mono">{{ pctText(stats.exec?.dual_share) }}</b></view>
+                <view class="r last"><text>平均完成耗时</text><b class="mono">{{ fmtSeconds(stats.exec?.avg_done_seconds) }}</b></view>
+              </view>
+            </view>
+            <text class="cap">没有执行时，读数仅展示原始统计，不推断驱离效果。</text>
+          </view>
         </view>
       </template>
     </view>
   </template>
+
   <template v-else>
   <!-- 总览 + 时间范围 -->
   <view class="qh-card">
@@ -428,11 +553,11 @@ const dateLabels = computed(() => {
       <text class="qh-an-sub">平均完成耗时 <b>{{ fmtSeconds(stats?.exec.avg_done_seconds) }}</b> · 双模联动占 <b>{{ pctText(stats?.exec.dual_share) }}</b>(分母=已完成指令)· 失败 {{ stats?.exec.failed ?? 0 }} 次</text>
     </view>
   </view>
-
-  <text v-if="error" class="qh-note" style="display:block">{{ error }}</text>
-  <text v-if="loading" class="qh-note">加载中…</text>
-  <text class="qh-note">图表随主题联动换肤 · 数据来自果园服务实时统计</text>
   </template>
+
+  <text v-if="error && !isSignal" class="qh-note" style="display:block">{{ error }}</text>
+  <text v-if="loading && !isSignal" class="qh-note">加载中…</text>
+  <text class="qh-note">图表随主题联动换肤 · 数据来自果园服务实时统计</text>
 
   <view v-if="isB && exportOpen" class="qh-mask qh-mask--bottom is-open" @click.self="exportOpen = false">
     <view class="qh-sheet qh-an-sheet">
@@ -452,37 +577,89 @@ const dateLabels = computed(() => {
 </template>
 
 <style scoped>
-.field-analysis{display:flex;flex-direction:column;gap:12px;padding:0 1px 16px;color:var(--ink-900)}
-.field-intro{display:flex;flex-direction:column;gap:5px;padding:15px 16px 13px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px}
-.field-index{font:700 10px var(--font-num);letter-spacing:2px;color:var(--accent)}
-.field-title{font:800 22px var(--font-sans);letter-spacing:2px;color:var(--ink-900);text-shadow:0 0 16px rgba(127,224,168,.12)}
-.field-caption{font-size:10px;line-height:1.5;color:var(--ink-500)}
-.field-ranges{display:flex;gap:5px;padding:4px;border-radius:8px;background:var(--surface-sunken);border:1px solid var(--line)}
-.field-ranges button{flex:1;border:0;border-radius:5px;min-height:34px;background:transparent;color:var(--ink-500);font-size:11px;cursor:pointer}
-.field-ranges button.on{background:var(--surface-muted);color:var(--accent);font-weight:700;box-shadow:0 0 10px rgba(255,180,84,.15)}
-.field-feedback{padding:10px 12px;background:var(--surface-muted);border-radius:6px;font-size:11px;color:var(--ink-500)}
-.field-feedback--error{color:#ff6259}.field-feedback button{border:0;background:transparent;color:inherit;text-decoration:underline}
-.field-summary{display:flex;gap:10px;padding:14px;background:var(--accent);border-radius:10px;color:var(--accent-fg);box-shadow:0 0 24px rgba(255,180,84,.22)}
-.field-total{width:37%;display:flex;flex-direction:column;gap:2px;border-right:1px solid rgba(26,18,6,.3)}
-.field-total text,.field-total small{font-size:10px}.field-total strong{font:700 43px/1.1 var(--font-num)}
-.field-metrics{flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:4px}.field-metrics view{display:flex;justify-content:space-between;align-items:baseline;gap:4px;border-bottom:1px solid rgba(26,18,6,.22)}
-.field-metrics view:last-child{border:0}.field-metrics b{font:700 16px var(--font-num)}.field-metrics text{font-size:9px}
-.field-panel{padding:13px 13px 14px;background:var(--surface-card);border:1px solid var(--line);border-radius:10px}
-.field-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:9px;border-bottom:1px solid var(--line-soft);color:var(--accent);font:700 12px var(--font-num);letter-spacing:1px}
-.field-panel-head small{font:10px var(--font-sans);color:var(--ink-500);text-align:right;letter-spacing:0}
-.field-daychart{display:flex;align-items:flex-end;gap:3px;height:110px;margin-top:13px;padding-bottom:19px;border-bottom:1px solid var(--line)}
-.field-daychart button{flex:1;min-width:0;height:100%;border:0;background:transparent;display:flex;align-items:flex-end;justify-content:center;position:relative;cursor:pointer;padding:0}
-.field-daychart i{width:75%;min-height:2px;background:var(--accent);border-radius:2px 2px 0 0;box-shadow:0 0 8px rgba(255,180,84,.45)}.field-daychart button.picked i{background:#ff6259;box-shadow:0 0 10px rgba(224,75,66,.55)}
-.field-daychart span{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);white-space:nowrap;font:8px var(--font-num);color:var(--ink-500)}
-.field-daychart.dense{gap:1px}.field-daychart.dense i{width:100%}.field-daychart.dense span{font-size:7px}
-.field-detail{display:block;margin-top:10px;font-size:10px;line-height:1.5;color:var(--ink-500)}.field-empty{display:block;padding:22px 2px 9px;font-size:11px;line-height:1.6;color:var(--ink-500)}
-.field-species{display:flex;flex-direction:column;gap:11px;padding-top:13px}.field-species-row{display:flex;align-items:center;gap:8px;min-width:0}
-.field-species-row button{width:90px;flex-shrink:0;border:0;background:transparent;text-align:left;color:var(--accent);font-size:11px;overflow-wrap:anywhere;cursor:pointer;padding:0}.field-species-row button[disabled]{color:var(--ink-500);cursor:default}
-.field-species-row .track{flex:1;height:7px;background:var(--surface-sunken);border-radius:6px;overflow:hidden}.field-species-row .track i{display:block;height:100%;background:var(--accent);border-radius:6px;box-shadow:0 0 8px rgba(255,180,84,.45)}
-.field-species-row>text{width:38px;text-align:right;flex-shrink:0;font:10px var(--font-num);color:var(--ink-700)}
-.field-hours{display:flex;gap:2px;margin-top:14px}.field-hours button{flex:1;height:26px;min-width:0;border:0;padding:0;border-radius:2px;cursor:pointer}
-.field-hours .l0{background:var(--surface-sunken)}.field-hours .l1{background:rgba(255,180,84,.25)}.field-hours .l2{background:rgba(255,180,84,.55)}.field-hours .l3{background:var(--accent);box-shadow:0 0 8px rgba(255,180,84,.45)}.field-hours button.picked{outline:2px solid #ff6259;outline-offset:2px}
-.field-hours-label{display:flex;justify-content:space-between;margin-top:5px;font:9px var(--font-num);color:var(--ink-500)}
-.field-exec-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 1px;border-bottom:1px solid var(--line-soft);font-size:11px;color:var(--ink-700)}
-.field-exec-row b{font:700 13px var(--font-num);color:var(--accent)}
+/* ============ C 鸟情统计板 ============ */
+.sgb{display:flex;flex-direction:column;color:var(--ink-900)}
+.sgb-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px 10px}
+.sgb-head .hl{display:flex;align-items:center;gap:8px}
+.sgb-head .ttl{font-size:19px;font-weight:900;letter-spacing:3px}
+.sgb-head .tag{background:#f5c400;border:2px solid var(--ink-900);color:var(--ink-900);font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 var(--shadow-ink)}
+.sgb-head .vol{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.sgb-head .vol text{font-size:9px;color:var(--ink-400);letter-spacing:1px}
+.sgb-ranges{display:flex;gap:8px;margin:0 14px 12px}
+.sgb-ranges text{flex:1;text-align:center;border:2px solid var(--ink-900);background:var(--surface-card);font-size:11px;font-weight:800;padding:7px 0;box-shadow:2px 2px 0 var(--shadow-ink);cursor:pointer}
+.sgb-ranges text.on{background:var(--ink-900);color:#f5c400}
+.sgb-note{margin:4px 14px;border:2px solid var(--ink-900);background:var(--surface-card);padding:10px 12px;font-size:11px;color:var(--ink-700)}
+.sgb-note.err{color:#d3212c;font-weight:700}
+.sgb-note .retry{text-decoration:underline;cursor:pointer}
+/* 翻牌数板 */
+.sgb-flips{display:flex;flex-wrap:wrap;gap:8px;margin:0 14px}
+.sgb-flips .flip{width:calc(50% - 4px);background:var(--ink-900);color:#f5c400;padding:10px 0 8px;text-align:center;position:relative}
+.sgb-flips .flip::before{content:'';position:absolute;inset:3px;border:1px solid rgba(245,196,0,.45);pointer-events:none}
+.sgb-flips .flip b{font-size:26px;font-weight:700;line-height:1.1}
+.sgb-flips .flip b.small{font-size:12px}
+.sgb-flips .flip span{display:block;font-size:8.5px;letter-spacing:2px;color:#9a9a92;margin-top:3px;font-weight:700}
+/* 图表窗口 */
+.sgb-win{border:2px solid var(--ink-900);background:var(--surface-card);box-shadow:3px 4px 0 var(--shadow-ink);margin:12px 14px 0}
+.sgb-win .tbar{height:22px;background:var(--surface-card);border-bottom:2px solid var(--ink-900);display:flex;align-items:center;gap:6px;padding:0 8px}
+.sgb-win .tbar .sq{width:10px;height:10px;border:2px solid var(--ink-900);background:#f5c400;flex-shrink:0}
+.sgb-win .tbar .t{font-size:10px;font-weight:900;letter-spacing:1px;background:var(--ink-900);color:#f5c400;padding:1px 8px;white-space:nowrap}
+.sgb-win .tbar .sub{margin-left:auto;font-size:8px;color:var(--ink-400);letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sgb-win .bd{padding:10px}
+.sgb-win .cap{font-size:9px;color:var(--ink-400);margin-top:6px;line-height:1.5}
+.sgb-win .cap.empty{color:var(--ink-400);padding:14px 2px 8px}
+/* 折线 */
+.linewrap svg{display:block;width:100%;height:auto}
+.linewrap .grid{stroke:#c8c6ba;stroke-width:1;stroke-dasharray:3 3}
+.linewrap .area{fill:rgba(245,196,0,.18)}
+.linewrap .ln{fill:none;stroke:var(--ink-900);stroke-width:2.5}
+.linewrap .mk{cursor:pointer;transition:transform .12s;transform-box:fill-box;transform-origin:center}
+.linewrap .mk:hover{transform:scale(1.8)}
+.linewrap .mk.hot:hover{transform:scale(1.35)}
+.linewrap .dates{display:flex;justify-content:space-between;font-size:7.5px;color:var(--ink-400);margin-top:3px;font-weight:700;min-height:10px}
+/* 物种排行 */
+.rank{display:flex;flex-direction:column;gap:8px}
+.rank .row{display:flex;align-items:center;gap:8px;padding:3px 4px;margin:-3px -4px;transition:background .12s}
+.rank .row:hover{background:var(--surface-sunken);outline:2px solid var(--ink-900);outline-offset:-2px}
+.rank .nm{width:78px;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-900)}
+.rank .nm .dot{color:#d3212c;font-size:9px}
+.rank .track{flex:1;height:13px;border:2px solid var(--ink-900);background:var(--surface-card)}
+.rank .track i{display:block;height:100%;background:var(--ink-900);transition:background .12s}
+.rank .row:hover .track i{background:#f5c400}
+.rank .track i.hz{background:repeating-linear-gradient(-45deg,#f5c400 0 8px,var(--ink-900) 8px 16px)}
+.rank .row:hover .track i.hz{background:repeating-linear-gradient(-45deg,#d3212c 0 8px,var(--ink-900) 8px 16px)}
+.rank .v{width:34px;text-align:right;font-size:11px;color:var(--ink-900)}
+/* 饼图 */
+.piewrap{display:flex;align-items:center;gap:12px}
+.pie{flex-shrink:0}
+.pie .slice{cursor:pointer;transition:opacity .16s ease}
+.pie .slice circle{transition:stroke-width .14s steps(3)}
+.piewrap.focus .slice{opacity:.22}
+.piewrap.focus .slice.cur{opacity:1}
+.piewrap.focus .slice.cur .ink{stroke-width:37}
+.piewrap.focus .slice.cur .fill{stroke-width:33}
+.plegend{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.plegend .r{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--ink-900);cursor:pointer}
+.plegend .r i{width:10px;height:10px;border:2px solid var(--ink-900);flex-shrink:0}
+.plegend .r b{margin-left:auto;color:var(--ink-900)}
+/* 时段热力 */
+.heat{display:flex;gap:2px}
+.heat i{flex:1;height:20px;border:1px solid var(--ink-900);background:var(--surface-card);cursor:pointer;transition:transform .1s}
+.heat i:hover{transform:scale(1.18);outline:2px solid #d3212c;outline-offset:1px}
+.heat i.l1{background:#f0dc7a}
+.heat i.l2{background:#f5c400}
+.heat i.l3{background:#d3212c}
+.heat i.picked{outline:2px solid #d3212c;outline-offset:1px}
+.heatx{display:flex;justify-content:space-between;font-size:7.5px;color:var(--ink-400);margin-top:3px;font-weight:700}
+/* 驱离执行读数 */
+.gauge{display:flex;align-items:center;gap:12px}
+.gauge .num b{font-size:30px;font-weight:700;color:var(--ink-900)}
+.gauge .num span{display:block;font-size:8.5px;color:var(--ink-400);letter-spacing:2px;margin-top:2px}
+.gauge .mini{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.gauge .mini .r{display:flex;justify-content:space-between;gap:6px;font-size:9.5px;border-bottom:1px solid var(--ink-300);padding-bottom:3px;color:var(--ink-700)}
+.gauge .mini .r.last{border-bottom:0}
+.gauge .mini .r b{font-weight:700;color:var(--ink-900);text-align:right}
+@media (prefers-reduced-motion: reduce){
+  .linewrap .mk,.heat i,.pie .slice,.pie .slice circle,.rank .track i{transition:none !important}
+  .linewrap .mk:hover,.heat i:hover{transform:none}
+}
 </style>
