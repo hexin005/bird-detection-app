@@ -14,6 +14,10 @@ export type Stats = {
   breakdown: { new: number; processing: number; handled: number; ignored: number }
   exec: { total: number; completed: number; failed: number; avg_start_seconds: number | null; avg_done_seconds: number | null; dual_share: number | null }
 }
+export type LibrarySpecies = { species: string; first_seen: number; last_seen: number; peak_count: number }
+export type LibraryItem = { id: string; name: string; status: string; at: number; ended_at: number | null; message: string; duration: number; progress: number; result_ready: number; video_id: string; species: LibrarySpecies[] }
+export type LibrarySummary = { tasks_total: number; birds_total: number; today_tasks: number; today_birds: number }
+export type LibraryDetail = LibraryItem & { intervals: { species: string; start: number; end: number; peak_count: number }[]; alarms: Alarm[]; stream_ready?: boolean }
 export type State = {
   alarms: Alarm[]; commands: Command[]; events: Event[];
   counts: { total: number; pending: number; completed: number }; settings: Preferences;

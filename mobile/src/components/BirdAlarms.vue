@@ -8,7 +8,8 @@ import type { Alarm } from '../types'
 const emit = defineEmits<{ open:[alarm:Alarm] }>()
 const store = useOrchard()
 const host = useHost()
-const species = ref('')
+// 物种过滤状态提升到 host(hostContext.alarmSpecies):图鉴「查看该鸟告警」等入口可外部设置
+const species = computed(() => host.alarmSpecies)
 const items = ref<Alarm[]>([])
 type Group = { species:string; total:number; pending:number; cover?:string; best_confidence?:number }
 const groups = ref<Group[]>([])
@@ -64,10 +65,9 @@ function toggleDone() {
 }
 
 function pick(name: string) {
-  species.value = name === species.value ? '' : name
-  items.value = []; doneItems.value = []
-  void load()
+  host.alarmSpecies = host.alarmSpecies === name ? '' : name
 }
+watch(species, () => { items.value = []; doneItems.value = []; void load() })
 watch(() => store.state?.counts.pending, () => { void load() })
 onMounted(() => { void load() })
 </script>

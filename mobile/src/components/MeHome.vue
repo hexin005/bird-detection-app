@@ -5,7 +5,7 @@ import type { Me } from '../types'
 import { THEMES, normalizeTheme } from '../theme'
 import ChangePassword from './ChangePassword.vue'
 
-const emit = defineEmits<{ nav: [page: 'themes' | 'analytics'] }>()
+const emit = defineEmits<{ nav: [page: 'themes' | 'analytics' | 'guide'] }>()
 const store = useOrchard()
 const me = ref<Me | null>(null)
 const error = ref('')
@@ -161,6 +161,20 @@ function onPasswordChanged() {
         <view style="flex:1;min-width:0">
           <view class="qh-alarmcard__title">{{ themeMeta?.label || '果园守护 1.0' }} <text class="qh-mvp">使用中</text></view>
           <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">共 2 套风格，大图预览一键切换，数据不受影响</text>
+        </view>
+        <text class="qh-chevron">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 害鸟图鉴入口 -->
+  <view class="qh-window" style="cursor:pointer" @click="emit('nav', 'guide')">
+    <view class="qh-tbar"><text class="qh-tbar__t">害鸟图鉴</text></view>
+    <view class="qh-window__bd">
+      <view class="qh-me-row">
+        <view style="flex:1;min-width:0">
+          <view class="qh-alarmcard__title">果园害鸟图鉴</view>
+          <text class="qh-page-subtitle" style="font-size:10px;display:block;margin-top:3px">13 种可识别鸟类 · 危害分级 · 识别特征与应对</text>
         </view>
         <text class="qh-chevron">›</text>
       </view>

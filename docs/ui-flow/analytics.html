@@ -1,0 +1,219 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>A1 数据分析 · 动态版</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.row{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;padding:10px 10px 0}
+.col{text-align:center}
+.captop{color:#c8c6be;font-size:12px;font-weight:700;letter-spacing:2px;padding:14px 0 4px}
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border:3px solid #000;text-align:left;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 6px;font-size:10px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:32px;left:0;right:0;overflow-y:auto}
+.hdr{padding:14px 14px 4px;display:flex;align-items:flex-start;justify-content:space-between}
+.hdr .t{font-size:22px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:11px;color:#555;margin-top:2px}
+.export{border:2px solid #000;background:#f2f0e9;font-size:11px;font-weight:800;padding:6px 10px;box-shadow:2px 2px 0 #000;letter-spacing:1px}
+.chips{display:flex;margin:8px 14px 0;border:2px solid #000;background:#f2f0e9}
+.chips span{flex:1;text-align:center;padding:7px 0;font-size:12px;font-weight:700;letter-spacing:2px;color:#55554f;border-left:2px solid #000}
+.chips span:first-child{border-left:none}
+.chips span.on{background:#000;color:#f2f0e9}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:10px 14px;padding:11px 12px}
+.win{margin:10px 14px;border:2px solid #000;box-shadow:4px 4px 0 #000;background:#f2f0e9}
+.tbar{display:flex;align-items:center;gap:7px;border-bottom:2px solid #000;padding:5px 9px;background:repeating-linear-gradient(0deg,#000 0 1px,#f2f0e9 1px 3px)}
+.tbar .bx{width:13px;height:13px;border:2px solid #000;background:#f2f0e9;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900}
+.tbar b{font-size:12px;letter-spacing:1px;background:#f2f0e9;padding:0 4px}
+.bd{padding:10px 11px}
+/* hero 数字 */
+.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:2px solid #000;background:#f2f0e9;margin:8px 14px;box-shadow:4px 4px 0 #000}
+.hero>div{text-align:center;padding:10px 0 8px;border-left:2px solid #000}
+.hero>div:first-child{border-left:none}
+.hero .n{font-size:21px;font-family:"Courier New",monospace;font-weight:800}
+.hero .n em{font-style:normal;font-size:11px}
+.hero .l{display:block;font-size:9px;color:#555;letter-spacing:1px;margin-top:2px}
+/* 双序列柱状 */
+.legend{display:flex;gap:14px;font-size:9.5px;font-weight:700;letter-spacing:1px;margin-bottom:8px}
+.legend i{display:inline-block;width:11px;height:11px;border:2px solid #000;margin-right:4px;vertical-align:-1px}
+.legend .sq{background:#111}
+.legend .dt{background:repeating-conic-gradient(#111 0 25%,#f2f0e9 0 50%) 0 0/4px 4px}
+.chart{display:flex;align-items:flex-end;gap:7px;height:120px;border-bottom:2px solid #000;padding:0 2px}
+.chart .day{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:2px;height:100%}
+.chart .b{width:9px;transform-origin:bottom;animation:grow .7s cubic-bezier(.22,.61,.36,1) both;animation-delay:calc(var(--i)*70ms)}
+.chart .b.dark{background:#111}
+.chart .b.dit{background:repeating-conic-gradient(#111 0 25%,#f2f0e9 0 50%) 0 0/4px 4px;border:1.5px solid #000}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.xlab{display:flex;margin-top:4px}
+.xlab span{flex:1;text-align:center;font-size:8px;color:#777;font-family:"Courier New",monospace}
+/* 物种条形 */
+.an-bar{display:flex;align-items:center;gap:8px;padding:4px 0}
+.an-bar .nm{width:74px;font-size:11.5px;font-weight:800;white-space:nowrap;cursor:pointer}
+.an-bar .tr{flex:1;height:14px;border:2px solid #000;background:#f2f0e9}
+.an-bar .fl{height:100%;background:repeating-linear-gradient(-45deg,#111 0 3px,#f2f0e9 3px 6px);border-right:2px solid #000;animation:widen .8s cubic-bezier(.22,.61,.36,1) both;animation-delay:calc(var(--i)*90ms)}
+@keyframes widen{from{width:0}}
+.an-bar .v{width:30px;text-align:right;font-size:13px}
+/* 24H */
+.h24{display:flex;align-items:flex-end;gap:2px;height:64px;border-bottom:2px solid #000}
+.h24 i{flex:1;background:#55554f;transform-origin:bottom;animation:grow .6s both;animation-delay:calc(var(--i)*24ms)}
+.h24 i.pk{background:#111;animation:grow .6s both,blink 1.2s steps(2) infinite 1s}
+@keyframes blink{50%{opacity:.25}}
+.h24x{display:flex;margin-top:3px}
+.h24x span{flex:1;text-align:center;font-size:8px;color:#777;font-family:"Courier New",monospace}
+.peak{font-size:10px;margin-top:6px;color:#333}
+/* 构成分段 */
+.seg{display:flex;height:16px;border:2px solid #000;margin-bottom:7px}
+.seg i{animation:widen2 .7s both}
+@keyframes widen2{from{flex-basis:0}}
+.s1{background:#111}.s2{background:repeating-linear-gradient(45deg,#111 0 3px,#f2f0e9 3px 6px)}.s3{background:#f2f0e9}
+.lgd{display:flex;gap:12px;font-size:9.5px;font-weight:700}
+.lgd i{display:inline-block;width:10px;height:10px;border:2px solid #000;margin-right:4px;vertical-align:-1px}
+/* 执行 */
+.rate{height:14px;border:2px solid #000;margin:8px 0 4px;position:relative}
+.rate i{display:block;height:100%;background:#111;animation:widen .8s both .2s}
+.rate b{position:absolute;right:5px;top:-1px;font-size:9px;mix-blend-mode:difference;color:#fff}
+.sub{font-size:9.5px;color:#555;margin-top:6px;line-height:1.6}
+/* 导出弹层 */
+.mask{position:absolute;top:36px;bottom:0;left:0;right:0;background-image:repeating-linear-gradient(45deg,rgba(17,17,17,.16) 0 3px,transparent 3px 8px)}
+.sheet{position:absolute;left:10px;right:10px;bottom:10px;background:#f2f0e9;border:2px solid #000;box-shadow:5px 5px 0 #000}
+.sheet .top{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #000;padding:7px 10px}
+.sheet .top b{font-size:14px;letter-spacing:1px}
+.sheet .x{border:2px solid #000;font-weight:900;font-size:11px;padding:0 7px;background:#f2f0e9}
+.sheet .bd2{padding:10px 11px}
+.sh .h{font-size:9px;font-weight:800;letter-spacing:2px;color:#555;margin:6px 0 4px}
+.opt{display:flex;align-items:center;gap:8px;border:2px solid #000;padding:7px 9px;margin-bottom:6px;font-size:12px;font-weight:700}
+.opt .rd{width:13px;height:13px;border:2px solid #000;flex-shrink:0}
+.opt.on{background:#000;color:#f2f0e9}
+.opt.on .rd{background:#f2f0e9}
+.opt small{margin-left:auto;font-size:9px;font-weight:400;opacity:.75}
+.btnfull{display:flex;align-items:center;justify-content:center;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #999;font-weight:800;font-size:13px;padding:10px 0;letter-spacing:2px}
+.fnote{font-size:9.5px;color:#555;margin-top:8px;line-height:1.7}
+.foot{color:#888;font-size:12px;text-align:center;padding:6px 20px 30px}
+.dock{position:absolute;bottom:0;left:0;right:0;height:30px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;letter-spacing:2px;color:#55554f}
+.dock .t+.t{border-left:2px solid #000}
+.dock .t.on{background:#000;color:#f2f0e9}
+</style></head><body>
+<div class="row">
+
+<!-- ============ ① 主视图(载入即动) ============ -->
+<div class="col">
+<div class="captop">① 主视图 · 数字滚动 + 柱体生长(动效已做进本稿)</div>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr">
+  <div><div class="t">果园数据分析</div><div class="s">自然日口径 · 覆盖整个示范果园</div></div>
+  <span class="export">⤓ 导出</span>
+</div>
+
+<div class="hero">
+  <div><span class="n mono" data-n="18">0</span><span class="l">检测场次</span></div>
+  <div><span class="n mono" data-n="214">0</span><span class="l">发现鸟数</span></div>
+  <div><span class="n mono" data-n="46">0</span><span class="l">检测告警</span></div>
+  <div><span class="n mono" data-n="96">0</span><em class="n mono" style="font-size:11px">%</em><span class="l">驱离完成率</span></div>
+</div>
+
+<div class="chips"><span>今日</span><span class="on">近 7 天</span><span>近 30 天</span></div>
+
+<div class="win">
+  <div class="tbar"><span class="bx">×</span><b>检测趋势 · 近 7 天(场次 × 鸟数)</b></div>
+  <div class="bd">
+    <div class="legend"><span><i class="sq"></i>检测场次</span><span><i class="dt"></i>发现鸟数</span></div>
+    <div class="chart">
+      <div class="day" style="--i:0"><i class="b dark" style="--i:0;height:18%"></i><i class="b dit" style="--i:0;height:22%"></i></div>
+      <div class="day" style="--i:1"><i class="b dark" style="--i:1;height:27%"></i><i class="b dit" style="--i:1;height:39%"></i></div>
+      <div class="day" style="--i:2"><i class="b dark" style="--i:2;height:9%"></i><i class="b dit" style="--i:2;height:11%"></i></div>
+      <div class="day" style="--i:3"><i class="b dark" style="--i:3;height:36%"></i><i class="b dit" style="--i:3;height:55%"></i></div>
+      <div class="day" style="--i:4"><i class="b dark" style="--i:4;height:27%"></i><i class="b dit" style="--i:4;height:33%"></i></div>
+      <div class="day" style="--i:5"><i class="b dark" style="--i:5;height:18%"></i><i class="b dit" style="--i:5;height:19%"></i></div>
+      <div class="day" style="--i:6"><i class="b dark" style="--i:6;height:27%"></i><i class="b dit" style="--i:6;height:24%"></i></div>
+    </div>
+    <div class="xlab"><span>11-05</span><span>11-06</span><span>11-07</span><span>11-08</span><span>11-09</span><span>11-10</span><span>今天</span></div>
+    <div class="sub">柱体载入时逐根生长 · 点按某天显示当日明细浮签</div>
+  </div>
+</div>
+
+<div class="win">
+  <div class="tbar"><span class="bx">×</span><b>鸟种分布 · TOP 5(按发现鸟数)</b></div>
+  <div class="bd">
+    <div class="an-bar"><span class="nm">八哥 ›图鉴</span><span class="tr"><i class="fl" style="--i:0;width:100%"></i></span><span class="v mono">58</span></div>
+    <div class="an-bar"><span class="nm">白喉红臀鹎 ›</span><span class="tr"><i class="fl" style="--i:1;width:71%"></i></span><span class="v mono">41</span></div>
+    <div class="an-bar"><span class="nm">珠颈斑鸠 ›</span><span class="tr"><i class="fl" style="--i:2;width:55%"></i></span><span class="v mono">32</span></div>
+    <div class="an-bar"><span class="nm">树麻雀 ›</span><span class="tr"><i class="fl" style="--i:3;width:47%"></i></span><span class="v mono">27</span></div>
+    <div class="an-bar"><span class="nm">东方喜鹊 ›</span><span class="tr"><i class="fl" style="--i:4;width:33%"></i></span><span class="v mono">19</span></div>
+    <div class="sub">口径与记录页一致:每场检测的峰值鸟数合计 · 点物种名直达图鉴该鸟详情</div>
+  </div>
+</div>
+
+<div class="win">
+  <div class="tbar"><span class="bx">×</span><b>时段活动 · 24H</b></div>
+  <div class="bd">
+    <div class="h24">
+      <i style="--i:0;height:6%"></i><i style="--i:1;height:4%"></i><i style="--i:2;height:4%"></i><i style="--i:3;height:4%"></i><i style="--i:4;height:7%"></i><i style="--i:5;height:18%"></i><i class="pk" style="--i:6;height:62%"></i><i class="pk" style="--i:7;height:54%"></i><i style="--i:8;height:30%"></i><i style="--i:9;height:22%"></i><i style="--i:10;height:16%"></i><i style="--i:11;height:12%"></i><i style="--i:12;height:10%"></i><i style="--i:13;height:9%"></i><i style="--i:14;height:11%"></i><i style="--i:15;height:14%"></i><i style="--i:16;height:20%"></i><i style="--i:17;height:26%"></i><i class="pk" style="--i:18;height:47%"></i><i style="--i:19;height:33%"></i><i style="--i:20;height:18%"></i><i style="--i:21;height:9%"></i><i style="--i:22;height:6%"></i><i style="--i:23;height:5%"></i>
+    </div>
+    <div class="h24x"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+    <div class="peak">峰值 06 / 07 / 18 时 — 建议该时段保持双模待机 · 柱体可点按看数值</div>
+  </div>
+</div>
+
+<div class="win">
+  <div class="tbar"><span class="bx">×</span><b>告警处理构成</b></div>
+  <div class="bd">
+    <div class="seg"><i class="s1" style="flex-basis:62%"></i><i class="s2" style="flex-basis:18%"></i><i class="s3" style="flex-basis:20%"></i></div>
+    <div class="lgd"><span><i style="background:#111"></i>已处理 29</span><span><i style="background:repeating-linear-gradient(45deg,#111 0 3px,#f2f0e9 3px 6px)"></i>已忽略 8</span><span><i></i>待处理 9</span></div>
+  </div>
+</div>
+
+<div class="win" style="margin-bottom:12px">
+  <div class="tbar"><span class="bx">×</span><b>驱离执行 · 模拟执行器</b></div>
+  <div class="bd">
+    <div class="hero" style="margin:0;border:none;box-shadow:none">
+      <div><span class="n mono" data-n="44">0</span><span class="l">执行次数</span></div>
+      <div><span class="n mono" data-n="42">0</span><span class="l">完成</span></div>
+      <div><span class="n mono" data-n="1" style="font-size:16px">0</span><em class="n mono" style="font-size:11px">.2s</em><span class="l">平均启动</span></div>
+      <div><span class="n mono" data-n="68">0</span><em class="n mono" style="font-size:11px">%</em><span class="l">双模占比</span></div>
+    </div>
+    <div class="rate"><i style="width:96%"></i><b>完成率 96%</b></div>
+    <div class="sub">平均完成耗时 4.8s · 失败 2 次(超时)· 系统时间 2026-11-11</div>
+  </div>
+</div>
+</div>
+<div class="dock"><div class="t">监控</div><div class="t">告警</div><div class="t">控制</div><div class="t">记录</div><div class="t on">我的</div></div>
+</div>
+</div>
+
+<!-- ============ ② 导出弹层 ============ -->
+<div class="col">
+<div class="captop">② 点「导出」→ 格式弹层</div>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span class="time mono">9:41</span></div>
+<div class="mask"></div>
+<div class="sheet">
+  <div class="top"><b>导出统计数据</b><span class="x">✕</span></div>
+  <div class="bd2">
+    <div class="sh">范围(跟随当前页面所选)</div>
+    <div class="opt on"><span class="rd"></span>近 7 天<small>11-05 ~ 11-11</small></div>
+    <div class="sh">格式</div>
+    <div class="opt on"><span class="rd"></span>CSV · Excel 直接打开<small>UTF-8 BOM 不乱码</small></div>
+    <div class="opt"><span class="rd"></span>JSON · 原始数据<small>供二次分析</small></div>
+    <div class="sh">包含内容</div>
+    <div class="fnote" style="margin-top:0">趋势明细(日期 / 检测场次 / 发现鸟数 / 告警数)· 鸟种分布 · 24H 时段 · 告警处理构成 · 驱离执行统计</div>
+    <div class="btnfull" style="margin-top:10px">⤓ 导出</div>
+    <div class="fnote">文件名:orchard-stats-7d-20261111.csv · 导出在本地浏览器完成,不上传任何数据</div>
+  </div>
+</div>
+<div class="dock"><div class="t">监控</div><div class="t">告警</div><div class="t">控制</div><div class="t">记录</div><div class="t on">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:8px 20px 0">CSV 前端本地生成(Blob 下载),零后端改动;<br>新增的「场次/鸟数」趋势需要后端 /api/stats 扩展两个序列</p>
+</div>
+
+</div>
+<p class="foot">A1 · 数据分析动态版 — 口径与「一检一记」对齐(场次/鸟数)· 动效:数字滚动/柱体生长/峰值闪烁(reduced-motion 自动降级)· 导出 CSV/JSON</p>
+<script>
+document.querySelectorAll('[data-n]').forEach(function(el){
+  var t=+el.dataset.n,st=performance.now(),d=900;
+  function step(n){var p=Math.min(1,(n-st)/d);el.textContent=Math.round(t*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(step)}
+  requestAnimationFrame(step);
+});
+</script>
+</body></html>

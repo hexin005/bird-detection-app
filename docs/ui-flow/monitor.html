@@ -1,0 +1,168 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>M1 监控页 · 上传引导与完成汇总</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.row{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;padding:10px 10px 0}
+.col{text-align:center}
+.captop{color:#c8c6be;font-size:12px;font-weight:700;letter-spacing:2px;padding:14px 0 4px}
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border:3px solid #000;text-align:left;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 6px;font-size:10px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:32px;left:0;right:0;overflow-y:auto}
+.hdr{padding:14px 14px 6px}
+.hdr .row{display:flex;align-items:center;justify-content:space-between}
+.hdr .brand .t{font-size:15px;font-weight:900}
+.hdr .brand .s{font-size:10px;color:#555;margin-top:1px}
+.hdr .acts{display:flex;gap:6px}
+.btn3d{border:2px solid #000;background:#f2f0e9;font-size:11px;font-weight:800;padding:5px 9px;box-shadow:2px 2px 0 #000}
+.conn{display:flex;justify-content:space-between;align-items:center;margin:6px 14px 0;padding:5px 9px;border:1.5px solid #000;background:#f2f0e9;font-size:10px}
+.conn .dot{display:inline-block;width:7px;height:7px;background:#000;margin-right:5px}
+.titleblock{padding:8px 14px 2px}
+.titleblock .row{display:flex;align-items:center;justify-content:space-between}
+.titleblock .t{font-size:22px;font-weight:900;letter-spacing:1px}
+.titleblock .s{font-size:11px;color:#555;margin-top:2px}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.badge .dot{display:inline-block;width:6px;height:6px;background:currentColor;margin-right:4px}
+.video{margin:8px 14px 0;height:186px;background:#111;position:relative;border:2px solid #000}
+.video .tag{position:absolute;color:#f2f0e9;font-size:10px;letter-spacing:1px;opacity:.85}
+.video .tag.tl{top:7px;left:8px}.video .tag.bl{bottom:7px;left:8px}
+.video .box{position:absolute;left:38%;top:28%;width:30%;height:44%;border:1.5px dashed #f2f0e9;opacity:.35}
+.video .center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#f2f0e9;font-size:12px;letter-spacing:2px}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:10px 14px;padding:11px 12px}
+.card.flat{box-shadow:none}
+.card .thead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.card .thead b{font-size:13px;letter-spacing:1px}
+.gitem{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:11.5px}
+.blk{display:inline-flex;width:20px;height:20px;border:2px solid #000;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;background:#f2f0e9}
+.blk.fill{background:#000;color:#f2f0e9}
+.linkbar{display:flex;align-items:center;gap:8px;margin:8px 14px;padding:8px 11px;border:2px dashed #000;background:#e7e5dd;font-size:11.5px;font-weight:700}
+.linkbar .arr{margin-left:auto;font-weight:900}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#000;color:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;font-weight:800;font-size:13px;padding:10px 0;margin:10px 14px}
+.btn.ghost{background:#f2f0e9;color:#000}
+.btn.half{width:calc(50% - 17px);display:inline-flex;margin:10px 0 0}
+.btnrow{display:flex;gap:6px;margin:10px 14px 0}
+.btnrow .btn{margin:0;flex:1}
+.srcrow{display:flex;align-items:center;gap:8px;margin:8px 14px 0}
+.srcrow .info{flex:1;border:2px solid #000;background:#f2f0e9;padding:6px 9px}
+.srcrow .name{font-size:11.5px;font-weight:800}
+.srcrow .dur{font-size:9.5px;color:#555;margin-top:1px}
+.srcrow .mini{border:2px solid #000;background:#f2f0e9;font-weight:800;font-size:11px;padding:8px 10px;box-shadow:2px 2px 0 #000;white-space:nowrap}
+.sumhead{display:flex;align-items:center;justify-content:space-between}
+.sumhead .t{font-size:15px;font-weight:900;letter-spacing:1px}
+.srow{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1.5px solid rgba(0,0,0,.15);font-size:12.5px;font-weight:700}
+.srow:last-of-type{border-bottom:none}
+.srow .dots{flex:1;border-bottom:2px dotted #999;transform:translateY(-3px)}
+.srow .n{font-size:14px}
+.summeta{font-size:10px;color:#555;margin-top:8px;line-height:1.7}
+.stats{display:flex;margin:10px 14px 0;border:2px solid #000;background:#f2f0e9;box-shadow:4px 4px 0 #000}
+.stats>div{flex:1;text-align:center;padding:8px 0;border-right:2px solid #000}
+.stats>div:last-child{border-right:none}
+.stats .n{display:block;font-size:17px;font-family:"Courier New",monospace;font-weight:800}
+.stats .l{display:block;font-size:9px;color:#555;letter-spacing:2px;margin-top:1px}
+.dock{position:absolute;bottom:0;left:0;right:0;height:30px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;letter-spacing:2px;color:#55554f}
+.dock .t+.t{border-left:2px solid #000}
+.dock .t.on{background:#000;color:#f2f0e9}
+.dock .t .bdg{font-size:9px;font-family:"Courier New",Consolas,monospace;font-weight:700;background:#000;color:#f2f0e9;padding:0 5px;margin-left:4px}
+.foot{color:#888;font-size:12px;text-align:center;padding:6px 20px 30px}
+.newtag{display:inline-block;border:2px solid #000;background:#000;color:#f2f0e9;font-size:9px;font-weight:800;padding:0 6px;margin-left:6px;letter-spacing:1px;vertical-align:2px}
+</style></head><body>
+<div class="row">
+
+<!-- ============ 状态① 未选视频 ============ -->
+<div class="col">
+<div class="captop">状态 ① 未选视频 · 新增拍摄引导</div>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row">
+  <div class="brand"><div class="t">青禾示范果园 <span class="badge" style="font-size:9px;padding:0 5px">MVP</span></div><div class="s">东区 · 01 号监控点</div></div>
+  <div class="acts"><span class="btn3d">3D 视角</span><span class="btn3d">⚙</span></div>
+</div></div>
+<div class="conn"><span><span class="dot"></span>已连接</span><span>数据来自果园服务</span></div>
+<div class="titleblock"><div class="row"><span class="t">果园，尽在掌握</span><span class="badge"><span class="dot"></span>待机</span></div><div class="s">今日巡护，从这里开始</div></div>
+
+<div class="video">
+  <span class="tag tl">录像演示 · YOLOv8</span>
+  <div class="box"></div>
+  <div class="center">导入视频，开始一次鸟类巡护</div>
+  <span class="tag bl">支持 MP4 / MOV / AVI / WebM · ≤500 MB</span>
+</div>
+
+<div class="card">
+  <div class="thead"><b>拍得对，才检得准<span class="newtag">新增引导</span></b><span class="badge fill">必读</span></div>
+  <div class="gitem"><span class="blk fill">1</span><span>固定机位，画面对准<b>挂果树冠</b>，一段视频一个场景</span></div>
+  <div class="gitem"><span class="blk fill">2</span><span>白天自然光拍摄，逆光 / 夜间画面检出率明显下降</span></div>
+  <div class="gitem"><span class="blk fill">3</span><span>建议单段 <span class="mono">15 秒 – 5 分钟</span>，鸟身别只占几个像素</span></div>
+  <div class="gitem"><span class="blk fill">4</span><span>同一视频重复上传会被识别并拒收，结果请到记录页查看</span></div>
+</div>
+
+<div class="linkbar">♦ 本果园重点防范：八哥 · 树麻雀 · 白喉红臀鹎 · 大嘴乌鸦 等 7 种害鸟<span class="arr">查看害鸟图鉴 ›</span></div>
+
+<div class="srcrow">
+  <div class="info"><div class="name">服务器演示录像</div><div class="dur">不知道拍什么？先用它跑一遍完整流程</div></div>
+  <span class="mini">使用演示视频</span>
+  <span class="mini">选择视频</span>
+</div>
+
+<button class="btn">开始检测</button>
+<div class="stats">
+  <div><span class="n">0</span><span class="l">待处理告警</span></div>
+  <div><span class="n">128</span><span class="l">检测事件</span></div>
+  <div><span class="n">96</span><span class="l">驱离完成</span></div>
+</div>
+</div>
+<div class="dock"><div class="t on">监控</div><div class="t">告警</div><div class="t">控制</div><div class="t">记录</div><div class="t">我的</div></div>
+</div>
+</div>
+
+<!-- ============ 状态② 检测完成 ============ -->
+<div class="col">
+<div class="captop">状态 ② 检测完成 · 本次汇总卡（一次检测 = 一条记录）</div>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row">
+  <div class="brand"><div class="t">青禾示范果园 <span class="badge" style="font-size:9px;padding:0 5px">MVP</span></div><div class="s">东区 · 01 号监控点</div></div>
+  <div class="acts"><span class="btn3d">3D 视角</span><span class="btn3d">⚙</span></div>
+</div></div>
+<div class="conn"><span><span class="dot"></span>已连接</span><span>数据来自果园服务</span></div>
+<div class="titleblock"><div class="row"><span class="t">果园，尽在掌握</span><span class="badge fill"><span class="dot"></span>已完成</span></div><div class="s">46 秒视频 · 检测于 11:47</div></div>
+
+<div class="video">
+  <span class="tag tl">结果回放 · 已画框</span>
+  <div class="box"></div>
+  <span class="tag bl">demo-bird.mp4 · 00:46</span>
+</div>
+
+<div class="card" style="box-shadow:5px 5px 0 #000">
+  <div class="sumhead"><span class="t">本次检测</span><span class="badge fill">4 种 · 23 只</span></div>
+  <div style="margin-top:6px">
+    <div class="srow"><span>八哥</span><span class="dots"></span><span class="n mono">×9</span></div>
+    <div class="srow"><span>白喉红臀鹎</span><span class="dots"></span><span class="n mono">×7</span></div>
+    <div class="srow"><span>珠颈斑鸠</span><span class="dots"></span><span class="n mono">×4</span></div>
+    <div class="srow"><span>东方喜鹊</span><span class="dots"></span><span class="n mono">×3</span></div>
+  </div>
+  <div class="summeta">瞬时峰值 5 只 · 检测中产生 3 条告警（去告警页处置）<br>逐帧明细与回放已归档到「检测记录」</div>
+  <div class="btnrow">
+    <button class="btn ghost">查看记录</button>
+    <button class="btn">3D 场景复现驱赶</button>
+  </div>
+</div>
+
+<div class="card flat" style="display:flex;gap:0;padding:0">
+  <div style="flex:1;text-align:center;padding:8px 0;border-right:2px solid #000"><div class="mono" style="font-size:17px">0</div><div class="cap" style="font-size:9px;color:#555;letter-spacing:2px">待处理告警</div></div>
+  <div style="flex:1;text-align:center;padding:8px 0;border-right:2px solid #000"><div class="mono" style="font-size:17px">3</div><div class="cap" style="font-size:9px;color:#555;letter-spacing:2px">本次告警</div></div>
+  <div style="flex:1;text-align:center;padding:8px 0"><div class="mono" style="font-size:17px">2</div><div class="cap" style="font-size:9px;color:#555;letter-spacing:2px">自动驱离</div></div>
+</div>
+</div>
+<div class="dock"><div class="t on">监控</div><div class="t">告警<span class="bdg">3</span></div><div class="t">控制</div><div class="t">记录</div><div class="t">我的</div></div>
+</div>
+</div>
+
+</div>
+<p class="foot">M1 · 监控页重构 — 上传前有引导（拍什么/怎么拍/看图鉴），检测完出「本次汇总卡」：总只数 + 物种分布，一键进记录 / 3D 复现</p>
+</body></html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>ui-flow · 流程边界重构预览批次</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:30px 0 60px}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.wrap{width:820px;margin:0 auto}
+h1{color:#f2f0e9;font-size:24px;letter-spacing:2px;font-weight:900}
+.sub{color:#a9a79e;font-size:13px;margin:6px 0 22px}
+.panel{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;padding:14px 16px;margin-bottom:14px}
+.panel h2{font-size:15px;letter-spacing:1px;border-bottom:2px solid #000;padding-bottom:7px;margin-bottom:10px}
+.flowrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;font-weight:700}
+.flowrow .st{border:2px solid #000;padding:4px 9px;background:#f2f0e9}
+.flowrow .st.dark{background:#000;color:#f2f0e9}
+.flowrow .st.old{border-style:dashed;color:#777;text-decoration:line-through}
+.flowrow .ar{font-weight:900}
+.vs{display:grid;grid-template-columns:1fr;gap:10px}
+.vs .lab{font-size:10px;letter-spacing:2px;color:#555;font-weight:800;margin-bottom:4px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+a.card{display:block;background:#f2f0e9;border:2px solid #000;box-shadow:3px 3px 0 #000;padding:11px 12px;text-decoration:none;color:#111}
+a.card:hover{background:#000;color:#f2f0e9}
+a.card b{display:block;font-size:14px;margin-bottom:4px}
+a.card span{font-size:11px;line-height:1.5;display:block}
+a.card .tag{display:inline-block;border:1.5px solid currentColor;font-size:9px;font-weight:800;padding:0 5px;margin-top:7px;letter-spacing:1px}
+ol.dec{margin-left:18px;font-size:13px;line-height:2}
+ol.dec b{border-bottom:2px solid #000}
+.note{font-size:12px;color:#555;line-height:1.8}
+</style></head><body>
+<div class="wrap">
+  <h1>流程边界重构 · 预览批次 ui-flow</h1>
+  <div class="sub">一次检测 = 一条记录 · 场景按结果复现 · 记录页瘦身 · 害鸟图鉴 · 上传引导（本批次只画稿，未写业务代码）</div>
+
+  <div class="panel">
+    <h2>流程对照</h2>
+    <div class="vs">
+      <div>
+        <div class="lab">现状 — 边界模糊</div>
+        <div class="flowrow">
+          <span class="st old">视频</span><span class="ar">›</span>
+          <span class="st old">逐帧检测</span><span class="ar">›</span>
+          <span class="st old">告警逐条流水</span><span class="ar">›</span>
+          <span class="st old">记录页事件刷屏</span><span class="ar">›</span>
+          <span class="st old">场景检测中随机出鸟</span>
+        </div>
+      </div>
+      <div>
+        <div class="lab">新流程 — 一检一记</div>
+        <div class="flowrow">
+          <span class="st">上传（含拍摄引导）</span><span class="ar">›</span>
+          <span class="st">检测（告警照常处置）</span><span class="ar">›</span>
+          <span class="st dark">完成汇总 N 只 · M 种</span><span class="ar">›</span>
+          <span class="st dark">记录页 +1 条</span><span class="ar">›</span>
+          <span class="st dark">3D 复现 · 果农驱赶</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>预览稿（点击打开）</h2>
+    <div class="cards">
+      <a class="card" href="monitor.html"><b>M1 监控页</b><span>未选视频：新增「拍得对才检得准」引导卡 + 害鸟图鉴入口；检测完成：本次汇总卡（总只数 + 物种分布），一键进记录 / 3D 复现</span><span class="tag">2 个状态</span></a>
+      <a class="card" href="records-a.html"><b>R-A 记录页 · 档案卡</b><span>每次检测一张卡：时间 + 「4 种 · 23 只」，物种 chips 一行，点击展开回放与本场处置线</span><span class="tag">方案 A</span></a>
+      <a class="card" href="records-b.html"><b>R-B 记录页 · 台账</b><span>一行一检的台账：时间 + 物种速览 + 右侧大数字总只数，密度更高，展开详情同 A</span><span class="tag">方案 B</span></a>
+      <a class="card" href="guide.html"><b>G2 害鸟图鉴 · 大视图</b><span>图片网格（封面 = 本园最近抓拍，零后端）+ 点开详情浮层：危害 / 识别特征 / 活动时段 / 本园应对；13 种按危害分级</span><span class="tag">新页面</span></a>
+      <a class="card" href="scene-flow.html"><b>3D 场景联动</b><span>触发时机改为「检测完成按汇总出鸟」，果农自动出动驱赶，驱散结算后返程回巡逻</span><span class="tag">逻辑重构</span></a>
+      <a class="card" href="analytics.html"><b>A1 数据分析 · 动态版</b><span>口径与一检一记对齐（每日场次/发现鸟数双序列趋势），数字滚动+柱体生长动效（稿内真实可动），导出 CSV/JSON 本地生成</span><span class="tag">改版+导出</span></a>
+      <div class="card" style="background:#e4e2d8;border-style:dashed;box-shadow:none"><b>告警页 · 不变</b><span>按你的要求保持现状：实时告警照常产生与处置；仅可选在物种标签上加图鉴入口</span><span class="tag">无改动</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>已定决策（2026-11-11 你已裁决）</h2>
+    <ol class="dec">
+      <li><b>记录页</b>：方案 A 档案卡。</li>
+      <li><b>场景鸟群</b>：按物种峰值落位 + 设上限（上限值实施时实测帧率再定）。</li>
+      <li><b>主题范围</b>：<b>仅 B（果园守护 1.0）先行</b>，signal 同步放到后续独立批次。</li>
+      <li><b>执行日志</b>：从记录页移除，收进记录详情与告警详情弹窗。</li>
+      <li><b>害鸟图鉴</b>：大视图图片网格 + 详情浮层介绍（按你的反馈升级）。</li>
+      <li><b>数据分析（新增，待你确认）</b>：口径扩展（每日检测场次 / 发现鸟数，与一检一记同源）+ 动效升级 + 导出 CSV（Excel 兼容）/ JSON，前端本地生成零后端；新增口径需后端 /api/stats 扩展两个趋势序列。</li>
+    </ol>
+    <p class="note" style="margin-top:8px">说明：首版预览稿的底部导航画得比真实应用丑（高度/灰度/字距不符），已按 components-qh.css 真实样式修正——应用本身 dock 不做任何改动。图鉴分级与危害文案由我按农业常识起草，实施后你可逐条校订。</p>
+  </div>
+</div>
+</body></html>

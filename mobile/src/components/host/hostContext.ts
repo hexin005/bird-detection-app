@@ -2,10 +2,10 @@
 // 所有主题布局/页面只通过 inject(hostKey) 发语义调用,不各自持有业务状态。
 import { computed, reactive, ref } from 'vue'
 import { useOrchard } from '../../store'
-import type { Alarm, AutoRule, Command, Event, Patrol, Preferences } from '../../types'
+import type { Alarm, AutoRule, Command, Event, LibrarySummary, Patrol, Preferences } from '../../types'
 import { applyTheme, type ThemeId } from '../../theme'
 
-export type PageId = 'monitor' | 'alarms' | 'control' | 'records' | 'me' | 'themes' | 'analytics'
+export type PageId = 'monitor' | 'alarms' | 'control' | 'records' | 'guide' | 'me' | 'themes' | 'analytics'
 export type RepelMode = 'acoustic' | 'infrared' | 'both'
 
 export const statusNames: Record<string, string> = {
@@ -57,6 +57,10 @@ export function createHost() {
   const theme = ref<ThemeId>('b1bit')
   const rules = ref<AutoRule[]>([])
   const patrol = ref<Patrol | null>(null)
+  /** 记录页统计(一检一记):今日/累计的检测场次与发现鸟数,进入记录页时刷新 */
+  const recordsSummary = ref<LibrarySummary | null>(null)
+  /** 告警页物种过滤(状态提升到 host:图鉴「查看该鸟告警」等语义动作可外部设置) */
+  const alarmSpecies = ref('')
 
   const s = computed(() => store.state)
   const alarm = computed(() => s.value?.alarms.find(a => a.id === detailId.value) || (fetchedAlarm.value?.id === detailId.value ? fetchedAlarm.value : null))
@@ -135,11 +139,13 @@ export function createHost() {
     archiveNonce.value++; nav('records')
   }
   function settings() { if (s.value) Object.assign(preferences, s.value.settings); modal.value = 'mSet' }
-  function openScene() {
+  function openScene(taskId?: unknown) {
     if (typeof window === 'undefined') return
-    // 场景挂载在后端 /scene/；开发时前端在 5178，必须用后端绝对地址
+    // 场景挂载在后端 /scene/；开发时前端在 5178，必须用后端绝对地址。
+    // taskId 仅接受字符串(模板里 @click="host.openScene" 会把 MouseEvent 传进来,需忽略)
+    const task = typeof taskId === 'string' && taskId ? `?task=${encodeURIComponent(taskId)}` : ''
     const base = (store.server || window.location.origin).replace(/\/$/, '')
-    window.open(base + '/scene/', '_blank')
+    window.open(base + '/scene/' + task, '_blank')
   }
   function handle() { selectedAlarm.value = detailId.value; modal.value = 'mConfirm' }
   async function execute() {
@@ -174,8 +180,17 @@ export function createHost() {
       todayAlarms.value = b.new + b.processing + b.handled + b.ignored
     } catch { todayAlarms.value = 0 }
   }
+  /** 记录页统计(口径=已归档任务,鸟数=各场峰值合计,见 /api/library/summary) */
+  async function loadRecordsSummary() {
+    try { recordsSummary.value = await store.request<LibrarySummary>('/library/summary') } catch { recordsSummary.value = null }
+  }
   /** A1 分诊台:跳过详情直接弹确认框驱离指定告警 */
   function quickRepel(id: string) { selectedAlarm.value = id; modal.value = 'mConfirm' }
+  /** 图鉴详情 → 告警页按物种过滤(过滤状态在 host.alarmSpecies,BirdAlarms watch 它自动刷新) */
+  function viewSpeciesAlarms(name: string) {
+    alarmSpecies.value = name
+    nav('alarms')
+  }
   /** S1 自动哨兵:规则/巡逻的读取与变更(错误经 run→toast 呈现) */
   async function loadAutomation() {
     const [r, p] = await Promise.all([
@@ -221,10 +236,10 @@ export function createHost() {
     recordMode, archiveTask, archiveTime, archiveNonce, recordFilter,
     preferences, older, historyEnd, fetchedAlarm, fetchedCommand, theme,
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
-    rules, patrol,
-    run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore,
+    rules, patrol, recordsSummary, alarmSpecies,
+    run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms,
     quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
-    inspectEvent, loadHistory, refreshToday, resetTransient, setTheme, onTokenChange,
+    inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,
   })
   return host
 }

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// B 主题布局:四页编排 + dock(五个语义入口)。页面内容来自 Host 公共组件。
+// B 主题布局:四页编排 + dock(五个语义入口)+ 害鸟图鉴次级页。页面内容来自 Host 公共组件。
 import { useHost } from '../hostContext'
 import BMonitorPage from '../pages/BMonitorPage.vue'
 import BAlarmsPage from '../pages/BAlarmsPage.vue'
 import BControlPage from '../pages/BControlPage.vue'
 import BRecordsPage from '../pages/BRecordsPage.vue'
+import SpeciesGuide from '../pages/SpeciesGuide.vue'
 
 const host = useHost()
 </script>
@@ -74,6 +75,20 @@ const host = useHost()
       </view>
     </view>
     <view class="page__content"><BRecordsPage /></view>
+  </view>
+
+  <!-- 害鸟图鉴(次级页:监控页引导条 / 我的页进入,dock 不高亮) -->
+  <view class="page" :class="{ 'is-current': host.page === 'guide' }">
+    <view class="statusbar">
+      <view class="qh-menubar">
+        <text class="qh-menubar__back" @click="host.nav('monitor')">◂ 返回</text>
+        <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="currentColor"/><rect x="6" y="4" width="2" height="2" style="fill:var(--surface-card)"/></svg>
+        <text class="qh-menubar__ttl">果园守护</text>
+        <text class="qh-menubar__item">害鸟图鉴</text>
+        <view class="qh-menubar__right"><text class="time">9:41</text></view>
+      </view>
+    </view>
+    <view class="page__content"><SpeciesGuide /></view>
   </view>
 
   <!-- dock:五个语义入口 -->

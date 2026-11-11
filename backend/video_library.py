@@ -87,6 +87,20 @@ class VideoLibrary:
             row['species'] = self.store.rows('SELECT species,MIN(video_time) first_seen,MAX(video_time) last_seen,MAX(count) peak_count FROM samples WHERE task_id=? GROUP BY species', (row['id'],))
         return rows
 
+    def summary(self):
+        """记录页统计(一检一记口径):只统计已归档任务(result_ready=1,进行中/失败不计);
+        鸟只数 = 各任务各物种的峰值(同帧最多同时出现数)合计,与记录卡「N 种 · M 只」同源,不跨帧累加。"""
+        archived = 'WHERE t.result_ready=1'
+        tasks_total = self.store.rows(f'SELECT COUNT(*) n FROM tasks t JOIN videos v ON v.id=t.video_id {archived}')[0]['n']
+        birds_sql = '''SELECT COALESCE(SUM(peak),0) n FROM (
+            SELECT s.task_id, s.species, MAX(s.count) peak FROM samples s
+            JOIN tasks t ON t.id=s.task_id {cond} GROUP BY s.task_id, s.species)'''
+        birds_total = self.store.rows(birds_sql.format(cond=archived))[0]['n']
+        midnight = time.mktime(time.localtime(time.time())[:3] + (0, 0, 0, 0, 0, -1))
+        today_tasks = self.store.rows(f'SELECT COUNT(*) n FROM tasks t JOIN videos v ON v.id=t.video_id {archived} AND t.at>=?', (midnight,))[0]['n']
+        today_birds = self.store.rows(birds_sql.format(cond=archived + ' AND t.at>=?'), (midnight,))[0]['n']
+        return {'tasks_total': tasks_total, 'birds_total': birds_total, 'today_tasks': today_tasks, 'today_birds': today_birds}
+
     def detail(self, task_id):
         rows = self.store.rows('SELECT t.*,v.name FROM tasks t JOIN videos v ON v.id=t.video_id WHERE t.id=?', (task_id,))
         if not rows:
@@ -102,6 +116,7 @@ class VideoLibrary:
             else:
                 spans.append({'start': sample['video_time'], 'end': sample['video_time'], 'peak_count': sample['count']})
         row['intervals'] = [{'species': species, **span} for species, spans in intervals.items() for span in spans]
+        row['species'] = self.store.rows('SELECT species,MIN(video_time) first_seen,MAX(video_time) last_seen,MAX(count) peak_count FROM samples WHERE task_id=? GROUP BY species', (task_id,))
         row['alarms'] = self.store.rows('SELECT * FROM alarms WHERE task_id=? ORDER BY video_time', (task_id,))
         row['stream_ready'] = (self.job_dir(task_id) / 'index.m3u8').exists()
         return row

@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>3D 场景 · 检测完成后联动</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.stage{width:780px;margin:26px auto 0;position:relative;border:3px solid #000;background:#10140f}
+.titlebar{height:30px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px}
+.titlebar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 6px;font-size:10px}
+.viewport{height:330px;position:relative;background:#1a2416;
+  background-image:radial-gradient(ellipse at 50% 115%, #2c3b22 0%, #1a2416 62%);overflow:hidden}
+.ground{position:absolute;left:8%;right:8%;bottom:52px;height:130px;border:2px solid #6f7f5e;opacity:.55;
+  background-image:repeating-linear-gradient(90deg,rgba(140,160,120,.35) 0 2px,transparent 2px 34px)}
+.tree{position:absolute;bottom:96px;width:0;height:0}
+.tree .crown{width:44px;height:44px;background:#3c5228;border:2px solid #6f7f5e;margin:0 auto}
+.tree .trunk{width:6px;height:22px;background:#5a4a32;margin:0 auto}
+.bird{position:absolute;width:14px;height:11px;background:#0d0d0d;border:1.5px solid #e8e6dc;font-size:8px;color:#e8e6dc;display:flex;align-items:center;justify-content:center;font-weight:800}
+.crew{position:absolute;width:20px;height:20px;border:2px solid #e8e6dc;background:#0d0d0d;color:#e8e6dc;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+.panel{position:absolute;top:12px;left:12px;width:224px;background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 rgba(0,0,0,.7);padding:9px 11px;font-size:10.5px}
+.panel .h{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px}
+.panel .h b{font-size:12px;letter-spacing:1px}
+.panel .h .st{border:2px solid #000;background:#000;color:#f2f0e9;font-size:9px;font-weight:800;padding:0 5px}
+.panel .sr{display:flex;justify-content:space-between;padding:1.5px 0;font-weight:700}
+.panel .foot{margin-top:6px;padding-top:5px;border-top:1.5px dashed #999;color:#555}
+.hudbr{position:absolute;right:12px;bottom:12px;background:#f2f0e9;border:2px solid #000;padding:5px 9px;font-size:9.5px;font-weight:800;letter-spacing:1px}
+.hudbr .live{display:inline-block;width:7px;height:7px;background:#000;margin-right:5px;animation:bl 1s steps(2) infinite}
+@keyframes bl{50%{opacity:.15}}
+.flow{width:780px;margin:16px auto 0;display:flex;gap:8px}
+.step{flex:1;border:2px solid #000;background:#f2f0e9;box-shadow:3px 3px 0 #000;padding:9px 10px;position:relative}
+.step .n{display:inline-flex;width:20px;height:20px;border:2px solid #000;background:#000;color:#f2f0e9;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-bottom:5px}
+.step b{display:block;font-size:12px;margin-bottom:3px}
+.step p{font-size:10px;color:#444;line-height:1.55}
+.step .arrow{position:absolute;right:-12px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:900;color:#c8c6be;z-index:2}
+.explain{width:780px;margin:16px auto 0;border:2px dashed #6f6f68;padding:12px 16px;color:#c8c6be;font-size:12px;line-height:1.9}
+.explain b{color:#f2f0e9}
+.foot{text-align:center;color:#888;font-size:12px;padding:14px 20px 30px}
+</style></head><body>
+
+<div class="stage">
+  <div class="titlebar"><span class="logo">果园守护</span><span>青禾示范果园沙盘 — 3D 视角</span><span class="mono" style="margin-left:auto">14:32</span></div>
+  <div class="viewport">
+    <div class="ground"></div>
+    <!-- 果树 ×6 -->
+    <div class="tree" style="left:14%"><div class="crown"></div><div class="trunk"></div></div>
+    <div class="tree" style="left:30%"><div class="crown"></div><div class="trunk"></div></div>
+    <div class="tree" style="left:47%"><div class="crown"></div><div class="trunk"></div></div>
+    <div class="tree" style="left:63%"><div class="crown"></div><div class="trunk"></div></div>
+    <div class="tree" style="left:79%"><div class="crown"></div><div class="trunk"></div></div>
+    <div class="tree" style="left:70%;bottom:70px"><div class="crown"></div><div class="trunk"></div></div>
+    <!-- 检出鸟群示意 11 只 -->
+    <div class="bird" style="left:31%;bottom:112px">×5</div>
+    <div class="bird" style="left:34%;bottom:118px">3</div>
+    <div class="bird" style="left:37%;bottom:110px">2</div>
+    <div class="bird" style="left:40%;bottom:120px">1</div>
+    <div class="bird" style="left:52%;bottom:104px">×3</div>
+    <div class="bird" style="left:55%;bottom:112px">2</div>
+    <div class="bird" style="left:58%;bottom:102px">1</div>
+    <div class="bird" style="left:66%;bottom:120px">×2</div>
+    <div class="bird" style="left:69%;bottom:128px">1</div>
+    <div class="bird" style="left:44%;bottom:96px">×1</div>
+    <div class="bird" style="left:60%;bottom:92px">×1</div>
+    <!-- 三果农向鸟群移动 -->
+    <div class="crew" style="left:20%;bottom:84px">农</div>
+    <div class="crew" style="left:24%;bottom:76px">设</div>
+    <div class="crew" style="left:28%;bottom:84px">声</div>
+    <!-- 本次检测面板 -->
+    <div class="panel">
+      <div class="h"><b>本次检测 · 11:47</b><span class="st">复现中</span></div>
+      <div class="sr"><span>八哥</span><span class="mono">×9</span></div>
+      <div class="sr"><span>白喉红臀鹎</span><span class="mono">×7</span></div>
+      <div class="sr"><span>珠颈斑鸠</span><span class="mono">×4</span></div>
+      <div class="sr"><span>东方喜鹊</span><span class="mono">×3</span></div>
+      <div class="foot">果农三人已出动 · 靠近后开始驱赶<br>每轮驱散约一半，直至清空后返程</div>
+    </div>
+    <div class="hudbr"><span class="live"></span>自动响应 · 进行中</div>
+  </div>
+</div>
+
+<div class="flow">
+  <div class="step"><span class="n">1</span><b>视频检测完成</b><p>后端汇总：4 种 · 23 只，随状态同步推给 3D 场景</p><span class="arrow">›</span></div>
+  <div class="step"><span class="n">2</span><b>鸟群按结果出现</b><p>按物种与数量落位（峰值映射，设上限防卡顿）</p><span class="arrow">›</span></div>
+  <div class="step"><span class="n">3</span><b>果农三人出动</b><p>自动响应：集结 → 到位 → 双模驱赶（复用现有阶段机）</p><span class="arrow">›</span></div>
+  <div class="step"><span class="n">4</span><b>驱散结算</b><p>每轮驱散约一半，清空后返程回巡逻；记录页同步留档</p></div>
+</div>
+
+<div class="explain">
+  <b>与现状的差别</b>：现在鸟群是「检测过程中随每一帧实时出现」，与检测结果脱节、数量也看不懂；改后<b>只在检测完成时，按汇总结果一次性出现</b>，果农随之出动驱赶，和「一次检测 = 一条记录」完全对齐。<br>
+  <b>待定口径</b>：视频里检出 23 只，场景里出现多少只 —— 忠实按峰值（设上限）还是按比例压缩，见决策点 ②。
+</div>
+
+<p class="foot">3D 场景联动 · 触发时机从「检测中实时」改为「检测完成按汇总」</p>
+</body></html>

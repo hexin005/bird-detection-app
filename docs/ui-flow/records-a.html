@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>R-A 检测记录 · 档案卡方案</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#23231f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111}
+.mono{font-family:"Courier New",Consolas,monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:18px auto;position:relative;overflow:hidden;border:3px solid #000;
+  background:#e7e5dd;background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.045) 0 2px,transparent 2px 7px);padding-top:36px}
+.menubar{position:absolute;top:0;left:0;right:0;height:36px;background:#000;color:#f2f0e9;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:11px}
+.menubar .logo{font-weight:800;background:#f2f0e9;color:#000;padding:1px 6px;font-size:10px}
+.menubar .time{margin-left:auto}
+.scroll{position:absolute;top:36px;bottom:32px;left:0;right:0;overflow-y:auto}
+.hdr{padding:16px 16px 6px}
+.hdr .row{display:flex;align-items:baseline;gap:10px}
+.hdr .t{font-size:26px;font-weight:900;letter-spacing:2px}
+.hdr .s{font-size:12px;color:#555;margin-top:3px}
+.stripe{height:10px;background:repeating-linear-gradient(0deg,#000 0 2px,#f2f0e9 2px 4px);border-top:2px solid #000;border-bottom:2px solid #000;margin:8px 0 0}
+.badge{display:inline-block;border:2px solid #000;font-size:10px;font-weight:800;padding:1px 7px;letter-spacing:1px;background:#f2f0e9}
+.badge.fill{background:#000;color:#f2f0e9}
+.stats{display:flex;margin:12px 14px 0;border:2px solid #000;background:#f2f0e9;box-shadow:4px 4px 0 #000}
+.stats>div{flex:1;text-align:center;padding:9px 0;border-right:2px solid #000}
+.stats>div:last-child{border-right:none}
+.stats .n{display:block;font-size:18px;font-family:"Courier New",monospace;font-weight:800}
+.stats .l{display:block;font-size:9px;color:#555;letter-spacing:2px;margin-top:2px}
+.daybar{display:flex;align-items:center;gap:10px;margin:14px 14px 6px;font-size:11px;font-weight:800;letter-spacing:2px;color:#444}
+.daybar::before,.daybar::after{content:"";flex:1;height:2px;background:#000}
+.card{background:#f2f0e9;border:2px solid #000;box-shadow:4px 4px 0 #000;margin:8px 14px;padding:10px 12px}
+.card.open{box-shadow:5px 5px 0 #000}
+.rhead{display:flex;align-items:center;gap:8px}
+.rhead .time{font-size:15px}
+.rhead .dur{font-size:10px;color:#555}
+.rhead .sum{margin-left:auto;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.chip{display:inline-block;border:2px solid #000;font-size:10.5px;font-weight:700;padding:2px 8px;background:#f2f0e9;white-space:nowrap}
+.chip.on{background:#000;color:#f2f0e9}
+.rlinks{display:flex;gap:14px;margin-top:8px;padding-top:7px;border-top:1.5px dashed #999;font-size:11px;font-weight:800}
+.rlinks .x{color:#555}
+.detail{margin-top:8px;border-top:2px solid #000;padding-top:8px}
+.vrow{display:flex;gap:9px;align-items:center}
+.thumb{width:104px;height:60px;border:2px solid #000;background:#111;position:relative;flex-shrink:0}
+.thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#f2f0e9;font-size:16px}
+.thumb .cap{position:absolute;bottom:2px;left:4px;color:#f2f0e9;font-size:8px;opacity:.8}
+.tline{flex:1;font-size:10px}
+.tline .l{display:flex;gap:7px;padding:1.5px 0}
+.tline .tm{color:#777;white-space:nowrap}
+.note{font-size:11px;color:#666;text-align:center;padding:12px 0 16px;line-height:1.7}
+.btn{display:flex;align-items:center;justify-content:center;background:#f2f0e9;color:#000;border:2px solid #000;box-shadow:2px 2px 0 #000;font-weight:800;font-size:12px;padding:8px 0;margin:6px 14px}
+.dock{position:absolute;bottom:0;left:0;right:0;height:30px;background:#f2f0e9;border-top:2px solid #000;display:flex}
+.dock .t{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;letter-spacing:2px;color:#55554f}
+.dock .t+.t{border-left:2px solid #000}
+.dock .t.on{background:#000;color:#f2f0e9}
+</style></head><body>
+<div class="phone">
+<div class="menubar"><span class="logo">果园守护</span><span>文件</span><span>监测</span><span>告警</span><span class="time mono">9:41</span></div>
+<div class="scroll">
+<div class="hdr"><div class="row"><span class="t">检测记录</span><span class="badge fill">一检一记</span></div><div class="s">只记两件事：什么时候测的 · 测出了什么</div></div>
+<div class="stripe"></div>
+
+<div class="stats">
+  <div><span class="n">3</span><span class="l">今日检测</span></div>
+  <div><span class="n">41</span><span class="l">发现鸟数</span></div>
+  <div><span class="n">2</span><span class="l">驱离完成</span></div>
+</div>
+
+<div class="daybar">11月11日 · 今天</div>
+
+<!-- 展开态示例 -->
+<div class="card open">
+  <div class="rhead">
+    <span class="time mono">11:47</span><span class="dur mono">46s</span>
+    <span class="sum badge fill">4 种 · 23 只</span>
+  </div>
+  <div class="chips">
+    <span class="chip on">八哥 ×9</span><span class="chip">白喉红臀鹎 ×7</span><span class="chip">珠颈斑鸠 ×4</span><span class="chip">东方喜鹊 ×3</span>
+  </div>
+  <div class="detail">
+    <div class="vrow">
+      <div class="thumb"><span class="play">▶</span><span class="cap mono">00:46 结果回放</span></div>
+      <div class="tline">
+        <div class="l"><span class="tm mono">11:47</span><span>产生告警 3 条（八哥 ×2 / 白喉红臀鹎 ×1）</span></div>
+        <div class="l"><span class="tm mono">11:49</span><span>自动驱离完成 · 鸟群散去</span></div>
+        <div class="l"><span class="tm mono">11:52</span><span>第二次驱离 · 全部清空</span></div>
+      </div>
+    </div>
+    <div class="rlinks" style="border-top:none;padding-top:6px"><span>▶ 回放结果视频</span><span>▾ 收起</span></div>
+  </div>
+</div>
+
+<!-- 折叠态 -->
+<div class="card">
+  <div class="rhead">
+    <span class="time mono">09:12</span><span class="dur mono">1m02s</span>
+    <span class="sum badge">2 种 · 6 只</span>
+  </div>
+  <div class="chips"><span class="chip">树麻雀 ×4</span><span class="chip">大嘴乌鸦 ×2</span></div>
+</div>
+
+<div class="card">
+  <div class="rhead">
+    <span class="time mono">07:29</span><span class="dur mono">31s</span>
+    <span class="sum badge">1 种 · 1 只</span>
+  </div>
+  <div class="chips"><span class="chip">珠颈斑鸠 ×1</span></div>
+</div>
+
+<div class="daybar">11月10日</div>
+
+<div class="card">
+  <div class="rhead">
+    <span class="time mono">21:07</span><span class="dur mono">58s</span>
+    <span class="sum badge">3 种 · 12 只</span>
+  </div>
+  <div class="chips"><span class="chip">八哥 ×5</span><span class="chip">大嘴乌鸦 ×2</span><span class="chip">山斑鸠 ×5</span></div>
+</div>
+
+<div class="card">
+  <div class="rhead">
+    <span class="time mono">16:33</span><span class="dur mono">24s</span>
+    <span class="sum badge">未发现鸟</span>
+  </div>
+  <div class="chips"><span class="chip" style="border-style:dashed;color:#555">无检出 · 已归档</span></div>
+</div>
+
+<button class="btn">加载更早 ▾</button>
+<div class="note">告警与驱离的完整执行链在「告警页 / 记录详情」内查看<br>本页只保留：时间 + 检测结果，一屏不再刷屏</div>
+</div>
+<div class="dock"><div class="t">监控</div><div class="t">告警</div><div class="t">控制</div><div class="t on">记录</div><div class="t">我的</div></div>
+</div>
+<p style="text-align:center;color:#888;font-size:12px;padding:2px 20px 26px">方案 A · 档案卡 — 每次检测一张卡，点击展开详情（回放 / 本场告警时间线）</p>
+</body></html>

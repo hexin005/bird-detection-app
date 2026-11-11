@@ -412,6 +412,12 @@ def create_app(settings=None):
     def library(species: Optional[str] = None, offset: int = Query(0, ge=0), user=Depends(auth)):
         return {'items': monitor.library.list(species, offset), 'species': monitor.library.species(), 'alarm_groups': monitor.library.alarm_groups()}
 
+    # 注意:必须先于 /api/library/{task_id} 声明,否则 'summary' 会被路径参数捕获
+    @app.get('/api/library/summary')
+    def library_summary(user=Depends(auth)):
+        """记录页统计:今日/累计的检测场次与发现鸟数(口径=已归档任务,鸟数=各场峰值合计)。"""
+        return monitor.library.summary()
+
     @app.get('/api/library/{task_id}')
     def video_detail(task_id: str, user=Depends(auth)):
         return monitor.library.detail(task_id)

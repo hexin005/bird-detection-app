@@ -50,6 +50,26 @@ class LibraryTests(unittest.TestCase):
         later,created=self.store.alarm('task-1','八哥',1,.9,'c.jpg',30,900,20,now=100.2,video_clock=True)
         self.assertNotEqual(first,later);self.assertTrue(created)
 
+    def test_summary_counts_only_archived_tasks_with_peak_bird_sums(self):
+        # 未归档(running):不计入场次,也不计鸟数
+        self.lib.samples('task-1',[{'species':'八哥','confidence':.9},{'species':'八哥','confidence':.8}],1,30)
+        self.lib.samples('task-1',[{'species':'八哥','confidence':.9}],1.5,45)
+        before=self.lib.summary()
+        self.assertEqual(before['tasks_total'],0);self.assertEqual(before['birds_total'],0)
+        # 归档后:1 场;鸟数=峰值 2(同帧最多同时 2 只,不跨帧累加为 3)
+        self.lib.progress('task-1',100,True);self.store.task('task-1','ended')
+        row=self.lib.summary()
+        self.assertEqual(row['tasks_total'],1);self.assertEqual(row['birds_total'],2)
+        self.assertEqual(row['today_tasks'],1);self.assertEqual(row['today_birds'],2)
+        # 第二场多物种:树麻雀峰值 1 + 珠颈斑鸠峰值 3,合计 6
+        with self.store.tx() as db:
+            db.execute('INSERT INTO videos (id,name,path,duration,fps,at) VALUES (?,?,?,?,?,?)',('video-2','第二段','b.mp4',15,25,2))
+        self.store.task('task-2','running');self.lib.attach('task-2',self.lib.video('video-2'))
+        self.lib.samples('task-2',[{'species':'树麻雀','confidence':.8},{'species':'珠颈斑鸠','confidence':.7},{'species':'珠颈斑鸠','confidence':.8},{'species':'珠颈斑鸠','confidence':.8}],1,25)
+        self.lib.progress('task-2',100,True);self.store.task('task-2','ended')
+        row=self.lib.summary()
+        self.assertEqual(row['tasks_total'],2);self.assertEqual(row['birds_total'],6)
+
 
 class VideoApiTests(unittest.TestCase):
     def setUp(self):
@@ -114,6 +134,10 @@ class VideoApiTests(unittest.TestCase):
         self.assertIn('seg00000.ts?ticket=',playlist.text)
         self.assertEqual(self.client.get(url+'encoder.log?ticket='+ticket).status_code,404)
         self.assertEqual(self.client.get('/api/library?species=不存在',headers=self.headers).json()['items'],[])
+        self.assertEqual(self.client.get('/api/library/summary').status_code,401)
+        # summary 路由必须先于 /{task_id} 声明:返回统计字段而非 detail 的 409/404
+        summary=self.client.get('/api/library/summary',headers=self.headers).json()
+        self.assertEqual(summary['tasks_total'],0)
         self.assertEqual(self.client.get('/api/library/task-media',headers=self.headers).json()['name'],'测试.avi')
         original=self.client.get(url+'source?ticket='+ticket+'&download=true')
         self.assertEqual(original.status_code,200)
