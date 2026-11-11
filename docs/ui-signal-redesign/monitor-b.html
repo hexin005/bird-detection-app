@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>首页方案B · 态势+应急条</title>
+<style>
+:root{--paper:#f2f1ea;--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink)}
+.mono{font-family:Consolas,"Courier New",monospace;font-weight:700}
+.phone{width:390px;height:844px;margin:28px auto;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 0 0 8px #262624,0 30px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.bar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0}
+.bar .ttl{background:var(--y);color:var(--ink);font-size:12px;font-weight:900;letter-spacing:2px;padding:2px 8px}
+.bar .item{font-size:10px;color:#9a9a92;letter-spacing:1px}
+.bar .time{margin-left:auto;font-size:12px}
+.content{flex:1;overflow-y:auto;padding-bottom:52px}
+.head{background:var(--ink);color:var(--paper);padding:10px 14px 8px;display:flex;justify-content:space-between;align-items:center}
+.head b{font-size:20px;font-weight:900;letter-spacing:5px}
+.head span{display:block;font-size:8px;letter-spacing:2px;color:#9a9a92;margin-top:2px}
+.head .d3{border:1px solid var(--y);color:var(--y);background:transparent;font-size:10px;letter-spacing:1px;padding:5px 9px;font-weight:700}
+.ticker{background:var(--y);border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);overflow:hidden;height:26px;display:flex;align-items:center}
+.ticker span{white-space:nowrap;font-size:11px;font-weight:800;color:var(--ink);padding-left:100%;animation:mq 18s linear infinite}
+@keyframes mq{to{transform:translateX(-100%)}}
+.mast{position:relative;height:296px;padding:0 16px;margin-top:10px}
+.rail{position:absolute;left:8px;right:8px;top:6px;height:5px;background:var(--ink)}
+.chain{position:absolute;top:10px;width:0;height:34px;border-left:2px dashed var(--ink)}
+.plate{position:absolute;left:44px;top:40px;width:170px;background:var(--r);border:3px solid var(--ink);color:#fff;text-align:center;padding:14px 0 12px;box-shadow:5px 6px 0 rgba(25,25,25,.28)}
+.plate .no{font-size:10px;letter-spacing:3px;font-weight:900}
+.plate .big{font-size:60px;font-weight:900;line-height:1.05}
+.plate .nm{font-size:12px;font-weight:900;letter-spacing:2px;border-top:2px solid rgba(255,255,255,.6);margin:4px 12px 0;padding-top:6px}
+.plate .en{font-size:8px;letter-spacing:2px;opacity:.85}
+.levels{position:absolute;right:14px;top:36px;width:130px}
+.levels h4{font-size:10px;font-weight:900;letter-spacing:2px;border-bottom:2px solid var(--ink);padding-bottom:5px;margin-bottom:8px}
+.lv{display:flex;gap:7px;margin-bottom:8px;opacity:.5}
+.lv.cur{opacity:1}
+.lv .sq{width:26px;height:26px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#fff;flex-shrink:0}
+.lv .t{font-size:10px;font-weight:800}.lv .t small{display:block;font-size:8.5px;color:var(--grey);font-weight:600}
+/* 应急处置条1:最新一报(替代告警牌区) */
+.strip{margin:12px 14px 0;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 4px 0 rgba(25,25,25,.22);cursor:pointer}
+.strip .hd{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px dashed var(--grey)}
+.strip .hd b{font-size:11px;font-weight:900;letter-spacing:1px}
+.strip .hd .n{margin-left:auto;font-size:9.5px;font-weight:900;background:var(--r);color:#fff;padding:1px 7px}
+.strip .bd{display:flex;align-items:center;gap:8px;padding:9px 11px}
+.strip .bd .sp{font-size:14px;font-weight:900}
+.strip .bd .m{font-size:9px;color:var(--grey);flex:1;min-width:0}
+.strip .bd .st{flex-shrink:0;font-size:9.5px;font-weight:900;border:2px solid var(--ink);padding:2px 8px;transform:rotate(-3deg);background:var(--r);border-color:var(--r);color:#fff}
+.strip .go{display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--ink);padding:8px 11px;font-size:11px;font-weight:900;background:var(--ink);color:var(--y);cursor:pointer}
+.strip .go span{font-size:9px;color:#9a9a92;font-weight:700}
+/* 应急处置条2:一键升起(替代升降控制面板) */
+.raise{margin:10px 14px 0;border:2px solid var(--ink);background:#fbfaf4;box-shadow:3px 4px 0 rgba(25,25,25,.22)}
+.raise .cfg{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px dashed var(--grey)}
+.raise .cfg b{font-size:11px;font-weight:900;letter-spacing:1px}
+.raise .cfg .cur{margin-left:auto;font-size:10px;font-weight:900;border:1px solid var(--ink);padding:2px 8px}
+.raise .btn{display:flex;align-items:center;gap:10px;background:var(--ink);cursor:pointer}
+.raise .btn .flag{width:14px;align-self:stretch;background:repeating-linear-gradient(-45deg,var(--y) 0 9px,var(--ink) 9px 18px);border-right:2px solid var(--y)}
+.raise .btn .t{flex:1;color:var(--y);font-size:14px;font-weight:900;letter-spacing:4px;padding:11px 0 2px;text-align:center}
+.raise .btn .s{display:block;text-align:center;font-size:9px;color:#9a9a92;letter-spacing:1px;padding-bottom:10px}
+/* 观测工作区 */
+.ws{margin:12px 14px 0;border:2px solid var(--ink);background:#fbfaf4}
+.ws .hd{display:flex;justify-content:space-between;align-items:center;padding:9px 12px}
+.ws .hd b{font-size:12px;font-weight:900;letter-spacing:2px}
+.ws .hd span{font-size:9px;color:var(--grey)}
+.obs{display:flex;margin:12px 14px 0;border:2px solid var(--ink);background:#fbfaf4}
+.obs div{flex:1;text-align:center;padding:9px 0 8px;border-right:2px solid var(--ink)}
+.obs div:last-child{border-right:0}
+.obs b{font-size:18px;font-weight:900}
+.obs span{display:block;font-size:8px;letter-spacing:2px;color:var(--grey);margin-top:2px;font-weight:700}
+.note{font-size:9px;color:var(--grey);text-align:center;margin:10px 14px;line-height:1.7}
+.dock{position:absolute;left:0;right:0;bottom:0;height:44px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:9.5px;letter-spacing:1px}
+.dock b{color:var(--y)}
+.dock .nav{display:flex;gap:12px}
+.dock .nav span{opacity:.6;font-weight:800}
+.dock .nav span.on{opacity:1;border-bottom:2px solid var(--y);padding-bottom:2px}
+</style></head><body>
+<div class="phone">
+  <div class="bar"><span class="ttl">信号台</span><span class="item">ST.01 东区</span><span class="time mono">9:41</span></div>
+  <div class="content">
+    <div class="head"><div><b>鸟情信号站</b><span>QINGHE SIGNAL SERVICE · ST.01</span></div><button class="d3 mono">3D 沙盘 ▸</button></div>
+    <div class="ticker"><span>09:41 珠颈斑鸠 ×2 现身东南果树区 ｜ 08:12 白喉红臀鹎 已执行双模驱离 ｜ 07:05 红外镜头自检 PASS ｜</span></div>
+
+    <div class="mast">
+      <div class="rail"></div><div class="chain" style="left:96px"></div><div class="chain" style="left:110px"></div>
+      <div class="plate"><div class="no">鸟情信号 · 待处理等级</div><div class="big">3</div><div class="nm">鸟群密集 · 建议驱离</div><div class="en">SIGNAL III · 3 条待处理</div></div>
+      <div class="levels"><h4>待处理等级表</h4>
+        <div class="lv"><div class="sq" style="background:var(--y);color:var(--ink)">1</div><div class="t">偶发到访<small>保持记录 · 无需处理</small></div></div>
+        <div class="lv"><div class="sq" style="background:#e07a18">2</div><div class="t">频繁活动<small>建议值守 · 关注返场</small></div></div>
+        <div class="lv cur"><div class="sq" style="background:var(--r)">3</div><div class="t">密集取食<small>待处理 3 条 · 建议驱离</small></div></div>
+      </div>
+    </div>
+
+    <!-- 应急条1:最新一报 + 去告警墙 -->
+    <div class="strip">
+      <div class="hd"><b>最新鸟情</b><span class="n">待处理 3</span></div>
+      <div class="bd"><span class="sp">珠颈斑鸠 ×2</span><span class="m mono">09:41 · 东南果树区 · 93%</span><span class="st">待处理</span></div>
+      <div class="go">打开告警墙 · 逐条处置<span>挂牌墙 · 筛选 · 历史 ›</span></div>
+    </div>
+
+    <!-- 应急条2:一键升起(当前配置) + 去升降页调整 -->
+    <div class="raise">
+      <div class="cfg"><b>应急驱离</b><span class="cur mono">▲▲ 双模 · 5 秒</span></div>
+      <div class="btn"><span class="flag"></span><div style="flex:1"><div class="t">升起驱离信号</div><span class="s mono">关联最新一报 · 人工确认后执行</span></div></div>
+    </div>
+
+    <div class="ws"><div class="hd"><b>观测工作区 ▸</b><span>选择视频 · 开始/停止观测</span></div></div>
+
+    <div class="obs">
+      <div><b>128</b><span>今日告警</span></div>
+      <div><b>12</b><span>执行完成</span></div>
+      <div><b>0.1s</b><span>平均响应</span></div>
+      <div><b>62%</b><span>双模占比</span></div>
+    </div>
+    <div class="note">首页 = 态势 + 应急 · 方式/时长/自动策略在「升降」页<br>逐条处置在「告警」页挂牌墙</div>
+  </div>
+  <div class="dock"><span>信号等级 <b class="mono">III</b> · 数据来自果园服务</span><div class="nav"><span class="on">信号台</span><span>告警</span><span>升降</span><span>记录</span><span>我的</span></div></div>
+</div>
+</body></html>

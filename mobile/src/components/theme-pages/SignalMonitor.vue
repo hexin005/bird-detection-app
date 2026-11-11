@@ -2,7 +2,7 @@
 // 信号站监控主页 —— 1:1 复刻 docs/ui-y/c-signal.html(真实数据 + 语义事件)
 // 口径:信号等级=「待处理等级」(counts.pending 全量);0 条=独立"静止"态,不高亮警示。
 import { computed, onMounted, ref } from 'vue'
-import { useHost, clock, shortTime, type RepelMode } from '../host/hostContext'
+import { useHost, clock, shortTime, modeCn } from '../host/hostContext'
 import { useWorkspace } from '../host/useWorkspace'
 import { useOrchard } from '../../store'
 import VideoPlayer from '../VideoPlayer.vue'
@@ -19,6 +19,7 @@ const pendingCount = computed(() => host.s?.counts.pending || 0)
 const level = computed(() => pendingCount.value >= 3 ? 3 : pendingCount.value >= 2 ? 2 : pendingCount.value >= 1 ? 1 : 0) // 0=静止
 const canRepel = computed(() => !host.store.busy && !host.offline && !host.store.active)
 const tags = computed(() => (host.s?.alarms || []).filter(a => a.status === 'new' || a.status === 'processing').slice(0, 3))
+const latest = computed(() => tags.value[0] ?? null)
 const ticker = computed(() => {
   if (disconnected.value) return `● 连接中断(${host.store.connection})—— 正在尝试恢复,当前数据可能滞后  ｜  `
   const items = (host.s?.events || []).slice(0, 4).map(e => `${clock(e.at)} ${e.message}`)
@@ -68,34 +69,43 @@ function requestRepel() {
     </view>
   </view>
 
-  <!-- 挂牌告警(最新 3 条) -->
-  <view class="sgn-tags">
-    <view v-for="a in tags" :key="a.id" class="sgn-tag" :class="{ hot: a.status === 'new' }" style="cursor:pointer" @click="host.openAlarm(a)">
-      <text class="sgn-tag-name">{{ a.species }}</text>
-      <text class="sgn-tag-meta mono">×{{ a.count }} · {{ Math.round(a.confidence * 100) }}% · {{ shortTime(a.at) }}</text>
-      <text class="sgn-tag-st" :class="{ dim: a.status !== 'new' }">{{ a.status === 'new' ? '待处理' : '执行中' }}</text>
+  <!-- 最新鸟情条:最新一报 + 待处理计数,处置在告警墙 -->
+  <view class="sgn-strip" @click="host.nav('alarms')">
+    <view class="strip-hd">
+      <text class="strip-t">最新鸟情</text>
+      <text class="strip-n mono" :class="{ zero: !pendingCount }">待处理 {{ pendingCount }}</text>
     </view>
-    <view v-if="!tags.length" class="sgn-tag empty"><text class="sgn-tag-name">无进行中告警</text><text class="sgn-tag-meta">历史记录见「记录」页</text></view>
+    <view class="strip-bd">
+      <template v-if="latest">
+        <text class="strip-sp">{{ latest.species }} <text class="x mono">×{{ latest.count }}</text></text>
+        <text class="strip-m mono">{{ shortTime(latest.at) }} · {{ latest.site }} · 置信 {{ Math.round(latest.confidence * 100) }}%</text>
+        <text class="strip-st" :class="{ run: latest.status !== 'new' }">{{ latest.status === 'new' ? '待处理' : '执行中' }}</text>
+      </template>
+      <template v-else>
+        <text class="strip-sp">暂无进行中鸟情</text>
+        <text class="strip-m">历史见「记录」页</text>
+      </template>
+    </view>
+    <view class="strip-go">
+      <text>打开告警墙 · 逐条处置</text>
+      <text class="sub">挂牌墙 · 筛选 · 历史 ›</text>
+    </view>
   </view>
 
-  <!-- 升降控制 -->
-  <view class="sgn-ctl">
-    <view class="sgn-hz"/>
-    <view class="sgn-ctl-bd">
-      <view class="sgn-ctl-row"><text class="sgn-ctl-t">驱离信号 · 升降控制</text><text class="sgn-ctl-note">3 / 5 / 8 秒 · 定时自动降下</text></view>
-      <view class="sgn-flags">
-        <view v-for="m in [{ id: 'acoustic', n: '▲ 声波', en: 'ACOUSTIC 01' }, { id: 'infrared', n: '▲ 红外', en: 'INFRARED 02' }, { id: 'both', n: '▲▲ 双模联挂', en: 'DUAL-MODE' }]" :key="m.id" class="sgn-flag" :class="{ on: host.mode === m.id }" @click="host.mode = m.id as RepelMode">
-          <text class="n">{{ m.n }}</text><text class="en mono">{{ m.en }}</text>
-        </view>
-      </view>
-      <view class="sgn-durs">
-        <text v-for="d in [3,5,8]" :key="d" class="sgn-dur" :class="{ on: host.duration === d }" @click="host.duration = d">{{ d }} 秒</text>
-      </view>
-      <button class="sgn-raise" :disabled="!canRepel" @click="requestRepel">
-        <text class="raise-t">升起驱离信号</text>
-        <text class="raise-s mono">{{ host.offline ? '设备离线 · 无法升起' : host.store.active ? '信号升空中 · ' + Math.max(0, host.remaining) + 's' : '关联 ' + (tags[0]?.id ? tags[0].id : '手动操作') + ' · 人工确认后执行' }}</text>
-      </button>
+  <!-- 应急驱离条:一键升起(方式/时长在升降页调整) -->
+  <view class="sgn-emg">
+    <view class="emg-cfg">
+      <text class="cfg-t">应急驱离</text>
+      <text class="cfg-cur mono">{{ modeCn[host.mode] }} · {{ host.duration }} 秒</text>
+      <text class="cfg-link" @click.stop="host.nav('control')">去调整 ›</text>
     </view>
+    <button class="emg-btn" :class="{ off: !canRepel }" :disabled="!canRepel" @click="requestRepel">
+      <i class="flag"/>
+      <view class="emg-main">
+        <text class="emg-t">升起驱离信号</text>
+        <text class="emg-s mono">{{ host.offline ? '设备离线 · 无法升起' : host.store.active ? '信号升空中 · ' + Math.max(0, host.remaining) + 's' : '关联 ' + (tags[0]?.id ?? '手动操作') + ' · 人工确认后执行' }}</text>
+      </view>
+    </button>
   </view>
 
   <!-- 观测工作区(折叠) -->
@@ -163,33 +173,32 @@ function requestRepel() {
 .sgn-lv .t { display:flex; flex-direction:column; gap:1px; }
 .sgn-lv .t1 { font-size:10.5px; font-weight:800; color:#191919; }
 .sgn-lv .t2 { font-size:9px; color:#6f6f68; }
-/* 挂牌告警 */
-.sgn-tags { display:flex; gap:9px; margin-top:6px; }
-.sgn-tag { flex:1; background:var(--surface-card); border:2px solid #191919; position:relative; padding:14px 6px 9px; text-align:center; box-shadow:3px 4px 0 rgba(25,25,25,.22); display:flex; flex-direction:column; gap:3px; align-items:center; }
-.sgn-tag::before { content:''; position:absolute; left:50%; top:-2px; transform:translateX(-50%); width:9px; height:9px; border-radius:50%; background:var(--surface-canvas); border:2px solid #191919; }
-.sgn-tag-name { font-size:13px; font-weight:900; }
-.sgn-tag-meta { font-size:8.5px; color:var(--ink-400); }
-.sgn-tag-st { font-size:9.5px; font-weight:900; border:2px solid #191919; padding:1px 7px; transform:rotate(-3deg); color:#191919; }
-.sgn-tag.hot .sgn-tag-st { background:#d3212c; border-color:#d3212c; color:#fff; }
-.sgn-tag.empty { border-style:dashed; color:var(--ink-400); }
-/* 升降控制 */
-.sgn-ctl { margin-top:12px; border:2px solid #191919; background:var(--surface-card); }
-.sgn-hz { height:10px; background:repeating-linear-gradient(-45deg,#f5c400 0 12px,#191919 12px 24px); border-bottom:2px solid #191919; }
-.sgn-ctl-bd { padding:10px 12px 12px; display:flex; flex-direction:column; gap:9px; }
-.sgn-ctl-row { display:flex; justify-content:space-between; align-items:baseline; }
-.sgn-ctl-t { font-size:13px; font-weight:900; letter-spacing:2px; }
-.sgn-ctl-note { font-size:9px; color:var(--ink-400); letter-spacing:1px; }
-.sgn-flags { display:flex; gap:8px; }
-.sgn-flag { flex:1; border:2px solid #191919; padding:7px 0 6px; text-align:center; font-size:11.5px; font-weight:800; display:flex; flex-direction:column; gap:1px; color:#191919; cursor:pointer; }
-.sgn-flag .en { font-size:8px; letter-spacing:1px; color:var(--ink-400); font-weight:700; }
-.sgn-flag.on { background:#191919; color:#f2f1ea; }
-.sgn-flag.on .en { color:#9a9a92; }
-.sgn-durs { display:flex; gap:6px; }
-.sgn-dur { flex:1; border:2px solid #191919; text-align:center; font-size:11px; font-weight:800; padding:5px 0; color:#191919; cursor:pointer; }
-.sgn-dur.on { background:#191919; color:#f5c400; }
-.sgn-raise { background:#191919; color:#f5c400; font-size:14px; font-weight:900; letter-spacing:4px; text-align:center; padding:11px 0; border:none; display:flex; flex-direction:column; gap:2px; }
-.sgn-raise[disabled] { background:#6f6f68; color:#d9d8d0; }
-.sgn-raise .raise-s { font-size:9px; letter-spacing:2px; color:#9a9a92; font-weight:700; }
+/* 最新鸟情条(替代挂牌告警区) */
+.sgn-strip { margin:12px 14px 0; border:2px solid #191919; background:var(--surface-card); box-shadow:3px 4px 0 var(--shadow-ink); cursor:pointer; }
+.strip-hd { display:flex; align-items:center; gap:8px; padding:8px 11px; border-bottom:1px dashed #6f6f68; }
+.strip-t { font-size:11px; font-weight:900; letter-spacing:1px; }
+.strip-n { margin-left:auto; font-size:9.5px; font-weight:900; background:#d3212c; color:#fff; padding:1px 7px; }
+.strip-n.zero { background:var(--surface-muted); color:var(--ink-400); }
+.strip-bd { display:flex; align-items:center; gap:8px; padding:9px 11px; }
+.strip-sp { font-size:14px; font-weight:900; min-width:0; overflow-wrap:anywhere; }
+.strip-sp .x { font-size:10px; background:#191919; color:#f5c400; padding:1px 6px; }
+.strip-m { font-size:9px; color:var(--ink-400); flex:1; min-width:0; }
+.strip-st { flex-shrink:0; font-size:9.5px; font-weight:900; border:2px solid #191919; padding:2px 8px; transform:rotate(-3deg); background:#d3212c; border-color:#d3212c; color:#fff; }
+.strip-st.run { background:#f5c400; border-color:#191919; color:#191919; }
+.strip-go { display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:2px solid #191919; padding:8px 11px; font-size:11px; font-weight:900; background:#191919; color:#f5c400; }
+.strip-go .sub { font-size:9px; color:#9a9a92; font-weight:700; text-align:right; }
+/* 应急驱离条(替代升降控制面板) */
+.sgn-emg { margin:10px 14px 0; border:2px solid #191919; background:var(--surface-card); box-shadow:3px 4px 0 var(--shadow-ink); }
+.emg-cfg { display:flex; align-items:center; gap:8px; padding:8px 11px; border-bottom:1px dashed #6f6f68; }
+.cfg-t { font-size:11px; font-weight:900; letter-spacing:1px; }
+.cfg-cur { margin-left:auto; font-size:10px; font-weight:700; border:1px solid #191919; padding:2px 8px; color:#191919; }
+.cfg-link { font-size:10px; font-weight:900; color:#d3212c; text-decoration:underline; cursor:pointer; flex-shrink:0; }
+.emg-btn { display:flex; align-items:center; width:100%; background:#191919; border:0; cursor:pointer; padding:0; }
+.emg-btn .flag { width:14px; align-self:stretch; background:repeating-linear-gradient(-45deg,#f5c400 0 9px,#191919 9px 18px); border-right:2px solid #f5c400; }
+.emg-main { flex:1; text-align:center; padding:11px 0 10px; min-width:0; }
+.emg-t { display:block; color:#f5c400; font-size:14px; font-weight:900; letter-spacing:4px; }
+.emg-s { display:block; text-align:center; font-size:9px; color:#9a9a92; letter-spacing:1px; margin-top:2px; }
+.emg-btn.off, .emg-btn[disabled] { opacity:.55; }
 /* 观测工作区 */
 .sgn-ws { margin-top:12px; border:2px solid #191919; background:var(--surface-card); }
 .sgn-ws-hd { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; }

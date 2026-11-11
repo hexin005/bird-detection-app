@@ -43,5 +43,15 @@ body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans S
     <p>待处理告警挂上<b>挂牌墙</b>：挂杆 + 吊绳 + 微倾斜牌面，牌内含置信度条与「升旗驱离 / 忽略」动作。物种筛选改为<b>一排横滑 chips + 行尾「全部物种 ▾」弹层</b>（13 类放得下），承接图鉴“查看该鸟告警”；历史处置为撕票工单行。</p></div><a class="go" href="alarms.html">查看 ›</a></div>
 
   <div class="tip">反馈方式：直接说哪一页要改什么（如“记录用方案B，但统计带只留两个数字”）；确认后我再出实施计划，经你审核才动业务代码。</div>
+
+  <div class="head" style="margin-top:30px"><b>批次 02 · 首页去重</b><span>SIGNAL HOME · DEDUP</span></div>
+  <div class="scope" style="margin-top:14px">
+    问题：首页(信号台)把<b>告警牌区(≈告警页挂牌墙)</b>和<b>升降控制面板(≈升降页配置区)</b>整块搬了进来，与两个专页高度重复。
+    原则：<b>首页 = 态势感知 + 应急动作，专页 = 逐条处置 + 参数配置</b>。以下两案都不动信号牌/等级表/跑马灯/观测工作区/观测带。
+  </div>
+  <div class="card"><span class="no">A</span><div><h3><a href="monitor-a.html">首页方案A「态势只读台」</a></h3>
+    <p>首页<b>完全去操作化</b>：告警牌区 → “最新鸟情”只读列表（时间+物种+状态章，无按钮）；升降面板整体移除。所有处置/驱离动作回归「告警」「升降」专页。</p></div><a class="go" href="monitor-a.html">查看 ›</a></div>
+  <div class="card"><span class="no">B</span><div><h3><a href="monitor-b.html">首页方案B「态势+应急条」<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">推荐</span></a></h3>
+    <p>告警牌区 → <b>最新一报条</b>（最新一报+待处理计数+去告警墙）；升降面板 → <b>应急驱离条</b>（保留一键升起，方式/时长只显摘要，调整进升降页）。既去重，又保住“看到信号变红→立刻升起”的应急路径。</p></div><a class="go" href="monitor-b.html">查看 ›</a></div>
 </div>
 </body></html>
