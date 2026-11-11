@@ -348,18 +348,28 @@ watch(
   { flush: 'post' },
 )
 
-// 深链:WebSocket 连接建立后拉取任务档案(登录/恢复两种路径都会经过 connected)
+// 深链:WebSocket 连接建立后拉取任务档案(登录/恢复两种路径都会经过 connected);
+// 档案请求失败自动重试,连续失败才提示——复现失败不该无声无息。
+const deepTaskMaxRetries = 3
+let deepTaskRetries = 0
+function fetchDeepTask() {
+  fetch(`${state.server}/api/library/${encodeURIComponent(deepTaskId)}`, {
+    headers: { Authorization: 'Bearer ' + state.token },
+  })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then((detail) => { if (detail) adoptTaskSummary(taskFromDetail(detail)) })
+    .catch(() => {
+      deepTaskRetries += 1
+      if (deepTaskRetries < deepTaskMaxRetries) setTimeout(fetchDeepTask, 2000)
+      else flash('历史任务复现失败 · 请在记录页重新打开')
+    })
+}
 watch(
   () => state.connected,
   (up) => {
     if (!up || !deepTaskId || deepTaskDone.value) return
     deepTaskDone.value = true
-    fetch(`${state.server}/api/library/${encodeURIComponent(deepTaskId)}`, {
-      headers: { Authorization: 'Bearer ' + state.token },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((detail) => { if (detail) adoptTaskSummary(taskFromDetail(detail)) })
-      .catch(() => {})
+    fetchDeepTask()
   },
 )
 

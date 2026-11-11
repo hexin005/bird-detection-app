@@ -37,6 +37,9 @@ export const state = reactive({
   mediaTicket: '',
 })
 
+// 供自动化验证读取连接层状态(与 App.vue 的 __sceneHandle 同类,不含敏感动作)
+if (typeof window !== 'undefined') window.__sceneData = state
+
 let socket = null
 let reconnectTimer = null
 let reconnectDelay = 2000
