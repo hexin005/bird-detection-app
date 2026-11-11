@@ -14,6 +14,7 @@ import PixelLayout from './layouts/PixelLayout.vue'
 import MeHome from '../MeHome.vue'
 import ThemePicker from '../ThemePicker.vue'
 import Analytics from '../Analytics.vue'
+import { alertNewAlarms, stopAlertTitleFlash } from '../../utils/alertNotify'
 
 const store = useOrchard()
 const host = createHost()
@@ -44,6 +45,13 @@ watch(() => store.token, token => { void onTokenChanged(token) })
 watch(() => host.s?.alarms.find(a => a.id === host.selectedAlarm)?.status, st => {
   if (st && st !== 'new') host.selectedAlarm = null
 })
+
+// 新告警提醒:待处理新增时提示音/通知/标题闪烁;进入告警页或清零后停止
+watch(() => host.s?.counts.pending, (now, prev) => {
+  if (prev !== undefined && (now ?? 0) > prev) alertNewAlarms((now ?? 0) - prev)
+  if ((now ?? 0) === 0) stopAlertTitleFlash()
+})
+watch(() => host.page, p => { if (p === 'alarms') stopAlertTitleFlash() })
 
 // 页面进入按需刷新(我的/分析为常驻组件)
 function onPageEnter(p: string) {
