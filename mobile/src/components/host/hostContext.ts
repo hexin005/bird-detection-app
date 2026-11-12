@@ -206,10 +206,11 @@ export function createHost() {
     guideSpecies.value = name
     nav('guide')
   }
-  /** 告警详情「问 AI 怎么处理」:打开助手小窗并携带告警上下文自动提问;流式进行中则预填草稿 */
+  /** 告警详情「问 AI 怎么处理」:关掉详情弹窗(其遮罩层级高于助手窗),打开助手小窗并携带告警上下文自动提问;流式进行中则预填草稿 */
   function askAIAbout(a: Alarm) {
     const pct = Math.round((a.confidence || 0) * 100)
     const question = `刚检测到${a.species} ${a.count} 只（置信度 ${pct}%），这条告警现在该怎么处理？`
+    modal.value = ''
     assistantOpen.value = true
     assistantMax.value = false
     if (assistantState.busy) {
