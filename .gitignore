@@ -13,6 +13,10 @@ mobile/unpackage/
 scene/dist/
 .zcode/
 
+# 申报书等参赛行政材料不入代码仓库（仅本地留存）
+三江学院_*.doc
+*.doc
+
 # 资产文件需要随项目一并交付给大赛组委会：
 # 模型权重 best.pt 与演示视频 demo-bird.mp4 默认提交到仓库，请勿忽略 assets/。
 # 若仓库托管平台对单文件大小有限制，改用 Git LFS 跟踪 assets/，见 README。

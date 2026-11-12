@@ -1,0 +1,43 @@
+# 统一换行符，避免 Windows(core.autocrlf=true) 与 Linux/macOS 之间产生整文件 diff。
+# 默认：Git 按文本自动识别并在检出时转成本机换行；仓库内一律存 LF。
+* text=auto
+
+# 文档与配置一律 LF（GitHub 网页渲染、评测环境 diff 均以 LF 为准）
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.py    text eol=lf
+*.ts    text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.css   text eol=lf
+*.vue   text eol=lf
+*.html  text eol=lf
+*.gitignore      text eol=lf
+*.gitattributes  text eol=lf
+
+# Windows 脚本保持 CRLF，避免部分 PowerShell / cmd 环境对 LF 结尾报错
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# 二进制资源不做任何换行/编码转换
+*.pt    binary
+*.mp4   binary
+*.mov   binary
+*.avi   binary
+*.webm  binary
+*.mkv   binary
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+*.webp  binary
+*.gif   binary
+*.pdf   binary
+*.doc   binary
+*.docx  binary
+*.sqlite3 binary
+*.ttf   binary
+*.woff  binary
+*.woff2 binary
