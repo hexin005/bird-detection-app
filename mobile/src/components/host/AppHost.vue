@@ -14,6 +14,8 @@ import PixelLayout from './layouts/PixelLayout.vue'
 import MeHome from '../MeHome.vue'
 import ThemePicker from '../ThemePicker.vue'
 import Analytics from '../Analytics.vue'
+import AssistantWidget from '../assistant/AssistantWidget.vue'
+import AssistantChat from '../assistant/AssistantChat.vue'
 import { alertNewAlarms, stopAlertTitleFlash } from '../../utils/alertNotify'
 
 const store = useOrchard()
@@ -65,7 +67,9 @@ watch(() => host.page, onPageEnter, { immediate: true })
 
 const layouts = { b1bit: BLayout, tower: TowerLayout, signal: SignalLayout, pixel: PixelLayout } as const
 const layout = computed(() => layouts[host.theme] || BLayout)
-const overlayPage = computed(() => ['me', 'themes', 'analytics'].includes(host.page) ? host.page : '')
+// AI 助手整页态优先于常规 overlay;常规切页时 nav() 已清 assistantMax,二者不会同时成立
+const overlayPage = computed(() => host.assistantMax ? 'assistant'
+  : (['me', 'themes', 'analytics'].includes(host.page) ? host.page : ''))
 function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value: number) {
   if (!Number.isFinite(value)) return
   if (key === 'confidence') host.preferences.confidence = Math.min(.95, Math.max(.1, value / 100))
@@ -119,8 +123,24 @@ function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value:
     <view class="page__content"><Analytics ref="analyticsRef" /></view>
   </view>
 
+  <!-- AI 助手整页态:— 缩回小窗;绝对定位覆盖(host.page 仍是 monitor,避免与布局页平分 flex 高度),底部给 dock 留位 -->
+  <view class="page page--assistant" :class="{ 'is-current': overlayPage === 'assistant' }">
+    <view class="statusbar">
+      <view class="qh-menubar">
+        <text class="qh-menubar__back" @click="host.assistantMax = false; host.assistantOpen = true">— 缩回</text>
+        <text class="qh-menubar__ttl">AI 助手</text>
+        <text class="qh-menubar__item">青禾问答</text>
+        <view class="qh-menubar__right"><text class="time">9:41</text></view>
+      </view>
+    </view>
+    <view class="page__content as-page"><AssistantChat /></view>
+  </view>
+
   <!-- 主题布局(四核心页 + dock,dock 沉底) -->
   <component :is="layout" />
+
+  <!-- AI 助手悬浮层:首页侧边按钮 / 小窗(整页态由上方 overlay 承载) -->
+  <AssistantWidget />
 
   <!-- ======================= 弹窗:设置 ======================= -->
   <view v-if="host.modal === 'mSet'" class="qh-mask qh-mask--bottom is-open" @click.self="host.modal = ''">
@@ -202,3 +222,16 @@ function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value:
     </view>
   </view>
 </template>
+
+<style scoped>
+/* AI 助手整页态:绝对定位盖在布局页之上(否则与 is-current 的 monitor 页平分 .phone 的 flex 高度) */
+.page--assistant {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--tabbar-height);
+  z-index: 12;
+  background: var(--dither-light);
+}
+</style>

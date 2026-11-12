@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import json
 import re
 import threading
 import time
@@ -13,10 +14,11 @@ import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import assistant as assistant_mod
 from .config import ROOT, Settings
 from .detector import NAMES
 from .emailer import MailSendError, send_code_mail
@@ -37,6 +39,16 @@ class Command(BaseModel):
     duration: Literal[3, 5, 8] = 3
     mode: Literal['acoustic', 'infrared', 'both'] = 'both'
     automatic: bool = False
+
+
+class AssistantHistory(BaseModel):
+    role: Literal['user', 'assistant']
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class AssistantAsk(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    history: list[AssistantHistory] = Field(default_factory=list)
 
 
 class Preferences(BaseModel):
@@ -489,6 +501,43 @@ def create_app(settings=None):
             if item['name'] == name:
                 return item
         raise HTTPException(404, '知识卡不存在')
+
+    @app.get('/api/assistant/status')
+    def assistant_status(user=Depends(auth)):
+        """前端打开聊天即查;configured=False 时前端展示配置引导并禁用发送。"""
+        return {'configured': bool(settings.deepseek_key), 'model': settings.deepseek_model}
+
+    @app.post('/api/assistant/chat')
+    async def assistant_chat(body: AssistantAsk, user=Depends(auth)):
+        """SSE 流式问答:meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
+        if not assistant_mod.IN_FLIGHT.acquire():
+            raise HTTPException(409, '上一条回答仍在生成，请稍候')
+        blocks, refs = assistant_mod.retrieve(body.question, store)
+        messages = assistant_mod.build_messages(body.question, blocks,
+                                                [item.model_dump() for item in body.history])
+
+        def sse(obj) -> str:
+            return 'data: ' + json.dumps(obj, ensure_ascii=False) + '\n\n'
+
+        async def events():
+            sent_delta = False
+            try:
+                yield sse({'type': 'meta', 'refs': refs})
+                try:
+                    async for delta in assistant_mod.stream_answer(messages, settings):
+                        sent_delta = True
+                        yield sse({'type': 'delta', 'text': delta})
+                    yield sse({'type': 'done'})
+                except assistant_mod.AssistantError as exc:
+                    yield sse({'type': 'error', 'detail': str(exc)})
+                except Exception:
+                    note = '回答已中断' + ('（已生成的部分保留）' if sent_delta else '')
+                    yield sse({'type': 'error', 'detail': note})
+            finally:
+                assistant_mod.IN_FLIGHT.release()
+
+        return StreamingResponse(events(), media_type='text/event-stream',
+                                 headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
     @app.get('/api/alarm-list')
     def alarm_list(species: Optional[str] = None, pending: bool = False, before: Optional[float] = None, user=Depends(auth)):

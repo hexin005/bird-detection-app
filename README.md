@@ -256,6 +256,25 @@ ipconfig   # 找到 IPv4 地址，例如 192.168.1.10
 - **搜索**：按中文名 / 英文名 / 拉丁学名 / 科属即时过滤，忽略大小写与首尾空格。
 - **数据来源**：`GET /api/knowledge`（列表）与 `GET /api/knowledge/{name}`（详情），告警聚合与 `/api/library` 同源。接口不可用时页面回落内置静态知识，本园记录显示“暂不可用”而非 0。
 
+### AI 助手（DeepSeek 问答）
+
+首页右缘有「AI 助手」悬浮小按钮：点击弹出聊天小窗，点 ■ 最大化成整页视图，点 — 缩回按钮；三种状态间会话与未发送草稿均保留（页面刷新后清空）。
+
+- **问答策略（RAG 优先）**：问题先经本地检索——明确鸟种（名称/学名/别名，别名一对多映射）、本园统计（意图词 + 按时间范围取数，附口径说明：告警次数≠鸟类个体数）、非特定鸟种知识（对知识卡字段做关键词匹配）；命中内容作为“参考资料”注入 DeepSeek 整理作答，前端展示可点击的参考资料标签（跳知识卡/数据分析）；未命中则标注“AI 通用回答 · 未引用本园知识库”。
+- **只读边界**：AI 不连接驱鸟设备接口，不能执行任何驱离操作；涉及操作时引导用户在应用内人工处理。
+- **接口**：`GET /api/assistant/status`（配置状态）、`POST /api/assistant/chat`（SSE 流式：meta→delta*→done）；同一时刻仅允许一条回答在生成（409 防重复提交）。
+- **配置 DeepSeek**（不配置时界面显示引导、发送禁用）：在 `.runtime/local.json` 增加：
+
+```json
+{
+  "deepseek_key": "sk-你的密钥",
+  "deepseek_model": "deepseek-chat",
+  "deepseek_base_url": "https://api.deepseek.com"
+}
+```
+
+  或设置环境变量 `BIRD_DEEPSEEK_KEY` 后重启后端。key 只存本机，不入库不入 git。
+
 ---
 
 ## 七、开发与验证
@@ -274,6 +293,9 @@ npm run build:app    # uni-app Android 应用资源（非 APK）
 
 # 鸟类知识库测试（种子 UPSERT、聚合口径、边界与鉴权）
 .venv\Scripts\python -m unittest discover -s backend/tests -p test_knowledge.py -v
+
+# AI 助手测试（检索三分类、流式事件序、上游故障剧本、在飞锁）
+.venv\Scripts\python -m unittest discover -s backend/tests -p test_assistant.py -v
 
 # 原交互 Demo 回归测试
 npm test
@@ -324,6 +346,7 @@ bird-detection-app/
 │   ├── video_pipeline.py   # FFmpeg HLS 编码 + MP4 合成管线
 │   ├── video_library.py    # 视频档案与鸟类索引
 │   ├── knowledge.py        # 鸟类知识库种子数据（代码即权威版本）
+│   ├── assistant.py        # AI 助手：本地检索三分类 + DeepSeek 流式问答（只读）
 │   ├── store.py            # SQLite 存储、事务、模拟执行器
 │   └── tests/              # 后端单元/集成测试
 ├── scripts/

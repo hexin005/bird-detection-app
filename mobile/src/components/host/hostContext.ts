@@ -3,6 +3,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useOrchard } from '../../store'
 import type { Alarm, AutoRule, Command, Event, LibrarySummary, Patrol, Preferences } from '../../types'
+import { resetAssistant, stopAssistant } from '../../data/assistantStore'
 import { applyTheme, type ThemeId } from '../../theme'
 
 export type PageId = 'monitor' | 'alarms' | 'control' | 'records' | 'guide' | 'me' | 'themes' | 'analytics'
@@ -62,6 +63,9 @@ export function createHost() {
   /** 告警页物种过滤(状态提升到 host:图鉴「查看该鸟告警」等语义动作可外部设置) */
   const alarmSpecies = ref('')
   const guideSpecies = ref('')
+  /** AI 助手三态:按钮(两者皆 false)/小窗(open)/整页(max);消息与草稿在 data/assistantStore,切态不丢 */
+  const assistantOpen = ref(false)
+  const assistantMax = ref(false)
 
   const s = computed(() => store.state)
   const alarm = computed(() => s.value?.alarms.find(a => a.id === detailId.value) || (fetchedAlarm.value?.id === detailId.value ? fetchedAlarm.value : null))
@@ -130,6 +134,12 @@ export function createHost() {
 
   function nav(p: PageId) {
     if (p !== 'records') archiveTask.value = ''
+    // 离开首页即收起 AI 助手;进行中的流式回答按产品约定中断并标记"已停止"(消息保留)
+    if (p !== 'monitor') {
+      assistantOpen.value = false
+      assistantMax.value = false
+      stopAssistant()
+    }
     page.value = p
     uni.pageScrollTo({ scrollTop: 0, duration: 0 })
   }
@@ -233,6 +243,9 @@ export function createHost() {
   function onTokenChange(token: string | undefined) {
     modal.value = ''; older.value = []; selectedAlarm.value = null
     fetchedAlarm.value = fetchedCommand.value = null
+    assistantOpen.value = false
+    assistantMax.value = false
+    resetAssistant()
     if (!token) page.value = 'monitor'
   }
 
@@ -241,7 +254,7 @@ export function createHost() {
     recordMode, archiveTask, archiveTime, archiveNonce, recordFilter,
     preferences, older, historyEnd, fetchedAlarm, fetchedCommand, theme,
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
-    rules, patrol, recordsSummary, alarmSpecies, guideSpecies,
+    rules, patrol, recordsSummary, alarmSpecies, guideSpecies, assistantOpen, assistantMax,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms, viewSpeciesGuide,
     quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
     inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,

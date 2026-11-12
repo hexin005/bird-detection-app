@@ -47,3 +47,14 @@ export type SpeciesKnowledge = {
 }
 // api=接口数据;fallback=请求失败回落内置静态数据,此时本园统计不可用(不得当 0 展示)
 export type KnowledgeSource = 'loading' | 'api' | 'fallback'
+
+// ===== AI 助手(/api/assistant,SSE 流式) =====
+export type AssistantRef = { kind: 'species' | 'stats'; name?: string }
+export type ChatMsg = {
+  role: 'user' | 'assistant'
+  text: string
+  refs?: AssistantRef[]
+  streaming?: boolean
+  error?: boolean
+  stopped?: boolean
+}
