@@ -1,0 +1,395 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>3D 场景 HUD 面板重设计 · 4 方向</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#171a17;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#e8e6dc;padding-bottom:40px}
+.pagehead{padding:18px 24px 10px;border-bottom:2px solid #2c2f2a}
+.pagehead h1{font-size:18px;letter-spacing:2px}
+.pagehead p{font-size:11.5px;color:#9a988c;margin-top:6px;line-height:1.7;max-width:960px}
+.row{display:flex;flex-wrap:wrap;gap:22px;padding:20px 24px}
+.col{width:322px;flex:0 0 auto}
+.captop{font-size:12px;font-weight:800;letter-spacing:2px;color:#cfcdbf;padding:2px 0 8px}
+.captop em{font-style:normal;color:#8a8878;font-weight:400}
+.note{font-size:10.5px;color:#8a8878;line-height:1.75;margin-top:8px}
+.note b{color:#c5c3b2}
+/* 场景底色示意条 */
+.strip{height:54px;border:1px solid #2c2f2a;position:relative;overflow:hidden;background:linear-gradient(180deg,#2b3d33 0%,#1d2a22 55%,#141b15 100%)}
+.strip::before{content:"";position:absolute;left:8%;bottom:0;width:52px;height:40px;background:radial-gradient(ellipse at 50% 100%,#233226 60%,transparent 61%)}
+.strip::after{content:"";position:absolute;right:14%;bottom:0;width:74px;height:48px;background:radial-gradient(ellipse at 50% 100%,#1f2d21 60%,transparent 61%)}
+.strip i{position:absolute;left:50%;bottom:6px;width:2px;height:34px;background:#3a4a3c}
+.strip i::before{content:"";position:absolute;top:-4px;left:-3px;width:8px;height:6px;background:#3a4a3c}
+.stack{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.panel{width:298px}
+.p-title{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.p-title b{font-size:12px}
+.p-title span{font-size:9px}
+.p-foot{font-size:9.5px;line-height:1.6;margin-top:8px;text-align:center;opacity:.75}
+.btnrow{display:grid;gap:6px}
+.btnrow.g2{grid-template-columns:1fr 1fr}
+.btnrow.g3{grid-template-columns:repeat(3,1fr);margin:9px 0}
+.btnrow button{font:inherit;font-size:10.5px;padding:7px 0;text-align:center;cursor:default}
+/* 通用数据行 */
+.drow{display:flex;align-items:center;gap:8px;padding:6px 0}
+.drow .nm{font-size:11px;font-weight:700}
+.drow .meta{font-size:9px;opacity:.65;display:block;margin-top:2px}
+.drow .go{margin-left:auto;font-size:10px;font-weight:700;padding:3px 8px;cursor:default}
+.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats3 .num{font-family:"Courier New",monospace;font-size:19px;font-weight:800}
+.stats3 .lbl{font-size:8.5px;opacity:.6;letter-spacing:1px;display:block;margin-top:2px}
+/* 步骤条(巡逻-集结-作业-执行-返回) */
+.steps{display:flex;align-items:flex-start;gap:3px}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.step i{width:16px;height:16px;display:grid;place-items:center;font-style:normal;font-family:"Courier New",monospace;font-size:9px;font-weight:800}
+.step em{font-style:normal;font-size:8.5px;opacity:.6;white-space:nowrap}
+.step::after{content:"";position:absolute;top:8px;left:calc(50% + 10px);right:calc(-50% + 10px);height:1.5px;background:currentColor;opacity:.25}
+.step:last-child::after{display:none}
+.step.done::after{opacity:.7}
+
+/* ============ 现状:暗色玻璃拟态(对照) ============ */
+.now .panel{border:1px solid rgba(97,208,184,.24);border-radius:14px;background:linear-gradient(135deg,rgba(9,27,31,.96),rgba(15,47,47,.92));box-shadow:0 12px 30px rgba(0,0,0,.5);padding:12px 14px;color:#e5f3ee}
+.now .p-title b{color:#effcf7}
+.now .p-title span{color:#83cbb7;font-family:"Courier New",monospace}
+.now .card{margin-top:10px;border:1px solid rgba(102,191,172,.2);border-radius:10px;background:rgba(10,28,32,.75);padding:10px}
+.now .card h5{font-size:10px;color:#80cdb9;letter-spacing:.6px;margin-bottom:7px;font-weight:600}
+.now .stats3 .num{color:#edf9f3}
+.now .stats3 .num.warn{color:#ffc66e}
+.now .btnrow button{border:1px solid rgba(126,188,176,.22);border-radius:8px;color:#b6cec7;background:rgba(4,18,23,.55)}
+.now .btnrow button.on{color:#edfff8;background:linear-gradient(135deg,rgba(30,161,137,.8),rgba(34,111,112,.78));border-color:rgba(105,238,206,.6);font-weight:600}
+.now .step i{border-radius:50%;border:1px solid rgba(97,221,192,.35);color:#8be8cc;background:rgba(43,156,134,.14)}
+.now .step.act i{border-color:#ff5e69;color:#fff;background:rgba(255,84,99,.28)}
+.now .step.done i{background:#59e1b6;color:#0e2a20;border-color:#59e1b6}
+.now .step.done::after{background:#59e1b6;opacity:1}
+.now .drow{border-top:1px solid rgba(99,185,166,.14)}
+.now .drow .go{border:1px solid rgba(97,221,192,.35);background:rgba(43,156,134,.12);color:#8be8cc;border-radius:6px}
+.now .tag{font-size:9px;color:#8ce7c1;border:1px solid rgba(91,207,154,.22);border-radius:99px;padding:1px 8px;background:rgba(36,102,75,.22)}
+.now .tag i{display:inline-block;width:5px;height:5px;border-radius:50%;background:#70e3ae;margin-right:4px;vertical-align:1px}
+
+/* ============ A 作战甲板 ============ */
+.a{--fg:#8dff9c;--dim:#54805c;--line:#2e5538;--warn:#ffd23e}
+.a .panel{position:relative;background:rgba(5,14,9,.72);padding:13px 15px;color:var(--fg);font-family:"Courier New",Consolas,monospace}
+.a .panel::before,.a .panel::after,.a .panel .ck::before,.a .panel .ck::after{content:"";position:absolute;width:14px;height:14px;border:1.5px solid var(--fg)}
+.a .panel::before{left:0;top:0;border-right:0;border-bottom:0}
+.a .panel::after{right:0;top:0;border-left:0;border-bottom:0}
+.a .panel .ck::before{left:0;bottom:0;border-right:0;border-top:0}
+.a .panel .ck::after{right:0;bottom:0;border-left:0;border-top:0}
+.a .panel b{font-size:11.5px;letter-spacing:2.5px;font-weight:800}
+.a .p-title span{color:var(--dim);font-size:8.5px;letter-spacing:1.5px}
+.a .scan{position:relative;overflow:hidden}
+.a .scan::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(141,255,156,.045) 0 1px,transparent 1px 4px);pointer-events:none}
+.a .sec{margin-top:11px;border-top:1px dashed var(--line);padding-top:9px}
+.a .sec h5{font-size:8.5px;color:var(--dim);letter-spacing:2px;margin-bottom:8px}
+.a .sec h5::before{content:"// "}
+.a .btnrow button{background:transparent;border:1px solid var(--line);color:var(--dim);letter-spacing:2px}
+.a .btnrow button.on{background:#0f2e14;border-color:var(--fg);color:var(--fg);text-shadow:0 0 8px rgba(141,255,156,.6)}
+.a .stats3 .num{color:var(--fg);text-shadow:0 0 10px rgba(141,255,156,.35)}
+.a .stats3 .num.warn{color:var(--warn)}
+.a .step{color:var(--fg)}
+.a .step i{border:1px solid var(--line);color:var(--dim)}
+.a .step.act i{border-color:var(--fg);color:#04140a;background:var(--fg)}
+.a .step.done i{border-color:var(--fg);color:var(--fg)}
+.a .step.done::after{background:var(--fg)}
+.a .step.act em,.a .step.done em{opacity:1}
+.a .drow .go{background:transparent;border:1px solid var(--fg);color:var(--fg);letter-spacing:1px}
+.a .tag{font-size:8.5px;color:var(--fg);border:1px solid var(--line);padding:1px 7px;letter-spacing:1px}
+.a .tag i{display:inline-block;width:5px;height:5px;background:var(--fg);margin-right:5px;vertical-align:1px;box-shadow:0 0 6px var(--fg)}
+.a .p-foot{color:var(--dim);letter-spacing:1px}
+
+/* ============ B 巡检夹板 ============ */
+.b{--ink:#26261f;--red:#c22c1e}
+.b .panel{background:#f1ebda;color:var(--ink);border:2px solid #2a2a24;padding:13px 15px 12px;box-shadow:4px 5px 0 rgba(0,0,0,.45);transform:rotate(-.4deg);position:relative}
+.b .panel::before{content:"";position:absolute;top:6px;left:50%;transform:translateX(-50%);width:64px;height:7px;background:radial-gradient(circle at 8px 3.5px,#171a17 2.5px,transparent 3px),radial-gradient(circle at 56px 3.5px,#171a17 2.5px,transparent 3px);opacity:.35}
+.b .p-title{border-bottom:2px solid var(--ink);padding-bottom:5px;margin-bottom:4px}
+.b .p-title b{font-family:"Courier New",monospace;font-size:13px;letter-spacing:1px}
+.b .p-title span{font-family:"Courier New",monospace;color:#6d6a58}
+.b .card{margin-top:10px;border:1.5px dashed #8b8672;padding:9px 10px;position:relative}
+.b .card h5{font-size:10px;font-weight:900;letter-spacing:1px;display:inline-block;border-bottom:2px solid var(--ink);margin-bottom:7px}
+.b .stamp{position:absolute;right:8px;top:7px;border:2px solid var(--red);color:var(--red);font-size:9px;font-weight:900;padding:1px 5px;transform:rotate(5deg);letter-spacing:1px}
+.b .btnrow button{background:#fff;border:1.5px solid var(--ink);color:var(--ink);font-family:"Courier New",monospace;font-weight:800}
+.b .btnrow button.on{background:var(--ink);color:#f1ebda}
+.b .stats3 .num{color:var(--ink)}
+.b .stats3 .num.warn{color:var(--red)}
+.b .step i{border:1.5px solid var(--ink);background:#fff;color:var(--ink)}
+.b .step.done i{background:var(--ink);color:#f1ebda}
+.b .step.act i{background:var(--red);border-color:var(--red);color:#fff}
+.b .step.act em{color:var(--red);font-weight:800;opacity:1}
+.b .drow{border-top:1px solid #c9c3ad}
+.b .drow .go{border:1.5px solid var(--ink);background:#fff;color:var(--ink)}
+.b .tag{font-size:9px;border:1.5px solid var(--ink);padding:1px 7px;font-weight:800}
+.b .tag i{display:inline-block;width:5px;height:5px;background:var(--ink);margin-right:4px;vertical-align:1px}
+.b .photo{margin-top:8px;border:1.5px solid var(--ink);background:#fff;padding:3px 3px 14px;transform:rotate(.8deg);position:relative;width:100px}
+.b .photo::before{content:"";position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:34px;height:10px;background:rgba(214,204,160,.85);border:1px solid #b3ac8e}
+.b .photo .ph{height:44px;background:linear-gradient(135deg,#7c8a6d,#4d5a42)}
+.b .photo em{position:absolute;bottom:2px;left:5px;font-style:normal;font-size:7.5px;color:#6d6a58;font-family:"Courier New",monospace}
+.b .duo{display:flex;gap:10px;align-items:flex-start}
+
+/* ============ C 机电控制柜 ============ */
+.c{--amber:#ffb454;--face:#22262a;--edge:#0d0f11;--etch:#cfc9b8}
+.c .panel{background:repeating-linear-gradient(90deg,#24282c 0 3px,#22262a 3px 6px);border:2px solid var(--edge);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -2px 4px rgba(0,0,0,.5),5px 6px 0 rgba(0,0,0,.4);padding:13px 15px;color:var(--etch);position:relative}
+.c .panel::before,.c .panel::after{content:"";position:absolute;top:5px;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#5c636b,#16181b 70%)}
+.c .panel::before{left:5px}.c .panel::after{right:5px}
+.c .p-title{justify-content:flex-start;gap:10px}
+.c .p-title b{font-size:12px;letter-spacing:3px;color:var(--etch);text-shadow:0 1px 0 #000}
+.c .p-title span{color:#7d7768;font-size:8.5px;letter-spacing:1.5px;font-family:"Courier New",monospace}
+.c .card{margin-top:11px;background:#1a1d20;border:1px solid #0a0c0e;box-shadow:inset 0 2px 6px rgba(0,0,0,.65);padding:9px 10px}
+.c .card h5{font-size:8.5px;letter-spacing:2.5px;color:#7d7768;margin-bottom:8px}
+.c .btnrow button{background:linear-gradient(180deg,#2c3136,#212529);border:1px solid #0d0f11;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);color:#a09a89;font-family:"Courier New",monospace;font-weight:800;letter-spacing:1px}
+.c .btnrow button.on{background:linear-gradient(180deg,#4a3a1c,#332813);border-color:#6b4c17;color:var(--amber);box-shadow:inset 0 0 10px rgba(255,180,84,.25),0 0 8px rgba(255,180,84,.2)}
+.c .lcd{font-family:"Courier New",monospace;background:#0d130d;border:1px solid #050705;box-shadow:inset 0 0 8px rgba(0,0,0,.8);color:var(--amber);padding:2px 6px;font-size:10px}
+.c .stats3 .num{color:var(--amber);text-shadow:0 0 8px rgba(255,180,84,.4)}
+.c .stats3 .num.warn{color:#ff7a45}
+.c .step i{width:12px;height:12px;border-radius:50%;border:1px solid #0a0c0e;background:#33383d;box-shadow:inset 0 1px 2px rgba(0,0,0,.7)}
+.c .step.done i{background:#5f8f4c;box-shadow:0 0 7px rgba(120,190,90,.5)}
+.c .step.act i{background:var(--amber);box-shadow:0 0 10px rgba(255,180,84,.8)}
+.c .step em{color:#7d7768}
+.c .step.act em{color:var(--amber);opacity:1}
+.c .step::after{background:#0a0c0e;opacity:1}
+.c .drow{border-top:1px solid #0a0c0e}
+.c .drow .go{border:1px solid #6b4c17;color:var(--amber);background:#1a1d20}
+.c .tag{font-size:8.5px;font-family:"Courier New",monospace;letter-spacing:1px;color:#a09a89;border:1px solid #0d0f11;background:#1a1d20;padding:1px 7px}
+.c .tag i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5f8f4c;margin-right:5px;vertical-align:-.5px;box-shadow:0 0 6px rgba(120,190,90,.6)}
+.c .tag.hot i{background:var(--amber);box-shadow:0 0 6px rgba(255,180,84,.8)}
+
+/* ============ D 白昼塔台 ============ */
+.d{--ink:#14170f;--org:#e8630a}
+.d .panel{background:#f7f5ee;color:var(--ink);border:2px solid var(--ink);box-shadow:5px 5px 0 rgba(0,0,0,.55);padding:0}
+.d .bar{display:flex;justify-content:space-between;align-items:center;background:repeating-linear-gradient(0deg,var(--ink) 0 1px,#f7f5ee 1px 3px);border-bottom:2px solid var(--ink);padding:6px 10px}
+.d .bar b{font-size:11.5px;letter-spacing:1px;background:#f7f5ee;padding:0 4px}
+.d .bar span{font-size:8px;font-family:"Courier New",monospace;font-weight:800;background:#f7f5ee;padding:0 4px;color:#5c5f52}
+.d .body{padding:10px 11px}
+.d .card{margin-top:9px;border:2px solid var(--ink)}
+.d .card h5{font-size:9px;font-weight:900;letter-spacing:1px;background:var(--ink);color:#f7f5ee;padding:3px 8px}
+.d .card .in{padding:8px 9px}
+.d .btnrow button{background:#f7f5ee;border:2px solid var(--ink);color:var(--ink);font-weight:800}
+.d .btnrow button.on{background:var(--ink);color:#f7f5ee}
+.d .stats3{border:2px solid var(--ink)}
+.d .stats3>div{padding:7px 0;text-align:center;border-left:2px solid var(--ink)}
+.d .stats3>div:first-child{border-left:0}
+.d .stats3 .num{color:var(--ink)}
+.d .stats3 .num.warn{color:var(--org)}
+.d .stats3 .lbl{color:#5c5f52}
+.d .step i{border:2px solid var(--ink);background:#f7f5ee;color:var(--ink)}
+.d .step.done i{background:var(--ink);color:#f7f5ee}
+.d .step.act i{background:var(--org);border-color:var(--ink);color:#fff}
+.d .step.act em{color:var(--org);font-weight:900;opacity:1}
+.d .step::after{background:var(--ink);opacity:.3}
+.d .drow{border-top:2px solid var(--ink)}
+.d .drow:first-of-type{border-top:0}
+.d .drow .go{border:2px solid var(--ink);background:var(--org);color:#fff;border-radius:0}
+.d .tag{font-size:9px;border:2px solid var(--ink);padding:1px 7px;font-weight:800;background:#f7f5ee}
+.d .tag i{display:inline-block;width:6px;height:6px;background:#2f9e44;margin-right:4px;vertical-align:0}
+</style></head><body>
+<div class="pagehead">
+  <h1>3D 场景 HUD 数据面板 · 重设计方向预览</h1>
+  <p>范围：场景内左右两块数据面板（左＝远程驱离控制与果农协作，右＝果园概览/本次检测/最近检测/设备遥测）。五列内容与示例数据<b>完全一致</b>，只有视觉方向不同；点击行为、移动端收缩逻辑维持现状，本次只重定视觉。确认某一方向后我再出实施计划，不动业务代码。</p>
+</div>
+<div class="row">
+
+  <!-- 现状 -->
+  <div class="col now">
+    <div class="captop">现状 · 暗色玻璃拟态 <em>（对照基线）</em></div>
+    <div class="strip"><i></i></div>
+    <div class="stack">
+      <div class="panel">
+        <div class="p-title"><b>远程驱离控制</b><span>AUTO · ST.01</span></div>
+        <div class="card"><h5>响应方式</h5>
+          <div class="btnrow g2"><button>手动控制</button><button class="on">自动响应</button></div>
+        </div>
+        <div class="card"><h5>果农响应流程 · 发现目标</h5>
+          <div class="steps">
+            <div class="step done"><i>✓</i><em>巡逻</em></div><div class="step act"><i>2</i><em>集结</em></div><div class="step"><i>3</i><em>作业</em></div><div class="step"><i>4</i><em>执行</em></div><div class="step"><i>5</i><em>返回</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="p-title"><b>果园运行数据</b><span>检测与设备</span></div>
+        <div class="card"><h5>果园概览</h5>
+          <div class="stats3"><div><span class="num warn">2</span><span class="lbl">待处理</span></div><div><span class="num">13</span><span class="lbl">检测事件</span></div><div><span class="num">7</span><span class="lbl">模拟执行</span></div></div>
+        </div>
+        <div class="card"><h5>本次检测 · 15:16</h5>
+          <div class="drow"><span class="nm">共 5 只 · 2 种</span><span class="tag"><i></i>场景复现 5 只</span></div>
+          <div class="drow"><div><span class="nm">八哥 ×3</span><span class="meta">按抓拍定位落鸟</span></div></div>
+          <div class="drow"><div><span class="nm">树麻雀 ×2</span><span class="meta">按峰值示意分布</span></div></div>
+        </div>
+        <div class="card"><h5>最近检测 · 位置示意</h5>
+          <div class="drow"><div><span class="nm">珠颈斑鸠 · 2 只</span><span class="meta">09:24 · 92%</span></div><span class="go">查看</span></div>
+          <div class="drow"><div><span class="nm">白喉红臀鹎 · 1 只</span><span class="meta">09:11 · 87%</span></div><span class="go">查看</span></div>
+        </div>
+        <div class="card"><h5>模拟设备</h5>
+          <div class="drow"><div><span class="nm">声学驱鸟器 01</span><span class="meta">正在执行声波驱离</span></div><span class="tag"><i></i>在线</span></div>
+          <div class="drow"><div><span class="nm">红外驱鸟器 02</span><span class="meta">待命 · 声波执行中</span></div><span class="tag"><i></i>在线</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>现状问题</b>：深底浅字的玻璃拟态在白昼场景里对比度下降；圆角+发光与 H5 硬边风格脱节；信息层级平，"本次检测"与历史记录权重相同。</p>
+  </div>
+
+  <!-- A -->
+  <div class="col a">
+    <div class="captop">方案 A · 作战甲板 <em>— 航电 CRT 单色磷光</em></div>
+    <div class="strip"><i></i></div>
+    <div class="stack">
+      <div class="panel scan"><i class="ck"></i>
+        <div class="p-title"><b>CREW.CONSOLE</b><span>ST.01 EAST</span></div>
+        <div class="sec"><h5>RESPONSE 响应方式</h5>
+          <div class="btnrow g2"><button>MANUAL 手动</button><button class="on">AUTO 自动</button></div>
+        </div>
+        <div class="sec"><h5>CREW 果农流程</h5>
+          <div class="steps">
+            <div class="step done"><i>✓</i><em>巡逻</em></div><div class="step act"><i>2</i><em>集结</em></div><div class="step"><i>3</i><em>作业</em></div><div class="step"><i>4</i><em>执行</em></div><div class="step"><i>5</i><em>返回</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel scan"><i class="ck"></i>
+        <div class="p-title"><b>ORCHARD.DATA</b><span>LIVE</span></div>
+        <div class="sec"><h5>OVERVIEW 概览</h5>
+          <div class="stats3"><div><span class="num warn">2</span><span class="lbl">待处理</span></div><div><span class="num">13</span><span class="lbl">事件</span></div><div><span class="num">7</span><span class="lbl">执行</span></div></div>
+        </div>
+        <div class="sec"><h5>LAST.SCAN 本次检测 15:16</h5>
+          <div class="drow"><span class="nm">TOTAL 5 BIRDS / 2 SPECIES</span><span class="tag"><i></i>复现 5</span></div>
+          <div class="drow"><div><span class="nm">八哥 ×3</span><span class="meta">LOCKED 抓拍定位</span></div></div>
+          <div class="drow"><div><span class="nm">树麻雀 ×2</span><span class="meta">SPREAD 示意分布</span></div></div>
+        </div>
+        <div class="sec"><h5>RECENT 最近检测</h5>
+          <div class="drow"><div><span class="nm">珠颈斑鸠 · 2</span><span class="meta">09:24 · 92%</span></div><span class="go">定位</span></div>
+          <div class="drow"><div><span class="nm">白喉红臀鹎 · 1</span><span class="meta">09:11 · 87%</span></div><span class="go">定位</span></div>
+        </div>
+        <div class="sec"><h5>DEVICES 设备</h5>
+          <div class="drow"><div><span class="nm">ACOUSTIC 声学01</span><span class="meta">EXECUTING 执行中</span></div><span class="tag"><i></i>ON</span></div>
+          <div class="drow"><div><span class="nm">INFRARED 红外02</span><span class="meta">STANDBY 待命</span></div><span class="tag"><i></i>ON</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>关键词</b>：四角括号取景框 · 磷光绿单色 · 等宽大写 · 扫描线。<b>优势</b>：与 3D 夜景/黄昏融合最好，监测系统感最强；数字读数极清晰。<b>代价</b>：中文名被压成小注释，白天强光下偏暗。</p>
+  </div>
+
+  <!-- B -->
+  <div class="col b">
+    <div class="captop">方案 B · 巡检夹板 <em>— 田间记录簿纸质</em></div>
+    <div class="strip"><i></i></div>
+    <div class="stack">
+      <div class="panel">
+        <div class="p-title"><b>巡检控制单</b><span>NO.0112</span></div>
+        <div class="card"><span class="stamp">自动执行</span><h5>响应方式</h5>
+          <div class="btnrow g2"><button>手动</button><button class="on">自动</button></div>
+        </div>
+        <div class="card"><h5>果农流程</h5>
+          <div class="steps">
+            <div class="step done"><i>✓</i><em>巡逻</em></div><div class="step act"><i>2</i><em>集结</em></div><div class="step"><i>3</i><em>作业</em></div><div class="step"><i>4</i><em>执行</em></div><div class="step"><i>5</i><em>返回</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="p-title"><b>果园观测记录</b><span>东区·01</span></div>
+        <div class="card"><h5>概览</h5>
+          <div class="stats3"><div><span class="num warn">2</span><span class="lbl">待处理</span></div><div><span class="num">13</span><span class="lbl">检测事件</span></div><div><span class="num">7</span><span class="lbl">模拟执行</span></div></div>
+        </div>
+        <div class="card"><span class="stamp">复现中</span><h5>本次检测 15:16</h5>
+          <div class="duo">
+            <div style="flex:1">
+              <div class="drow"><div><span class="nm">共 5 只 · 2 种</span></div></div>
+              <div class="drow"><div><span class="nm">八哥 ×3</span><span class="meta">按抓拍定位</span></div></div>
+              <div class="drow"><div><span class="nm">树麻雀 ×2</span><span class="meta">按峰值示意</span></div></div>
+            </div>
+            <div class="photo"><div class="ph"></div><em>八哥 · 抓拍</em></div>
+          </div>
+        </div>
+        <div class="card"><h5>最近检测</h5>
+          <div class="drow"><div><span class="nm">珠颈斑鸠 · 2 只</span><span class="meta">09:24 · 92%</span></div><span class="go">查看</span></div>
+          <div class="drow"><div><span class="nm">白喉红臀鹎 · 1 只</span><span class="meta">09:11 · 87%</span></div><span class="go">查看</span></div>
+        </div>
+        <div class="card"><h5>模拟设备</h5>
+          <div class="drow"><div><span class="nm">声学驱鸟器 01</span><span class="meta">正在执行声波驱离</span></div><span class="tag"><i></i>在线</span></div>
+          <div class="drow"><div><span class="nm">红外驱鸟器 02</span><span class="meta">待命 · 声波执行中</span></div><span class="tag"><i></i>在线</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>关键词</b>：米白纸卡 · 打字机墨字 · 红色印章 · 装订孔 · 拍立得抓拍。<b>优势</b>：白昼场景下最清晰；"巡检记录"叙事与果园场景天然贴合，抓拍照片有相片实感。<b>代价</b>：与 3D 暗景反差大，夜间光照下纸白会抢视线。</p>
+  </div>
+
+  <!-- C -->
+  <div class="col c">
+    <div class="captop">方案 C · 机电控制柜 <em>— 琥珀 LED 工业面板</em></div>
+    <div class="strip"><i></i></div>
+    <div class="stack">
+      <div class="panel">
+        <div class="p-title"><b>驱离控制台</b><span>UNIT-01 / RUN</span></div>
+        <div class="card"><h5>响应方式 RESPONSE</h5>
+          <div class="btnrow g2"><button>手动</button><button class="on">自动</button></div>
+        </div>
+        <div class="card"><h5>果农流程 CREW LINE</h5>
+          <div class="steps">
+            <div class="step done"><i></i><em>巡逻</em></div><div class="step act"><i></i><em>集结</em></div><div class="step"><i></i><em>作业</em></div><div class="step"><i></i><em>执行</em></div><div class="step"><i></i><em>返回</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="p-title"><b>运行数据</b><span>PANEL B / 24V</span></div>
+        <div class="card"><h5>概览 OVERVIEW</h5>
+          <div class="stats3"><div><span class="num warn">2</span><span class="lbl">待处理</span></div><div><span class="num">13</span><span class="lbl">检测事件</span></div><div><span class="num">7</span><span class="lbl">模拟执行</span></div></div>
+        </div>
+        <div class="card"><h5>本次检测 LAST SCAN · <span class="lcd">15:16</span></h5>
+          <div class="drow"><div><span class="nm">共 5 只 · 2 种</span></div><span class="lcd">REX5</span></div>
+          <div class="drow"><div><span class="nm">八哥 ×3</span><span class="meta">按抓拍定位落鸟</span></div></div>
+          <div class="drow"><div><span class="nm">树麻雀 ×2</span><span class="meta">按峰值示意分布</span></div></div>
+        </div>
+        <div class="card"><h5>最近检测 RECENT</h5>
+          <div class="drow"><div><span class="nm">珠颈斑鸠 · 2 只</span><span class="meta">09:24 · 92%</span></div><span class="go">定位</span></div>
+          <div class="drow"><div><span class="nm">白喉红臀鹎 · 1 只</span><span class="meta">09:11 · 87%</span></div><span class="go">定位</span></div>
+        </div>
+        <div class="card"><h5>设备 DEVICES</h5>
+          <div class="drow"><div><span class="nm">声学驱鸟器 01</span><span class="meta">正在执行声波驱离</span></div><span class="tag hot"><i></i>执行中</span></div>
+          <div class="drow"><div><span class="nm">红外驱鸟器 02</span><span class="meta">待命 · 声波执行中</span></div><span class="tag"><i></i>在线</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>关键词</b>：拉丝金属 · 铆钉 · 内嵌仪表凹槽 · 琥珀 LED 指示排 · 蚀刻铭牌。<b>优势</b>：与"模拟执行器/设备"叙事最契合，质感最重；LED 状态灯在暗景里辨识度高。<b>代价</b>：视觉最重，容易压过 3D 场景本身；浅色时段偏沉。</p>
+  </div>
+
+  <!-- D -->
+  <div class="col d">
+    <div class="captop">方案 D · 白昼塔台 <em>— 硬边报表 IoT</em></div>
+    <div class="strip"><i></i></div>
+    <div class="stack">
+      <div class="panel">
+        <div class="bar"><b>远程驱离控制</b><span>CTRL/01</span></div>
+        <div class="body">
+          <div class="card"><h5>响应方式</h5>
+            <div class="in"><div class="btnrow g2"><button>手动控制</button><button class="on">自动响应</button></div></div>
+          </div>
+          <div class="card"><h5>果农响应流程 · 集结中</h5>
+            <div class="in"><div class="steps">
+              <div class="step done"><i>✓</i><em>巡逻</em></div><div class="step act"><i>2</i><em>集结</em></div><div class="step"><i>3</i><em>作业</em></div><div class="step"><i>4</i><em>执行</em></div><div class="step"><i>5</i><em>返回</em></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="bar"><b>果园运行数据</b><span>DATA/02</span></div>
+        <div class="body">
+          <div class="stats3"><div><span class="num warn">2</span><span class="lbl">待处理告警</span></div><div><span class="num">13</span><span class="lbl">检测事件</span></div><div><span class="num">7</span><span class="lbl">模拟执行</span></div></div>
+          <div class="card"><h5>本次检测 · 15:16</h5>
+            <div class="in">
+              <div class="drow"><div><span class="nm">共 5 只 · 2 种</span></div><span class="tag"><i></i>复现 5 只</span></div>
+              <div class="drow"><div><span class="nm">八哥 ×3</span><span class="meta">按抓拍定位落鸟</span></div></div>
+              <div class="drow"><div><span class="nm">树麻雀 ×2</span><span class="meta">按峰值示意分布</span></div></div>
+            </div>
+          </div>
+          <div class="card"><h5>最近检测 · 位置示意</h5>
+            <div class="in">
+              <div class="drow"><div><span class="nm">珠颈斑鸠 · 2 只</span><span class="meta">09:24 · 92%</span></div><span class="go">查看</span></div>
+              <div class="drow"><div><span class="nm">白喉红臀鹎 · 1 只</span><span class="meta">09:11 · 87%</span></div><span class="go">查看</span></div>
+            </div>
+          </div>
+          <div class="card"><h5>模拟设备</h5>
+            <div class="in">
+              <div class="drow"><div><span class="nm">声学驱鸟器 01</span><span class="meta">正在执行声波驱离</span></div><span class="tag"><i></i>在线</span></div>
+              <div class="drow"><div><span class="nm">红外驱鸟器 02</span><span class="meta">待命 · 声波执行中</span></div><span class="tag"><i></i>在线</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>关键词</b>：不透明白卡 · 2px 硬边 · 橙色数据强调 · 硬投影 · 黑色标题条。<b>优势</b>：与 H5「B·果园守护」主题同一视觉语言，产品整体感最强；任何光照下读数都稳。<b>代价</b>：在 3D 暗景上最"跳"，沉浸感略让位给信息清晰。</p>
+  </div>
+
+</div>
+</body></html>

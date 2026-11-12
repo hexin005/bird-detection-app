@@ -90,4 +90,20 @@
   --shadow-sm: 0 2px 6px rgba(36, 43, 28, 0.08);
   --shadow-md: 0 4px 14px rgba(36, 43, 28, 0.12);
   --shadow-lg: 0 12px 36px rgba(36, 43, 28, 0.18);
+
+  /* ---- HUD 数字科技感（scene 专用；mobile 端 tokens 不含本段） ---- */
+  --hud-cyan: #5fe8c8;
+  --hud-cyan-soft: #a5f3dd;
+  --hud-cyan-dim: #8eaaa4;
+  --hud-cyan-faint: #6f918a;
+  --hud-text: #eef9f4;
+  --hud-warn: #ffc66e;
+  --hud-warn-deep: #ff9d4d;
+  --hud-danger: #ff6e5e;
+  --hud-bg-1: rgba(8, 24, 26, 0.92);
+  --hud-bg-2: rgba(12, 36, 36, 0.86);
+  --hud-card: rgba(9, 26, 28, 0.82);
+  --hud-line: rgba(102, 191, 172, 0.24);
+  --hud-line-strong: rgba(113, 239, 207, 0.5);
+  --font-mono: "Cascadia Mono", "Consolas", "JetBrains Mono", "SF Mono", "Courier New", monospace;
 }

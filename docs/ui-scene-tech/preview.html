@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>青禾 · 果园 3D — 数字科技感 HUD 预览（B+ 方向）</title>
+<style>
+  /* ==========================================================
+     青禾 · 果园 3D — HUD 科技感改版预览
+     方向：B（轻科技 HUD）为底 + A 的两样（四角括号 / 告警时扫描线）
+     本文件为静态设计样机，仅用于方向讨论，数据均为示意
+     ========================================================== */
+  :root {
+    --hud-bg-1: rgba(8, 24, 26, 0.92);
+    --hud-bg-2: rgba(12, 36, 36, 0.86);
+    --hud-card: rgba(9, 26, 28, 0.82);
+    --hud-line: rgba(102, 191, 172, 0.24);
+    --hud-line-strong: rgba(113, 239, 207, 0.5);
+    --cyan: #5fe8c8;
+    --cyan-soft: #a5f3dd;
+    --cyan-dim: #8eaaa4;
+    --cyan-faint: #6f918a;
+    --text-bright: #eef9f4;
+    --warn: #ffc66e;
+    --warn-deep: #ff9d4d;
+    --danger: #ff6e5e;
+    --lime: #d3e856;
+    --mono: "Cascadia Mono", "Consolas", "JetBrains Mono", "SF Mono", monospace;
+    --sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06120f; }
+  body { font-family: var(--sans); }
+
+  /* ---------- 1440×900 设计稿，等比缩放适配窗口 ---------- */
+  .stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1440px; height: 900px;
+    transform-origin: center center;
+  }
+  .scene-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 42%, transparent 52%, rgba(7, 21, 17, 0.44) 100%),
+      linear-gradient(to bottom, rgba(6, 18, 16, 0.5), transparent 130px),
+      linear-gradient(to top, rgba(6, 18, 16, 0.55), transparent 120px);
+  }
+
+  /* ================= 顶栏 ================= */
+  .hud-top {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 18px 24px 26px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    pointer-events: none;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand__mark {
+    width: 40px; height: 40px; display: grid; place-items: center;
+    background: linear-gradient(150deg, rgba(16, 52, 48, 0.95), rgba(8, 28, 28, 0.95));
+    border: 1px solid var(--hud-line-strong);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
+    color: var(--cyan-soft); font-family: var(--sans); font-size: 19px; font-weight: 700;
+    box-shadow: 0 0 18px rgba(95, 232, 200, 0.18), inset 0 0 12px rgba(95, 232, 200, 0.08);
+  }
+  .brand__name-row { display: flex; align-items: center; gap: 8px; }
+  .brand__name { font-size: 19px; font-weight: 700; letter-spacing: 2px; color: #f2fbf7; text-shadow: 0 0 14px rgba(95, 232, 200, 0.25); }
+  .brand__tag {
+    font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    color: #0b211d; background: var(--cyan); padding: 2px 6px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+  }
+  .brand__site {
+    margin-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+    color: rgba(165, 243, 221, 0.66);
+  }
+  .badges { display: flex; align-items: center; gap: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+    font-size: 11px; letter-spacing: 1px; color: var(--cyan-soft);
+    background: rgba(8, 26, 26, 0.88); border: 1px solid var(--hud-line);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+  }
+  .badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px rgba(95, 232, 200, 0.8); }
+  .badge--live { color: #d9ffe9; border-color: rgba(89, 225, 182, 0.55); }
+  .badge--live .badge__dot { background: #59e1b6; box-shadow: 0 0 10px rgba(89, 225, 182, 0.9); animation: pulse 1.6s ease-in-out infinite; }
+  .badge--clock { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: rgba(165, 243, 221, 0.8); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ================= 面板公共 ================= */
+  .panel {
+    position: absolute; top: 96px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 738px; overflow-y: auto; scrollbar-width: none;
+  }
+  .panel::-webkit-scrollbar { display: none; }
+  .panel--control { left: 24px; width: 288px; }
+  .panel--info { right: 24px; width: 272px; }
+
+  /* 四角括号：平时青色，告警态转橙红 */
+  .corners { position: absolute; inset: -3px; pointer-events: none; --bracket: rgba(95, 232, 200, 0.7); }
+  .panel--info.is-alarm .corners { --bracket: rgba(255, 138, 94, 0.85); }
+  .corners::before, .corners::after, .corners--b::before, .corners--b::after {
+    content: ""; position: absolute; width: 13px; height: 13px;
+  }
+  .corners::before { top: 0; left: 0; border-top: 2px solid var(--bracket); border-left: 2px solid var(--bracket); }
+  .corners::after { bottom: 0; right: 0; border-bottom: 2px solid var(--bracket); border-right: 2px solid var(--bracket); }
+  .corners--b::before { top: 0; right: 0; border-top: 2px solid var(--bracket); border-right: 2px solid var(--bracket); }
+  .corners--b::after { bottom: 0; left: 0; border-bottom: 2px solid var(--bracket); border-left: 2px solid var(--bracket); }
+  .panel--info.is-alarm .corners::before, .panel--info.is-alarm .corners::after,
+  .panel--info.is-alarm .corners--b::before, .panel--info.is-alarm .corners--b::after {
+    filter: drop-shadow(0 0 4px rgba(255, 138, 94, 0.6));
+  }
+
+  /* 告警时才出现的扫描线（右侧面板有未处理告警 → 激活） */
+  .panel--info.is-alarm { position: absolute; }
+  .panel--info.is-alarm .scanline {
+    content: ""; position: absolute; left: 2px; right: 2px; height: 46px; z-index: 5;
+    background: linear-gradient(to bottom, transparent, rgba(255, 138, 94, 0.10) 45%, rgba(255, 158, 94, 0.16) 50%, rgba(255, 138, 94, 0.10) 55%, transparent);
+    animation: scan 4.2s linear infinite; pointer-events: none;
+  }
+  @keyframes scan { 0% { top: -46px; } 100% { top: 100%; } }
+
+  .panel__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    background: linear-gradient(90deg, rgba(23, 82, 72, 0.88), rgba(10, 34, 36, 0.62));
+    border-left: 3px solid var(--cyan);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+    box-shadow: 0 6px 18px rgba(3, 16, 15, 0.35);
+  }
+  .panel--info.is-alarm .panel__head { border-left-color: var(--warn-deep); background: linear-gradient(90deg, rgba(96, 62, 28, 0.88), rgba(40, 30, 18, 0.62)); }
+  .panel__title { display: flex; align-items: center; gap: 9px; }
+  .panel__no {
+    font-family: var(--mono); font-size: 13px; font-weight: 700; color: #0b211d;
+    background: var(--cyan); width: 22px; height: 22px; display: grid; place-items: center;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  }
+  .panel--info.is-alarm .panel__no { background: var(--warn-deep); }
+  .panel__head strong { display: block; font-size: 13px; letter-spacing: 1px; color: #f0fcf7; }
+  .panel__head small { display: block; margin-top: 1px; font-family: var(--mono); font-size: 8.5px; letter-spacing: 1.6px; color: rgba(165, 243, 221, 0.6); }
+  .panel__live { font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px; color: var(--cyan-soft); }
+  .panel--info.is-alarm .panel__live { color: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+
+  /* ================= 卡片 ================= */
+  .card {
+    position: relative;
+    background: var(--hud-card);
+    border: 1px solid var(--hud-line);
+    border-radius: 10px;
+    padding: 10px 11px;
+    box-shadow: 0 10px 26px rgba(3, 16, 15, 0.35), inset 0 1px 0 rgba(193, 255, 235, 0.06);
+    backdrop-filter: blur(10px);
+  }
+  .card__title {
+    display: flex; align-items: center; gap: 7px; margin-bottom: 9px;
+    font-size: 10.5px; letter-spacing: 1.5px; color: #8fd8c2;
+  }
+  .card__title i {
+    width: 6px; height: 6px; background: var(--cyan); flex: 0 0 auto;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%);
+    box-shadow: 0 0 6px rgba(95, 232, 200, 0.7);
+  }
+  .card__title em { font-style: normal; margin-left: auto; font-family: var(--mono); font-size: 8px; letter-spacing: 1.4px; color: var(--cyan-faint); }
+
+  /* ---------- 果园概览：发光数字 + sparkline ---------- */
+  .stats { display: flex; }
+  .stat { flex: 1; padding: 0 6px; }
+  .stat + .stat { border-left: 1px solid rgba(102, 191, 172, 0.16); }
+  .stat__num {
+    font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1.1;
+    color: #edfffa; text-shadow: 0 0 14px rgba(99, 235, 199, 0.35);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat__num.is-warn { color: var(--warn); text-shadow: 0 0 16px rgba(255, 178, 92, 0.45); animation: breathe 2.2s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { text-shadow: 0 0 10px rgba(255, 178, 92, 0.3); }
+    50% { text-shadow: 0 0 22px rgba(255, 178, 92, 0.65); }
+  }
+  .stat__label { margin-top: 3px; font-size: 9.5px; letter-spacing: 1px; color: var(--cyan-dim); }
+  .spark { margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(102, 191, 172, 0.18); display: flex; align-items: flex-end; gap: 8px; }
+  .spark__label { font-size: 9px; letter-spacing: 1px; color: var(--cyan-faint); writing-mode: horizontal-tb; }
+  .spark svg { flex: 1; display: block; }
+  .spark__sum { font-family: var(--mono); font-size: 9px; color: var(--cyan-dim); letter-spacing: 1px; }
+
+  /* ---------- 检测记录行 ---------- */
+  .sum-line { font-size: 11px; color: #c9ded7; letter-spacing: 0.5px; }
+  .sum-line b { font-family: var(--mono); font-size: 15px; color: #edfffa; text-shadow: 0 0 10px rgba(99, 235, 199, 0.3); }
+  .sum-chip {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 9px; letter-spacing: 0.5px;
+    color: var(--cyan-soft); background: rgba(95, 232, 200, 0.1); border: 1px solid rgba(95, 232, 200, 0.25); border-radius: 3px;
+  }
+  .row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    border-bottom: 1px solid rgba(102, 191, 172, 0.13);
+  }
+  .row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .row__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 3px rgba(95, 232, 200, 0.14); flex: 0 0 auto; }
+  .row__dot.is-alarm { background: var(--warn-deep); box-shadow: 0 0 0 3px rgba(255, 157, 77, 0.16); animation: pulse 1.5s ease-in-out infinite; }
+  .row__body { flex: 1; min-width: 0; }
+  .row__name { display: block; font-size: 11.5px; font-weight: 500; color: #e9f6f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row__meta { display: block; margin-top: 1px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.6px; color: var(--cyan-dim); }
+  .locate {
+    flex: 0 0 auto; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 1px;
+    color: #8be8cc; background: rgba(43, 156, 134, 0.14); border: 1px solid rgba(97, 221, 192, 0.32);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+    cursor: pointer;
+  }
+  .locate.is-on { color: #0b211d; background: var(--cyan); border-color: var(--cyan); }
+
+  /* ---------- 抓拍快照（模拟检测框画面） ---------- */
+  .snapshot {
+    margin-top: 8px; position: relative; height: 62px; border-radius: 6px; overflow: hidden;
+    background:
+      radial-gradient(ellipse at 60% 40%, rgba(84, 110, 70, 0.55), transparent 70%),
+      linear-gradient(160deg, #17251a, #0d1a14 70%);
+    border: 1px solid rgba(102, 191, 172, 0.18);
+  }
+  .snapshot::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.014) 2px 3px);
+  }
+  .snapshot__bbox {
+    position: absolute; left: 34%; top: 26%; width: 52px; height: 34px;
+    border: 1.5px solid var(--lime); box-shadow: 0 0 10px rgba(211, 232, 86, 0.35);
+  }
+  .snapshot__bbox::before {
+    content: "白头鹎 0.96"; position: absolute; left: -1.5px; top: -15px;
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.5px; color: #1c2a10;
+    background: var(--lime); padding: 1px 4px; white-space: nowrap;
+  }
+  .snapshot__tag {
+    position: absolute; left: 8px; bottom: 6px; font-family: var(--mono); font-size: 8.5px;
+    letter-spacing: 1.4px; color: rgba(165, 243, 221, 0.55);
+  }
+  .snapshot__rec { position: absolute; right: 8px; top: 6px; display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 8.5px; color: rgba(255, 110, 94, 0.85); letter-spacing: 1px; }
+  .snapshot__rec i { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s infinite; }
+
+  /* ---------- 设备行：波环 / 红外脉冲 ---------- */
+  .device { display: flex; align-items: center; gap: 9px; position: relative; }
+  .device + .device { margin-top: 9px; }
+  .device__icon-wrap { position: relative; width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; }
+  .device__icon {
+    width: 30px; height: 30px; display: grid; place-items: center; font-size: 13px; color: #78ddc2;
+    background: rgba(73, 163, 145, 0.16); border: 1px solid rgba(97, 221, 192, 0.3);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
+  .device__icon.is-ir { color: #ff8d7a; background: rgba(163, 73, 62, 0.16); border-color: rgba(255, 141, 122, 0.3); }
+  .ring {
+    position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid rgba(95, 232, 200, 0.55); transform: translate(-50%, -50%);
+    animation: ripple 2.4s ease-out infinite; pointer-events: none;
+  }
+  .ring:nth-child(2) { animation-delay: 0.8s; }
+  .ring:nth-child(3) { animation-delay: 1.6s; }
+  @keyframes ripple {
+    0% { width: 30px; height: 30px; opacity: 0.8; }
+    100% { width: 64px; height: 64px; opacity: 0; }
+  }
+  .ir-pulse { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255, 110, 94, 0.7); transform: translate(-50%, -50%); animation: irPulse 1.6s ease-out infinite; pointer-events: none; }
+  @keyframes irPulse {
+    0% { width: 28px; height: 28px; opacity: 0.9; }
+    100% { width: 52px; height: 52px; opacity: 0; }
+  }
+  .device__body { flex: 1; min-width: 0; }
+  .device__name { display: block; font-size: 11.5px; font-weight: 500; color: #e9f6f0; letter-spacing: 0.5px; }
+  .device__name small { font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: var(--cyan-faint); margin-left: 5px; }
+  .device__desc { display: block; margin-top: 1px; font-size: 9.5px; color: var(--cyan-dim); }
+  .device__desc.is-active { color: #7be9c4; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+    color: #8ce7c1; background: rgba(36, 102, 75, 0.24); border: 1px solid rgba(91, 207, 154, 0.28); border-radius: 3px;
+  }
+  .pill i { width: 5px; height: 5px; border-radius: 50%; background: #70e3ae; box-shadow: 0 0 8px rgba(112, 227, 174, 0.8); }
+
+  /* ---------- 左栏：分段开关 / 模式 / 充能按钮 ---------- */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .seg button, .modes button {
+    min-height: 32px; font-family: var(--sans); font-size: 11px; letter-spacing: 1px;
+    color: #b6cec7; background: rgba(4, 18, 23, 0.55); border: 1px solid rgba(126, 188, 176, 0.22);
+    cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button.is-active, .modes button.is-selected {
+    color: #edfff8; font-weight: 600;
+    background: linear-gradient(135deg, rgba(30, 161, 137, 0.85), rgba(34, 111, 112, 0.8));
+    border-color: rgba(105, 238, 206, 0.6);
+    box-shadow: 0 0 14px rgba(50, 216, 177, 0.18), inset 0 1px rgba(255, 255, 255, 0.16);
+  }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .help { margin-top: 8px; font-size: 9.5px; line-height: 1.6; color: #a4c1b8; }
+
+  .repel {
+    position: relative; width: 100%; margin-top: 10px; height: 40px; overflow: hidden;
+    font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: 2px; color: #f4fffb;
+    background: linear-gradient(115deg, #1fbf9e, #1d7f88);
+    border: 1px solid rgba(113, 239, 207, 0.65); cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+    box-shadow: 0 4px 18px rgba(18, 184, 151, 0.28), inset 0 1px rgba(255, 255, 255, 0.22);
+  }
+  .repel small { display: block; margin-top: 1px; font-family: var(--mono); font-size: 8px; letter-spacing: 2.5px; color: rgba(244, 255, 251, 0.65); font-weight: 400; }
+  .repel::after {
+    content: ""; position: absolute; top: -20%; bottom: -20%; width: 46px;
+    background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    transform: skewX(-18deg); animation: sweep 2.8s ease-in-out infinite;
+  }
+  @keyframes sweep { 0% { left: -60px; } 55%, 100% { left: calc(100% + 60px); } }
+  .footnote { margin-top: 8px; text-align: center; font-family: var(--mono); font-size: 8px; letter-spacing: 1.6px; color: var(--cyan-faint); }
+
+  /* ---------- 果农流程步骤条 ---------- */
+  .steps { display: flex; align-items: flex-start; gap: 3px; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+  .step__dot {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    font-family: var(--mono); font-size: 9.5px; font-weight: 600; color: #8be8cc;
+    border: 1px solid rgba(97, 221, 192, 0.35); background: rgba(43, 156, 134, 0.14);
+  }
+  .step.is-active .step__dot {
+    color: #fff; border-color: #ff5e69; background: rgba(255, 84, 99, 0.28);
+    box-shadow: 0 0 12px rgba(255, 84, 99, 0.55); animation: pulse 1.4s ease-in-out infinite;
+  }
+  .step.is-done .step__dot { color: #0e2a20; border-color: #59e1b6; background: #59e1b6; }
+  .step__name { font-size: 9px; color: var(--cyan-dim); text-align: center; letter-spacing: 0.5px; }
+  .step.is-active .step__name { color: #e5f3ee; font-weight: 600; }
+  .step.is-done .step__name { color: #74d9ba; }
+  .step__line { flex: 1; height: 1px; margin-top: 12px; background: rgba(97, 221, 192, 0.3); }
+  .step__line.is-done { background: #59e1b6; }
+  .phase {
+    margin-top: 9px; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center;
+    background: rgba(43, 156, 134, 0.12); border: 1px solid rgba(97, 221, 192, 0.14); border-radius: 4px;
+  }
+  .phase b { font-size: 10px; color: #74d9ba; letter-spacing: 0.5px; }
+  .phase span { font-family: var(--mono); font-size: 8.5px; letter-spacing: 1px; color: var(--cyan-faint); }
+
+  /* ---------- 场景设置（光照滑杆） ---------- */
+  .dl-track { position: relative; height: 6px; border-radius: 3px; margin: 12px 0 4px;
+    background: linear-gradient(90deg, #1d2f4d 0%, #4d5f8a 18%, #ffd9a0 32%, #bfe3ff 50%, #ffe9b8 68%, #6d7aa8 84%, #1d2f4d 100%);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .dl-thumb {
+    position: absolute; top: 50%; left: 62%; width: 14px; height: 14px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    background: var(--cyan); border: 2px solid #0b211d;
+    box-shadow: 0 0 12px rgba(95, 232, 200, 0.8);
+  }
+  .dl-scale { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 8px; color: var(--cyan-faint); letter-spacing: 1px; }
+  .dl-readout { margin-top: 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  .dl-readout b { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #edfffa; text-shadow: 0 0 12px rgba(99, 235, 199, 0.35); }
+  .dl-readout span { font-size: 9px; color: var(--cyan-faint); }
+
+  /* ================= 底栏 ================= */
+  .hud-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+    padding: 22px 24px 16px;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+    pointer-events: none;
+  }
+  .legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .legend__item { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: 0.5px; color: rgba(200, 226, 216, 0.75); }
+  .legend__swatch { width: 9px; height: 9px; border-radius: 2px; box-shadow: 0 0 6px rgba(255, 255, 255, 0.12); }
+  .ops { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+  .ghost {
+    height: 30px; padding: 0 13px; font-family: var(--sans); font-size: 11px; letter-spacing: 1px;
+    color: var(--cyan-soft); background: rgba(8, 26, 26, 0.88); border: 1px solid var(--hud-line); cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+  }
+  .toast {
+    position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 11;
+    display: flex; align-items: center; gap: 7px; padding: 7px 14px;
+    font-size: 11px; letter-spacing: 1px; color: #d9ffe9; white-space: nowrap;
+    background: rgba(12, 42, 32, 0.92); border: 1px solid rgba(89, 225, 182, 0.55);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+    box-shadow: 0 6px 22px rgba(47, 178, 126, 0.25), 0 0 18px rgba(89, 225, 182, 0.12);
+  }
+  .toast i { width: 14px; height: 14px; border-radius: 50%; background: #59e1b6; color: #0e2a20; display: grid; place-items: center; font-size: 9px; font-weight: 700; font-style: normal; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- ======== 简化低多边形果园背景（示意） ======== -->
+  <svg class="scene-bg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#a9d3c0"/><stop offset="0.7" stop-color="#dceccf"/><stop offset="1" stop-color="#eef0d8"/>
+      </linearGradient>
+      <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#fff7d0" stop-opacity="0.85"/><stop offset="1" stop-color="#fff7d0" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#a8c682"/><stop offset="1" stop-color="#8fb46f"/>
+      </linearGradient>
+      <g id="tree">
+        <rect x="-3" y="10" width="6" height="14" fill="#6b5236"/>
+        <polygon points="0,-26 16,-8 10,12 -10,12 -16,-8" fill="#6f9b58"/>
+        <polygon points="0,-26 16,-8 0,-4" fill="#83ad64"/>
+      </g>
+      <g id="bird">
+        <path d="M -7,0 Q -3,-5 0,0 Q 3,-5 7,0" fill="none" stroke="#2c3527" stroke-width="2.2" stroke-linecap="round"/>
+      </g>
+    </defs>
+
+    <rect width="1440" height="560" fill="url(#sky)"/>
+    <circle cx="1060" cy="170" r="120" fill="url(#sunGlow)"/>
+    <circle cx="1060" cy="170" r="42" fill="#fff8dc" opacity="0.92"/>
+    <g fill="#ffffff" opacity="0.32">
+      <ellipse cx="300" cy="140" rx="110" ry="10"/><ellipse cx="380" cy="126" rx="70" ry="8"/>
+      <ellipse cx="740" cy="92" rx="90" ry="9"/>
+    </g>
+    <polygon points="0,470 220,430 430,468 640,438 860,472 1080,442 1290,470 1440,448 1440,560 0,560" fill="#9cc287"/>
+    <polygon points="0,505 260,478 520,505 800,482 1060,508 1320,486 1440,502 1440,560 0,560" fill="#8db97c"/>
+
+    <rect y="540" width="1440" height="360" fill="url(#ground)"/>
+    <polygon points="240,548 380,548 560,900 60,900" fill="#b7d18e" opacity="0.85"/>
+    <polygon points="1060,548 1200,548 1400,900 920,900" fill="#b7d18e" opacity="0.7"/>
+    <polygon points="660,548 780,548 960,900 560,900" fill="#d8dcb6" opacity="0.9"/>
+    <g stroke="#7ea361" stroke-width="2" opacity="0.5">
+      <line x1="0" y1="600" x2="1440" y2="596"/><line x1="0" y1="680" x2="1440" y2="672"/><line x1="0" y1="790" x2="1440" y2="778"/>
+    </g>
+
+    <!-- 远排树 -->
+    <g opacity="0.9">
+      <use href="#tree" transform="translate(140,516) scale(0.5)"/><use href="#tree" transform="translate(230,514) scale(0.46)"/>
+      <use href="#tree" transform="translate(320,516) scale(0.52)"/><use href="#tree" transform="translate(410,513) scale(0.45)"/>
+      <use href="#tree" transform="translate(500,516) scale(0.5)"/><use href="#tree" transform="translate(590,514) scale(0.47)"/>
+      <use href="#tree" transform="translate(860,515) scale(0.5)"/><use href="#tree" transform="translate(950,513) scale(0.46)"/>
+      <use href="#tree" transform="translate(1310,516) scale(0.5)"/><use href="#tree" transform="translate(1400,514) scale(0.46)"/>
+    </g>
+    <!-- 中排树 -->
+    <g>
+      <use href="#tree" transform="translate(120,620) scale(0.8)"/><use href="#tree" transform="translate(300,626) scale(0.88)"/>
+      <use href="#tree" transform="translate(470,618) scale(0.78)"/><use href="#tree" transform="translate(1010,624) scale(0.85)"/>
+      <use href="#tree" transform="translate(1190,618) scale(0.78)"/><use href="#tree" transform="translate(1360,626) scale(0.9)"/>
+    </g>
+    <!-- 近排树（左一为目标树，有鸟群与红外光束） -->
+    <g>
+      <use href="#tree" transform="translate(180,790) scale(1.2)"/>
+      <use href="#tree" transform="translate(420,806) scale(1.28)"/>
+      <use href="#tree" transform="translate(1120,800) scale(1.22)"/>
+      <use href="#tree" transform="translate(1330,812) scale(1.3)"/>
+    </g>
+
+    <!-- 监测立杆 + 声学设备 + 红外光束 -->
+    <g>
+      <rect x="874" y="560" width="5" height="150" fill="#5c6a60"/>
+      <rect x="866" y="548" width="21" height="15" rx="2" fill="#3d4a44"/>
+      <circle cx="876" cy="555" r="3.4" fill="#9fd8c6"/>
+      <rect x="869" y="576" width="15" height="9" rx="2" fill="#4a584f"/>
+      <line x1="876" y1="580" x2="196" y2="756" stroke="#f04438" stroke-width="2.5" stroke-dasharray="10 7" opacity="0.55"/>
+      <circle cx="196" cy="756" r="5" fill="#f04438" opacity="0.6"/>
+    </g>
+    <!-- 鸟群剪影（目标树附近） -->
+    <use href="#bird" transform="translate(240,690) scale(1.1)"/>
+    <use href="#bird" transform="translate(285,668) scale(0.9)"/>
+    <use href="#bird" transform="translate(205,660) scale(0.8)"/>
+    <use href="#bird" transform="translate(262,726) scale(1.2)"/>
+    <use href="#bird" transform="translate(320,700) scale(0.95)"/>
+
+    <!-- 路边栅栏 -->
+    <g stroke="#8a8468" stroke-width="3" opacity="0.7">
+      <line x1="560" y1="560" x2="560" y2="578"/><line x1="620" y1="560" x2="620" y2="578"/><line x1="680" y1="560" x2="680" y2="578"/>
+      <line x1="740" y1="560" x2="740" y2="578"/><line x1="800" y1="560" x2="800" y2="578"/>
+      <line x1="552" y1="566" x2="808" y2="566"/>
+    </g>
+  </svg>
+  <div class="vignette"></div>
+
+  <!-- ======== 顶栏 ======== -->
+  <header class="hud-top">
+    <div class="brand">
+      <div class="brand__mark">青</div>
+      <div>
+        <div class="brand__name-row">
+          <span class="brand__name">青禾示范果园</span>
+          <span class="brand__tag">3D DIGITAL TWIN</span>
+        </div>
+        <div class="brand__site">EAST-01 · 果园数字沙盘 // ORCHARD OPS CONSOLE</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge badge--clock" id="clock">15:42:07</span>
+      <span class="badge badge--live"><i class="badge__dot"></i>正在监测</span>
+      <span class="badge"><i class="badge__dot"></i>实时连接</span>
+    </div>
+  </header>
+
+  <!-- ======== 左栏 · 远程驱离控制 ======== -->
+  <aside class="panel panel--control">
+    <i class="corners"></i><i class="corners corners--b"></i>
+    <header class="panel__head">
+      <div class="panel__title">
+        <span class="panel__no">01</span>
+        <div><strong>远程驱离控制</strong><small>REPEL CONTROL // 手动</small></div>
+      </div>
+      <span class="panel__live">READY</span>
+    </header>
+
+    <div class="card">
+      <div class="card__title"><i></i>响应方式<em>RESPONSE</em></div>
+      <div class="seg">
+        <button class="is-active">手动控制</button>
+        <button>自动响应</button>
+      </div>
+      <div class="modes">
+        <button>声波</button>
+        <button>红外</button>
+        <button class="is-selected">双模</button>
+      </div>
+      <button class="repel">模拟驱离 · 12 只示意鸟<small>MANUAL // DUAL-MODE // SIM-EXECUTOR</small></button>
+      <div class="footnote">MANUAL TRIGGER · SIMULATED ACTUATOR</div>
+    </div>
+
+    <div class="card">
+      <div class="card__title"><i></i>果农响应流程<em>CREW</em></div>
+      <div class="steps">
+        <div class="step is-done"><span class="step__dot">✓</span><span class="step__name">检查果树</span></div>
+        <i class="step__line is-done"></i>
+        <div class="step is-active"><span class="step__dot">02</span><span class="step__name">开启红外</span></div>
+        <i class="step__line"></i>
+        <div class="step"><span class="step__dot">03</span><span class="step__name">开启声波</span></div>
+      </div>
+      <div class="phase"><b>前往作业点 · 已发现目标</b><span>PHASE 2/3</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card__title"><i></i>场景设置<em>DAYLIGHT</em></div>
+      <div class="dl-track"><div class="dl-thumb"></div></div>
+      <div class="dl-scale"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+      <div class="dl-readout"><b>下午 · 15:00</b><span>拖动预览晨昏光照</span></div>
+    </div>
+  </aside>
+
+  <!-- ======== 右栏 · 果园运行数据（含未处理告警 → 扫描线激活） ======== -->
+  <aside class="panel panel--info is-alarm">
+    <i class="scanline"></i>
+    <i class="corners"></i><i class="corners corners--b"></i>
+    <header class="panel__head">
+      <div class="panel__title">
+        <span class="panel__no">02</span>
+        <div><strong>果园运行数据</strong><small>ORCHARD OPS // 实时</small></div>
+      </div>
+      <span class="panel__live">● ALERT</span>
+    </header>
+
+    <div class="card">
+      <div class="card__title"><i></i>果园概览<em>OVERVIEW</em></div>
+      <div class="stats">
+        <div class="stat"><div class="stat__num is-warn" data-count="7">7</div><div class="stat__label">待处理告警</div></div>
+        <div class="stat"><div class="stat__num" data-count="132">132</div><div class="stat__label">检测事件</div></div>
+        <div class="stat"><div class="stat__num" data-count="18">18</div><div class="stat__label">模拟执行</div></div>
+      </div>
+      <div class="spark">
+        <span class="spark__label">近6次<br/>出鸟</span>
+        <svg viewBox="0 0 120 30" preserveAspectRatio="none">
+          <line x1="0" y1="29" x2="120" y2="29" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+          <rect x="6"  y="20" width="10" height="9"  fill="rgba(95,232,200,0.5)"/>
+          <rect x="25" y="14" width="10" height="15" fill="rgba(95,232,200,0.5)"/>
+          <rect x="44" y="23" width="10" height="6"  fill="rgba(95,232,200,0.5)"/>
+          <rect x="63" y="16" width="10" height="13" fill="rgba(95,232,200,0.5)"/>
+          <rect x="82" y="8"  width="10" height="21" fill="rgba(95,232,200,0.65)"/>
+          <rect x="101" y="13" width="10" height="16" fill="#d3e856"/>
+        </svg>
+        <span class="spark__sum">Σ23</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__title"><i></i>本次检测<em>TASK 14:32</em></div>
+      <p class="sum-line">共 <b>23</b> 只 · <b>3</b> 种<span class="sum-chip">场景复现 12 只</span></p>
+      <div class="row">
+        <i class="row__dot is-alarm"></i>
+        <div class="row__body"><span class="row__name">白头鹎 ×9</span><span class="row__meta">按抓拍定位落鸟 · 96%</span></div>
+      </div>
+      <div class="row">
+        <i class="row__dot"></i>
+        <div class="row__body"><span class="row__name">麻雀 ×8</span><span class="row__meta">按峰值示意分布 · 91%</span></div>
+      </div>
+      <div class="row">
+        <i class="row__dot"></i>
+        <div class="row__body"><span class="row__name">珠颈斑鸠 ×6</span><span class="row__meta">按峰值示意分布 · 88%</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__title"><i></i>最近检测 · 位置示意<em>DETECT</em></div>
+      <div class="row">
+        <i class="row__dot is-alarm"></i>
+        <div class="row__body"><span class="row__name">白头鹎 · 4 只</span><span class="row__meta">14:31 · 93% · B2 区</span></div>
+        <button class="locate is-on">返回</button>
+      </div>
+      <div class="row">
+        <i class="row__dot"></i>
+        <div class="row__body"><span class="row__name">麻雀 · 6 只</span><span class="row__meta">14:29 · 90% · A1 区</span></div>
+        <button class="locate">查看</button>
+      </div>
+      <div class="snapshot">
+        <div class="snapshot__bbox"></div>
+        <span class="snapshot__rec"><i></i>REC</span>
+        <span class="snapshot__tag">SNAPSHOT // CAM-01 // 14:31:52</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__title"><i></i>模拟设备<em>DEVICES</em></div>
+      <div class="device">
+        <div class="device__icon-wrap">
+          <i class="ring"></i><i class="ring"></i><i class="ring"></i>
+          <div class="device__icon">◉</div>
+        </div>
+        <div class="device__body">
+          <span class="device__name">声学驱鸟器 01<small>ACO-01</small></span>
+          <span class="device__desc is-active">正在执行声波驱离</span>
+        </div>
+        <span class="pill"><i></i>在线</span>
+      </div>
+      <div class="device">
+        <div class="device__icon-wrap">
+          <i class="ir-pulse"></i>
+          <div class="device__icon is-ir">◎</div>
+        </div>
+        <div class="device__body">
+          <span class="device__name">红外驱鸟器 02<small>IR-02</small></span>
+          <span class="device__desc">待命 · 与声学联动</span>
+        </div>
+        <span class="pill"><i></i>在线</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======== 底栏 ======== -->
+  <footer class="hud-bottom">
+    <div class="legend">
+      <span class="legend__item"><i class="legend__swatch" style="background:#d3e856"></i>检测框</span>
+      <span class="legend__item"><i class="legend__swatch" style="background:#e0a03a"></i>告警标记</span>
+      <span class="legend__item"><i class="legend__swatch" style="background:#7b9b63"></i>果树</span>
+      <span class="legend__item"><i class="legend__swatch" style="background:#8d9491"></i>监测设备</span>
+      <span class="legend__item"><i class="legend__swatch" style="background:#f04438"></i>红外光束</span>
+    </div>
+    <div class="ops">
+      <button class="ghost">自动环绕</button>
+      <button class="ghost">重置视角</button>
+    </div>
+  </footer>
+
+  <div class="toast"><i>✓</i>模拟鸟群已散去 · 效果以监控复核为准</div>
+</div>
+
+<script>
+  /* 等比缩放：1440×900 设计稿适配任意窗口 */
+  function fit() {
+    const s = Math.min(innerWidth / 1440, innerHeight / 900);
+    document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+  addEventListener('resize', fit); fit();
+
+  /* 概览数字 count-up（打开 HTML 时有滚动跳数效果） */
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const target = +el.dataset.count, dur = 900, t0 = performance.now();
+    (function tick(t) {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * e);
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+  });
+
+  /* 顶栏时钟：样机固定演示时刻，避免与场景光照设定打架 */
+  // setInterval(() => { ... }, 1000);
+</script>
+</body>
+</html>

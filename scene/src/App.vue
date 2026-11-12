@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { createOrchardScene } from './lib/renderer.js'
 import { state, connect, disconnect, resume, clearSession, defaultServer } from './lib/data.js'
 
@@ -648,6 +648,119 @@ watch(ready, r => {
   }
 })
 onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
+
+/* ---------- HUD 数字科技感：时钟 / 概览数字补间 / 告警态 / 出鸟趋势 ---------- */
+const hudClock = ref('')
+let hudClockTimer = null
+function tickHudClock() {
+  const d = new Date()
+  hudClock.value = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':')
+}
+
+/* 系统开启"减少动态效果"时跳过 JS 补间直接显示真值（prefers-reduced-motion 的 CSS 规则盖不住 JS 动画） */
+const reduceMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : null
+
+/** 概览三数字补间：新值从当前显示值继续走（不从 0 起跳），先取消未完成的旧 rAF */
+const displayCounts = reactive({ pending: 0, total: 0, completed: 0 })
+const countRafs = { pending: 0, total: 0, completed: 0 }
+const countSettles = { pending: 0, total: 0, completed: 0 }
+function tweenCount(key, target) {
+  target = Number(target) || 0
+  clearTimeout(countSettles[key])
+  if (reduceMotion?.matches) {
+    cancelAnimationFrame(countRafs[key]); countRafs[key] = 0
+    displayCounts[key] = target
+    return
+  }
+  cancelAnimationFrame(countRafs[key])
+  const from = displayCounts[key]
+  if (from === target) { displayCounts[key] = target; return }
+  const t0 = performance.now()
+  const step = (t) => {
+    const p = Math.min(1, (t - t0) / 600)
+    displayCounts[key] = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)))
+    if (p < 1) countRafs[key] = requestAnimationFrame(step)
+    else countRafs[key] = 0
+  }
+  countRafs[key] = requestAnimationFrame(step)
+  // 兜底：rAF 在后台标签页/被遮挡视图中会被暂停，用定时器保证显示值最终落到真值
+  countSettles[key] = setTimeout(() => {
+    cancelAnimationFrame(countRafs[key]); countRafs[key] = 0
+    displayCounts[key] = target
+  }, 720)
+}
+watch(() => state.counts.pending, (v) => tweenCount('pending', v))
+watch(() => state.counts.total, (v) => tweenCount('total', v))
+watch(() => state.counts.completed, (v) => tweenCount('completed', v))
+
+/** 右栏告警态：有待处理告警 → 四角括号转橙 + 扫描线激活 */
+const alarmActive = computed(() => (state.counts.pending || 0) > 0)
+
+/** 近 6 场已归档任务出鸟数（每场 species[].peak_count 求和，口径同记录页"一检一记"） */
+const birdTrend = ref(null) // null → 整行隐藏
+const BIRD_TREND_LEN = 6
+let birdTrendSeq = 0        // 并发守卫：只采纳最后一次响应，防乱序
+let birdTrendTaskId = ''    // lastTask 每 0.6s 重发，按 task_id 去重
+async function fetchBirdTrend() {
+  if (!state.token || !state.server) return
+  const seq = ++birdTrendSeq
+  try {
+    const res = await fetch(`${state.server}/api/library`, { headers: { Authorization: 'Bearer ' + state.token } })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const data = await res.json()
+    if (seq !== birdTrendSeq) return
+    const items = Array.isArray(data?.items) ? data.items : []
+    birdTrend.value = items
+      .filter((t) => t.result_ready === 1) // 只统计已归档（结果就绪）的任务
+      .slice(0, BIRD_TREND_LEN)
+      .map((t) => (t.species || []).reduce((sum, s) => sum + (s.peak_count || 0), 0))
+      .reverse() // 时间正序，最新一场在最右
+  } catch {
+    if (seq === birdTrendSeq) birdTrend.value = null
+  }
+}
+// 刷新监听 lastTask.task_id：taskSummary 不覆盖零出鸟任务、深链模式会跳过最新任务，均不可靠
+watch(
+  () => state.lastTask?.task_id || '',
+  (id) => {
+    if (!id || id === birdTrendTaskId) return
+    birdTrendTaskId = id
+    fetchBirdTrend()
+  },
+)
+watch(() => state.connected, (up) => { if (up) fetchBirdTrend() })
+
+/** sparkline 几何：均匀布柱，值为 0 画 1px 基线点 */
+const sparkBars = computed(() => {
+  const t = birdTrend.value
+  if (!t || !t.length) return []
+  const max = Math.max(1, ...t)
+  const n = t.length
+  const step = n > 1 ? 91 / (n - 1) : 0
+  return t.map((v, i) => ({
+    x: n > 1 ? +(6 + i * step).toFixed(1) : 55,
+    h: v > 0 ? Math.max(3, Math.round((v / max) * 26)) : 1,
+  }))
+})
+const sparkTotal = computed(() => (birdTrend.value || []).reduce((a, b) => a + b, 0))
+
+/** 驱离主按钮的 mono 副标 */
+const repelBtnSub = computed(() => {
+  const mode = { acoustic: 'ACOUSTIC', infrared: 'INFRARED', both: 'DUAL-MODE' }[effectiveRepelMode.value] || 'DUAL-MODE'
+  return `${responseMode.value === 'auto' ? 'AUTO // CREW DISPATCH' : `MANUAL // ${mode}`} // SIM-EXECUTOR`
+})
+
+onMounted(() => {
+  tickHudClock()
+  hudClockTimer = setInterval(tickHudClock, 1000)
+})
+onBeforeUnmount(() => {
+  clearInterval(hudClockTimer)
+  for (const k of Object.keys(countRafs)) cancelAnimationFrame(countRafs[k])
+  for (const k of Object.keys(countSettles)) clearTimeout(countSettles[k])
+})
 </script>
 
 <template>
@@ -713,6 +826,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
       <span class="hud-brand__site">东区 · 01 号监控点 · 果园数字沙盘</span>
       </div>
       <div class="hud-badges">
+        <span class="hud-badge hud-badge--clock mono">{{ hudClock }}</span>
         <span :class="badgeClass"><i class="hud-badge__dot" />{{ monitorLabel }}</span>
         <span class="hud-badge" :class="{ 'is-warn': !state.connected }">
           <i class="hud-badge__dot" />{{ state.connected ? '实时连接' : '连接中断' }}
@@ -722,14 +836,20 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 
     <!-- 左侧：远程驱离控制与果农协作 -->
     <aside class="hud-panel hud-panel--control" :class="{ 'is-collapsed': controlCollapsed }">
+      <i class="hud-corners" aria-hidden="true" />
+      <i class="hud-corners hud-corners--b" aria-hidden="true" />
+      <div class="hud-panel__scroll">
       <div class="hud-panel__head">
-        <div><strong>远程驱离控制</strong><span>{{ crewPhaseLabel }}</span></div>
+        <div class="hud-panel__title">
+          <span class="hud-panel__no">01</span>
+          <div><strong>远程驱离控制</strong><span class="mono">REPEL CTRL · {{ crewPhaseLabel }}</span></div>
+        </div>
         <button class="hud-panel__toggle" :aria-expanded="!controlCollapsed" @click="togglePanel('control')">{{ controlCollapsed ? '展开' : '收起' }}</button>
       </div>
 
       <template v-if="!controlCollapsed">
         <div class="hud-card hud-control-card">
-          <div class="hud-card__title">响应方式</div>
+          <div class="hud-card__title" data-en="RESPONSE">响应方式</div>
           <div class="response-switch">
             <button :class="{ 'is-active': responseMode === 'manual' }" :disabled="executing || repelling" @click="setResponseMode('manual')">手动控制</button>
             <button :class="{ 'is-active': responseMode === 'auto' }" :disabled="executing || repelling" @click="setResponseMode('auto')">自动响应</button>
@@ -741,7 +861,8 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
             <button :class="{ 'is-selected': selectedRepelMode === 'both' }" :disabled="executing || repelling" @click="selectRepelMode('both')">双模</button>
           </div>
           <button class="hud-action hud-action--repel hud-control-submit" :class="{ 'is-done': repelDone, 'is-executing': executing }" :disabled="responseMode === 'auto' || !birdCount || executing || repelling || offline || !state.token" @click="repel(effectiveRepelMode, false)">
-            {{ repelDone ? '指令完成 · 待复核' : responseMode === 'auto' ? crewPhase === 'patrol' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `模拟驱离 · ${birdCount} 只示意鸟` : '等待检测到鸟类' }}
+            <span>{{ repelDone ? '指令完成 · 待复核' : responseMode === 'auto' ? crewPhase === 'patrol' ? '自动响应已就绪' : crewPhase === 'working' ? '果农正在前往设备…' : crewPhase === 'positioned' ? '果农已到位 · 正在启动' : crewPhase === 'actuating' ? '设备驱离执行中…' : '等待自动流程' : repelling ? '正在下发…' : executing ? '驱离执行中…' : birdCount ? `模拟驱离 · ${birdCount} 只示意鸟` : '等待检测到鸟类' }}</span>
+            <small class="hud-control-sub mono">{{ repelBtnSub }}</small>
           </button>
           <div class="control-footnote">{{ responseMode === 'auto' ? '设备抵达判定已开启 · 模拟执行器' : '手动触发不派出果农 · 模拟执行器' }}</div>
         </div>
@@ -749,7 +870,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
         <div class="hud-card crew-card">
           <div class="crew-card__head">
             <div>
-              <div class="hud-card__title">果农响应流程</div>
+              <div class="hud-card__title" data-en="CREW">果农响应流程</div>
               <span class="crew-card__phase">{{ crewPhaseLabel }}</span>
             </div>
             <button class="crew-card__toggle" @click="crewExpanded = !crewExpanded">{{ crewExpanded ? '收起' : '展开' }}</button>
@@ -771,7 +892,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 
         <div class="hud-card daylight-card">
           <div class="crew-card__head">
-            <div><div class="hud-card__title">场景设置</div><span class="crew-card__phase">{{ daylightName }}</span></div>
+            <div><div class="hud-card__title" data-en="DAYLIGHT">场景设置</div><span class="crew-card__phase">{{ daylightName }}</span></div>
             <button class="crew-card__toggle" :aria-expanded="daylightExpanded" @click="daylightExpanded = !daylightExpanded">{{ daylightExpanded ? '收起' : '展开' }}</button>
           </div>
           <template v-if="daylightExpanded">
@@ -789,27 +910,43 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
         </div>
 
       </template>
+      </div>
     </aside>
 
     <!-- 右侧：果园概览、检测记录与设备遥测 -->
-    <aside class="hud-panel hud-panel--info" :class="{ 'is-collapsed': infoCollapsed }">
+    <aside class="hud-panel hud-panel--info" :class="{ 'is-collapsed': infoCollapsed, 'is-alarm': alarmActive }">
+      <i class="hud-scanline" aria-hidden="true" />
+      <i class="hud-corners" aria-hidden="true" />
+      <i class="hud-corners hud-corners--b" aria-hidden="true" />
+      <div class="hud-panel__scroll">
       <div class="hud-panel__head">
-        <div><strong>果园运行数据</strong><span>检测与模拟设备状态</span></div>
+        <div class="hud-panel__title">
+          <span class="hud-panel__no">02</span>
+          <div><strong>果园运行数据</strong><span class="mono">ORCHARD OPS · {{ alarmActive ? '待处理告警' : '运行正常' }}</span></div>
+        </div>
         <button class="hud-panel__toggle" :aria-expanded="!infoCollapsed" @click="togglePanel('info')">{{ infoCollapsed ? '展开' : '收起' }}</button>
       </div>
       <template v-if="!infoCollapsed">
         <div class="hud-card">
-          <div class="hud-card__title">果园概览</div>
+          <div class="hud-card__title" data-en="OVERVIEW">果园概览</div>
           <div class="hud-stats">
-            <div class="hud-stat"><span class="hud-stat__num is-warn">{{ state.counts.pending }}</span><span class="hud-stat__label">待处理告警</span></div>
-            <div class="hud-stat"><span class="hud-stat__num">{{ state.counts.total }}</span><span class="hud-stat__label">检测事件</span></div>
-            <div class="hud-stat"><span class="hud-stat__num">{{ state.counts.completed }}</span><span class="hud-stat__label">模拟执行</span></div>
+            <div class="hud-stat"><span class="hud-stat__num is-warn mono">{{ displayCounts.pending }}</span><span class="hud-stat__label">待处理告警</span></div>
+            <div class="hud-stat"><span class="hud-stat__num mono">{{ displayCounts.total }}</span><span class="hud-stat__label">检测事件</span></div>
+            <div class="hud-stat"><span class="hud-stat__num mono">{{ displayCounts.completed }}</span><span class="hud-stat__label">模拟执行</span></div>
+          </div>
+          <div v-if="sparkBars.length" class="hud-spark">
+            <span class="hud-spark__label">近{{ sparkBars.length }}次<br />出鸟</span>
+            <svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+              <line class="hud-spark__base" x1="0" y1="29" x2="120" y2="29" />
+              <rect v-for="(b, i) in sparkBars" :key="i" class="hud-spark__bar" :class="{ 'is-last': i === sparkBars.length - 1 }" :x="b.x" :y="29 - b.h" width="10" :height="b.h" />
+            </svg>
+            <span class="hud-spark__sum mono">Σ{{ sparkTotal }}</span>
           </div>
         </div>
 
         <!-- 本次检测:一检一记汇总(时间 + 物种×峰值),与 H5 记录页同口径 -->
         <div v-if="taskSummary" class="hud-card">
-          <div class="hud-card__title">本次检测 · {{ timeText(taskSummary.at) }}</div>
+          <div class="hud-card__title" data-en="TASK">本次检测 · {{ timeText(taskSummary.at) }}</div>
           <p class="detection-count">共 {{ taskSummary.total }} 只 · {{ taskSummary.species.length }} 种<template v-if="birdCount"> · 场景复现 {{ birdCount }} 只</template></p>
           <div v-for="s in taskSummary.species" :key="s.species" class="hud-detect">
             <i class="hud-detect__dot" />
@@ -822,7 +959,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
         </div>
 
         <div class="hud-card">
-          <div class="hud-card__title">最近检测 · 位置示意</div>
+          <div class="hud-card__title" data-en="DETECT">最近检测 · 位置示意</div>
           <p class="detection-count">最新帧检出 {{ detectedCount }} 只 · 场景示意 {{ birdCount }} 只</p>
           <template v-if="recentAlarms.length">
             <div v-for="a in recentAlarms" :key="a.id" class="hud-detect">
@@ -840,11 +977,12 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
         </div>
 
         <div class="hud-card">
-          <div class="hud-card__title">模拟设备</div>
-          <div class="hud-device"><div class="hud-device__icon">◉</div><div class="hud-device__body"><span class="hud-device__name">声学驱鸟器 01</span><span class="hud-device__desc">{{ acousticDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
-          <div class="hud-device" style="margin-top: 8px;"><div class="hud-device__icon" style="color: #ef6472;">◎</div><div class="hud-device__body"><span class="hud-device__name">红外驱鸟器 02</span><span class="hud-device__desc">{{ irDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
+          <div class="hud-card__title" data-en="DEVICES">模拟设备</div>
+          <div class="hud-device"><div class="hud-device__wrap"><template v-if="executing && repelMode !== 'infrared'"><i class="hud-ring" /><i class="hud-ring" /><i class="hud-ring" /></template><div class="hud-device__icon">◉</div></div><div class="hud-device__body"><span class="hud-device__name">声学驱鸟器 01</span><span class="hud-device__desc">{{ acousticDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
+          <div class="hud-device" style="margin-top: 8px;"><div class="hud-device__wrap"><i v-if="executing && repelMode !== 'acoustic'" class="hud-irpulse" /><div class="hud-device__icon is-ir">◎</div></div><div class="hud-device__body"><span class="hud-device__name">红外驱鸟器 02</span><span class="hud-device__desc">{{ irDesc }}</span></div><span class="hud-pill" :class="{ 'is-off': offline }"><i class="hud-pill__dot" />{{ offline ? '离线' : '在线' }}</span></div>
         </div>
       </template>
+      </div>
     </aside>
 
     <!-- 底部图例与操作 -->
@@ -1009,32 +1147,35 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
   text-align: center;
 }
 
-/* ---------- 底部操作按钮 ---------- */
+/* ---------- HUD 操作按钮（底部 ghost + 驱离主按钮） ---------- */
 .hud-action {
   pointer-events: auto;
   padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(52, 80, 47, 0.16);
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--brand-800);
+  border: 1px solid var(--hud-line);
+  background: rgba(8, 26, 26, 0.88);
+  color: var(--hud-cyan-soft);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: 500;
+  letter-spacing: 1px;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: background 0.15s ease, transform 0.15s ease;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+  box-shadow: 0 4px 14px rgba(3, 16, 15, 0.3);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.hud-action:hover {
-  background: var(--brand-100);
+.hud-action:hover:not(:disabled) {
+  background: rgba(23, 82, 72, 0.9);
   transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(18, 184, 151, 0.2);
 }
 
-/* 声波驱离按钮：告警橙，突出主操作 */
+/* 声波驱离主按钮：充能式渐变 + 扫光（扫光规则见 .hud-control-submit） */
 .hud-action--repel {
   background: linear-gradient(115deg, #24b69b, #237e85);
   border-color: rgba(113, 239, 207, .72);
   color: #f4fffb;
   font-weight: 600;
+  letter-spacing: 2px;
   box-shadow: 0 4px 16px rgba(18, 184, 151, .24), inset 0 1px rgba(255,255,255,.22);
 }
 .hud-action--repel:hover:not(:disabled) {
@@ -1046,7 +1187,6 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
   opacity: 0.55;
   cursor: not-allowed;
 }
-.hud-action--repel.is-executing { animation: qhBlink 1.4s steps(2) infinite; }
 .hud-action--repel.is-done {
   background: linear-gradient(115deg, #2f9e6e, #1f7d5c);
   border-color: rgba(89, 225, 182, .72);
@@ -1058,30 +1198,77 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
   top: 78px;
   right: 24px;
   max-height: calc(100vh - 148px);
-  overflow-y: auto;
-  padding: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: #6e9d8e transparent;
+  overflow: visible;
+  padding: 0;
 }
+/* 滚动收敛到内层：四角括号与扫描线固定在面板外框上，不随内容滚动 */
+.hud-panel__scroll {
+  max-height: inherit;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.hud-panel__scroll::-webkit-scrollbar { display: none; }
 .hud-panel--control { left: 24px; right: auto; }
 .hud-panel--info { width: 248px; left: auto; right: 24px; }
 .hud-panel.is-collapsed { width: auto; max-height: none; overflow: visible; }
+.hud-panel.is-collapsed .hud-panel__scroll { max-height: none; overflow: visible; gap: 0; }
+
+/* 四角括号：平时青色，右栏告警态转橙红并发光 */
+.hud-corners { position: absolute; inset: -3px; pointer-events: none; --bracket: rgba(95, 232, 200, 0.7); z-index: 6; }
+.hud-corners::before, .hud-corners::after,
+.hud-corners--b::before, .hud-corners--b::after { content: ""; position: absolute; width: 13px; height: 13px; }
+.hud-corners::before { top: 0; left: 0; border-top: 2px solid var(--bracket); border-left: 2px solid var(--bracket); }
+.hud-corners::after { bottom: 0; right: 0; border-bottom: 2px solid var(--bracket); border-right: 2px solid var(--bracket); }
+.hud-corners--b::before { top: 0; right: 0; border-top: 2px solid var(--bracket); border-right: 2px solid var(--bracket); }
+.hud-corners--b::after { bottom: 0; left: 0; border-bottom: 2px solid var(--bracket); border-left: 2px solid var(--bracket); }
+.hud-panel--info.is-alarm .hud-corners { --bracket: rgba(255, 157, 77, 0.9); }
+.hud-panel--info.is-alarm .hud-corners::before, .hud-panel--info.is-alarm .hud-corners::after,
+.hud-panel--info.is-alarm .hud-corners--b::before, .hud-panel--info.is-alarm .hud-corners--b::after {
+  filter: drop-shadow(0 0 4px rgba(255, 157, 77, 0.6));
+}
+
+/* 告警扫描线：仅右栏存在待处理告警时出现，4.2s 一轮 */
+.hud-scanline { display: none; position: absolute; left: 2px; right: 2px; height: 46px; z-index: 5; pointer-events: none; }
+.hud-panel--info.is-alarm .hud-scanline {
+  display: block;
+  background: linear-gradient(to bottom, transparent, rgba(255, 157, 77, 0.08) 45%, rgba(255, 157, 77, 0.15) 50%, rgba(255, 157, 77, 0.08) 55%, transparent);
+  animation: hudScan 4.2s linear infinite;
+}
+@keyframes hudScan { 0% { top: -46px; } 100% { top: calc(100% - 46px); } }
 .hud-panel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid rgba(97, 208, 184, 0.24);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(9, 27, 31, 0.94), rgba(15, 47, 47, 0.9));
-  box-shadow: 0 12px 30px rgba(3, 18, 21, 0.3), inset 0 1px rgba(158, 243, 219, 0.09);
-  backdrop-filter: blur(16px);
+  padding: 9px 10px;
+  border: 1px solid var(--hud-line);
+  border-left: 3px solid var(--hud-cyan);
+  background: linear-gradient(90deg, rgba(23, 82, 72, 0.88), rgba(10, 34, 36, 0.62));
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  box-shadow: 0 8px 22px rgba(3, 16, 15, 0.35);
+  backdrop-filter: blur(12px);
   margin-bottom: var(--space-3);
+  flex: 0 0 auto;
 }
-.hud-panel__head > div { display: flex; flex-direction: column; gap: 3px; }
-.hud-panel__head strong { color: #effcf7; font-size: var(--text-sm); letter-spacing: .3px; }
-.hud-panel__head span { color: #83cbb7; font: 9px var(--font-num); letter-spacing: .55px; }
+.hud-panel__title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.hud-panel__no {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  font: 700 11px var(--font-mono);
+  color: #0b211d;
+  background: var(--hud-cyan);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+  box-shadow: 0 0 10px rgba(95, 232, 200, 0.4);
+}
+.hud-panel__title > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hud-panel__head strong { color: #f0fcf7; font-size: var(--text-sm); letter-spacing: 1px; }
+.hud-panel__head span { color: rgba(165, 243, 221, 0.62); font: 8.5px var(--font-mono); letter-spacing: 1.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-panel--info.is-alarm .hud-panel__head { border-left-color: var(--hud-warn-deep); background: linear-gradient(90deg, rgba(96, 62, 28, 0.9), rgba(40, 30, 18, 0.62)); }
+.hud-panel--info.is-alarm .hud-panel__no { background: var(--hud-warn-deep); box-shadow: 0 0 10px rgba(255, 157, 77, 0.45); }
 .hud-panel__toggle, .crew-card__toggle {
   border: 0;
   padding: 5px 8px;
@@ -1095,20 +1282,84 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 }
 .hud-panel .hud-card {
   color: #e5f3ee;
-  border-color: rgba(102, 191, 172, .2);
-  background:
-    linear-gradient(135deg, rgba(10, 28, 32, .78), rgba(13, 40, 41, .72)),
-    repeating-linear-gradient(0deg, transparent 0 23px, rgba(95, 218, 190, .025) 24px);
-  box-shadow: 0 12px 28px rgba(4, 18, 22, .28), inset 0 1px rgba(193, 255, 235, .055);
-  backdrop-filter: blur(16px);
+  border: 1px solid var(--hud-line);
+  border-radius: 10px;
+  background: var(--hud-card);
+  box-shadow: 0 10px 26px rgba(3, 16, 15, 0.32), inset 0 1px 0 rgba(193, 255, 235, 0.055);
+  backdrop-filter: blur(10px);
 }
-.hud-panel .hud-card__title { color: #80cdb9; letter-spacing: .6px; }
-.hud-panel .hud-stat__num { color: #edf9f3; text-shadow: 0 0 14px rgba(99, 235, 199, .16); }
-.hud-panel .hud-stat__num.is-warn { color: #ffc66e; }
-.hud-panel .hud-stat__label, .hud-panel .hud-detect__meta { color: #8eaaa4; }
+.hud-panel .hud-card__title { display: flex; align-items: center; gap: 7px; color: #8fd8c2; letter-spacing: 1px; }
+.hud-panel .hud-card__title::before {
+  content: "";
+  width: 6px; height: 6px; flex: 0 0 auto;
+  background: var(--hud-cyan);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%);
+  box-shadow: 0 0 6px rgba(95, 232, 200, 0.7);
+}
+.hud-panel .hud-card__title::after {
+  content: attr(data-en);
+  margin-left: auto;
+  font: 8px var(--font-mono);
+  letter-spacing: 1.4px;
+  color: var(--hud-cyan-faint);
+}
+.hud-panel .hud-stat { padding: 0 6px; }
+.hud-panel .hud-stat + .hud-stat { border-left: 1px solid rgba(102, 191, 172, 0.16); }
+.hud-panel .hud-stat__num {
+  font: 700 22px/1.1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: #edfffa;
+  text-shadow: 0 0 14px rgba(99, 235, 199, 0.35);
+}
+.hud-panel .hud-stat__num.is-warn { color: var(--hud-warn); animation: hudBreathe 2.2s ease-in-out infinite; }
+@keyframes hudBreathe {
+  0%, 100% { text-shadow: 0 0 10px rgba(255, 178, 92, 0.3); }
+  50% { text-shadow: 0 0 22px rgba(255, 178, 92, 0.65); }
+}
+.hud-panel .hud-stat__label { color: var(--hud-cyan-dim); letter-spacing: 1px; }
+.hud-panel .hud-detect__meta { color: var(--hud-cyan-dim); }
+
+/* sparkline：近 6 场已归档任务出鸟趋势 */
+.hud-spark { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(102, 191, 172, 0.18); }
+.hud-spark__label { flex: 0 0 auto; font-size: 9px; line-height: 1.3; letter-spacing: 1px; color: var(--hud-cyan-faint); }
+.hud-spark svg { flex: 1; height: 26px; display: block; min-width: 0; }
+.hud-spark__base { stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
+.hud-spark__bar { fill: rgba(95, 232, 200, 0.5); }
+.hud-spark__bar.is-last { fill: var(--detect); }
+.hud-spark__sum { flex: 0 0 auto; font-size: 9px; letter-spacing: 1px; color: var(--hud-cyan-dim); }
 .hud-panel .hud-detect__name, .hud-panel .hud-device__name, .hud-panel .crew-task__body strong { color: #e9f6f0; }
-.hud-panel .hud-device__desc, .hud-panel .hud-empty, .hud-panel .crew-task__body span { color: #8eaaa4; }
-.hud-panel .hud-device__icon { background: rgba(73, 163, 145, .14); color: #78ddc2; }
+.hud-panel .hud-device__desc, .hud-panel .hud-empty, .hud-panel .crew-task__body span { color: var(--hud-cyan-dim); }
+.hud-device__wrap { position: relative; width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; }
+.hud-panel .hud-device__icon {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  font-size: 13px;
+  border-radius: 2px;
+  color: #78ddc2;
+  background: rgba(73, 163, 145, 0.16);
+  border: 1px solid rgba(97, 221, 192, 0.3);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+.hud-panel .hud-device__icon.is-ir { color: #ff8d7a; background: rgba(163, 73, 62, 0.16); border-color: rgba(255, 141, 122, 0.3); }
+/* 设备执行动效：声学=扩散波环，红外=红色脉冲（模板里由 executing/repelMode 驱动） */
+.hud-ring, .hud-irpulse {
+  position: absolute; left: 50%; top: 50%;
+  width: 30px; height: 30px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.hud-ring { border: 1px solid rgba(95, 232, 200, 0.55); animation: hudRipple 2.4s ease-out infinite; }
+.hud-ring:nth-of-type(2) { animation-delay: 0.8s; }
+.hud-ring:nth-of-type(3) { animation-delay: 1.6s; }
+@keyframes hudRipple {
+  0% { width: 30px; height: 30px; opacity: 0.8; }
+  100% { width: 62px; height: 62px; opacity: 0; }
+}
+.hud-irpulse { border: 1px solid rgba(255, 110, 94, 0.7); animation: hudIrPulse 1.6s ease-out infinite; }
+@keyframes hudIrPulse {
+  0% { width: 28px; height: 28px; opacity: 0.9; }
+  100% { width: 50px; height: 50px; opacity: 0; }
+}
 .hud-panel .hud-pill { color: #8ce7c1; background: rgba(36, 102, 75, .22); border-color: rgba(91, 207, 154, .22); }
 .hud-panel .hud-pill__dot { background: #70e3ae; box-shadow: 0 0 8px rgba(112, 227, 174, .75); }
 .hud-panel .hud-pill.is-off { color: #ffc07d; background: rgba(143, 83, 43, .22); border-color: rgba(246, 164, 91, .3); }
@@ -1120,12 +1371,12 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .response-switch button, .repel-modes button {
   min-height: 36px;
   border: 1px solid rgba(126, 188, 176, .22);
-  border-radius: var(--radius-sm);
   color: #b6cec7;
   background: rgba(4, 18, 23, .55);
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
   transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 .response-switch button.is-active, .repel-modes button.is-selected {
@@ -1137,9 +1388,30 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 }
 .response-switch button:disabled, .repel-modes button:disabled { opacity: .55; cursor: not-allowed; }
 .response-help { margin: 8px 0 0; color: #a4c1b8; font-size: var(--text-2xs); line-height: 1.6; }
-.hud-control-submit { width: 100%; justify-content: center; margin-top: 2px; }
-.control-footnote { margin-top: 8px; color: #779991; font-size: var(--text-2xs); text-align: center; }
-.crew-card__head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.hud-control-submit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin-top: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.hud-control-sub { font-size: 7.5px; font-weight: 400; letter-spacing: 1.2px; color: rgba(244, 255, 251, 0.62); white-space: nowrap; overflow: hidden; max-width: 100%; }
+/* 充能扫光：执行中横向掠过；静止时光带停在画布外不可见 */
+.hud-action--repel::after {
+  content: "";
+  position: absolute;
+  top: -20%; bottom: -20%; left: -60px; width: 46px;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-18deg);
+}
+.hud-action--repel.is-executing::after { animation: hudSweep 2.8s ease-in-out infinite; }
+@keyframes hudSweep { 0% { left: -60px; } 55%, 100% { left: calc(100% + 60px); } }
+.control-footnote { margin-top: 8px; color: var(--hud-cyan-faint); font-size: var(--text-2xs); text-align: center; letter-spacing: 1px; }
+.crew-card__head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0; }
 .crew-card__head .hud-card__title { margin: 0 0 3px; }
 .crew-card__phase { color: #70dfc0; font-size: var(--text-2xs); }
 .crew-task-list { display: flex; flex-direction: column; gap: 2px; }
@@ -1162,37 +1434,47 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .crew-step.is-active .crew-step__dot { border-color: #ff5e69; color: #fff; background: rgba(255,84,99,.28); box-shadow: 0 0 10px rgba(255,84,99,.5); }
 .crew-step.is-done .crew-step__dot { background: #59e1b6; color: #0e2a20; border-color: #59e1b6; }
 .crew-step.is-muted { opacity: .45; }
-.crew-step__name { font-size: 9.5px; color: var(--ink-400); text-align: center; line-height: 1.3; }
+.crew-step__name { font-size: 9.5px; color: #b9d0c8; text-align: center; line-height: 1.3; }
 .crew-step.is-active .crew-step__name { color: #e5f3ee; font-weight: 600; }
 .crew-step.is-done .crew-step__name { color: #74d9ba; }
 .crew-step__line { flex: 1; height: 1px; background: rgba(97,221,192,.3); margin-top: 12px; }
 .crew-step__line.is-done { background: #59e1b6; }
 .crew-step__status-line { padding: 6px 8px; border-radius: var(--radius-md); background: rgba(43,156,134,.12); display: flex; flex-direction: column; gap: 2px; }
 .crew-step__status-line span:first-child { color: #74d9ba; font-size: 10px; font-weight: 600; }
-.crew-step__detail { color: var(--ink-400); font-size: 10px; }
+.crew-step__detail { color: #b9d0c8; font-size: 10px; }
 
 /* 最近检测定位按钮 */
-.hud-detect__locate { flex: 0 0 auto; border: 1px solid rgba(97,221,192,.35); background: rgba(43,156,134,.12); color: #8be8cc; font-size: 11px; font-weight: 600; min-height: 36px; padding: 6px 8px; cursor: pointer; }
-.hud-detect__locate.is-on { background: rgba(89,225,182,.22); color: #b8f5dd; border-color: #59e1b6; }
+.hud-detect__locate {
+  flex: 0 0 auto;
+  border: 1px solid rgba(97, 221, 192, 0.32);
+  background: rgba(43, 156, 134, 0.14);
+  color: #8be8cc;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px;
+  min-height: 28px; padding: 4px 9px; cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+}
+.hud-detect__locate.is-on { background: var(--hud-cyan); color: #0b211d; border-color: var(--hud-cyan); }
 
-/* 驱离操作反馈 */
+/* 驱离操作反馈：HUD toast（切角 + 发光边） */
 .repel-msg {
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--success-bg);
-  border: 1px solid var(--success-fg);
-  color: var(--success-fg);
+  padding: 7px 14px;
+  background: rgba(12, 42, 32, 0.92);
+  border: 1px solid rgba(89, 225, 182, 0.55);
+  color: #d9ffe9;
   font-size: var(--text-xs);
   font-weight: 500;
+  letter-spacing: 1px;
   white-space: nowrap;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 6px 22px rgba(47, 178, 126, 0.25), 0 0 18px rgba(89, 225, 182, 0.12);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
 }
 
 /* 未驱走：告警橙提示 */
 .repel-msg.is-warn {
-  background: var(--warn-bg);
-  border-color: var(--warn-line);
-  color: var(--warn-fg);
+  background: rgba(64, 38, 16, 0.92);
+  border-color: rgba(255, 157, 77, 0.6);
+  color: #ffe3c2;
+  box-shadow: 0 6px 22px rgba(200, 120, 40, 0.22), 0 0 18px rgba(255, 157, 77, 0.12);
 }
 
 .hud-note-abs {
@@ -1200,19 +1482,22 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
   left: 50%;
   transform: translateX(-50%);
   bottom: 78px;
-  font-size: var(--text-2xs);
-  color: var(--ink-700);
-  letter-spacing: 0.2px;
-  padding: 6px 11px;
-  border-radius: var(--radius-pill);
-  background: rgba(251, 250, 243, 0.88);
-  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: rgba(165, 243, 221, 0.55);
+  padding: 6px 12px;
+  border: 1px solid rgba(102, 191, 172, 0.2);
+  background: rgba(8, 26, 26, 0.85);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+  box-shadow: 0 6px 18px rgba(3, 16, 15, 0.3);
   pointer-events: none;
   z-index: 10;
   white-space: nowrap;
 }
 
 @media (max-width: 640px) {
+  .hud-badge--clock { display: none; }
   .hud-panel { display: flex; width: min(300px, calc(100vw - 18px)); max-height: calc(100vh - 126px); }
   .hud-panel--control { left: 9px; right: auto; top: 68px; }
   .hud-panel--info { left: auto; right: 9px; top: 68px; }
@@ -1230,7 +1515,7 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 }
 
 /* ---- 光照演示卡 ---- */
-.daylight-card .daylight-switch { display: flex; gap: 6px; margin-bottom: 8px; }
+.daylight-card .daylight-switch { display: flex; gap: 6px; margin-top: 12px; margin-bottom: 8px; }
 .daylight-card .daylight-switch button { flex: 1; border: 1px solid rgba(212, 232, 86, .35); background: transparent; color: inherit; padding: 5px 0; font-size: 12px; cursor: pointer; opacity: .65; }
 .daylight-card .daylight-switch button.is-active { opacity: 1; background: rgba(212, 232, 86, .14); border-color: #d3e856; }
 .daylight-card .daylight-slider { width: 100%; accent-color: #d3e856; }
@@ -1239,15 +1524,10 @@ onBeforeUnmount(() => { if (daylightTimer) clearInterval(daylightTimer) })
 .daylight-card .daylight-readout { margin-top: 6px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
 .daylight-card .daylight-hint { margin-top: 4px; font-size: 11px; opacity: .55; line-height: 1.5; }
 button:focus-visible, input:focus-visible { outline: 2px solid #d3e856; outline-offset: 3px; }
-.hud-panel .hud-card { background: rgba(15, 36, 33, .91); box-shadow: 0 8px 24px rgba(4, 18, 22, .18); }
-.hud-panel .hud-stat__label, .hud-panel .hud-detect__meta, .hud-panel .hud-device__desc, .control-footnote { color: #b9d0c8; }
-.crew-card__head { margin-bottom: 0; }
-.crew-step__name, .crew-step__detail { color: #b9d0c8; }
-.daylight-card .daylight-switch { margin-top: 12px; }
-.detection-count { font-size: 11px; line-height: 1.5; color: #b9d0c8; margin: 0 0 8px; }
+.detection-count { font-size: 11px; line-height: 1.5; color: var(--hud-cyan-dim); margin: 0 0 8px; }
 .capture-detail { margin: 12px 0 0; }
-.capture-detail img { width: 100%; display: block; border-radius: 6px; }
-.capture-detail figcaption { margin-top: 6px; font-size: 11px; line-height: 1.5; color: #b9d0c8; }
+.capture-detail img { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--hud-line); }
+.capture-detail figcaption { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--hud-cyan-dim); }
 
 /* ---- 声波音效开关 ---- */
 .sound-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
