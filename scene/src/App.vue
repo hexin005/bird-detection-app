@@ -10,7 +10,7 @@ const loadProgress = ref(0)
 
 /* ---------- 登录 ---------- */
 const serverInput = ref('')
-const username = ref('orchard')
+const username = ref('')
 const password = ref('')
 const needLogin = computed(() => !state.token)
 const loginError = ref('')
@@ -331,6 +331,15 @@ function adoptTaskSummary(task) {
   const count = handle.adoptFromSummary(task.species)
   birdCount.value = count
   taskSummary.value = task
+  // P3:该任务告警已全部处理(自动规则/人工) → 3D 与记录一致,复现即散去
+  const taskAlarms = state.alarms.filter((a) => a.task_id === task.task_id)
+  const allProcessed = taskAlarms.length > 0 && taskAlarms.every((a) => a.status !== 'new')
+  if (allProcessed && count > 0) {
+    handle.disperse(1)
+    birdCount.value = 0
+    flash(`检测完成复现 · ${task.species.length} 种 · 鸟情已处理，鸟群已散去`)
+    return
+  }
   flash(`检测完成复现 · ${task.species.length} 种 · ${count} 只鸟已落位`)
   if (responseMode.value === 'auto' && crewPhase.value === 'patrol' && count > 0) {
     crewPhase.value = 'alert' // 集结 → onCrewAlertReady → 前往设备 → 自动驱离
@@ -795,7 +804,7 @@ onBeforeUnmount(() => {
         <input v-model="serverInput" class="login-input" placeholder="http://127.0.0.1:8008" />
 
         <label class="login-label">账号</label>
-        <input v-model="username" class="login-input" placeholder="orchard" />
+        <input v-model="username" class="login-input" placeholder="账号" />
 
         <label class="login-label">密码</label>
         <input

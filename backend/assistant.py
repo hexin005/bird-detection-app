@@ -120,10 +120,11 @@ def _match_knowledge(question: str, rows, limit=3):
     return [row for _, _, row in scored[:limit]]
 
 
-def _stats_block(question: str, store):
-    """本园统计:按问题时间范围取数,并附口径说明(告警次数≠个体数等)。"""
+def _stats_block(question: str, store, user_id=None):
+    """本园统计:按问题时间范围取数,并附口径说明(告警次数≠个体数等);
+    user_id 给定时仅检索该账号的数据,统计与记录一律在 SQL 阶段完成隔离。"""
     days = 1 if ('今天' in question or '今日' in question) else 7
-    data = store.stats(days)
+    data = store.stats(days, user_id)
     lines = [f'时间范围:近 {days} 天(含今天,服务器本地时区)', '口径说明:以下均为"告警记录次数"等记录统计,'
              '不代表鸟类个体数量;视频段数不代表告警次数;"最近记录"不代表该鸟现在仍在园内;'
              '没有实时监测数据时,不得声称鸟类当前仍在果园。']
@@ -133,9 +134,11 @@ def _stats_block(question: str, store):
         lines.append('告警物种TOP: ' + ', '.join(f"{r['species']} {r['count']}条" for r in data['species']))
     else:
         lines.append('告警物种TOP: 范围内无告警记录')
+    scope = 'WHERE user_id=?' if user_id is not None else ''
+    args = (user_id,) if user_id is not None else ()
     groups = store.rows(
-        """SELECT species, COUNT(*) total, SUM(status='new') pending, MAX(at) last_seen
-           FROM alarms GROUP BY species ORDER BY total DESC LIMIT 8""")
+        f"""SELECT species, COUNT(*) total, SUM(status='new') pending, MAX(at) last_seen
+           FROM alarms {scope} GROUP BY species ORDER BY total DESC LIMIT 8""", args)
     if groups:
         lines.append('全部历史累计告警: ' + ', '.join(f"{r['species']} {r['total']}条" for r in groups))
     return '\n'.join(['【本园统计】'] + lines)
@@ -150,8 +153,9 @@ def _card_block(row):
     return f'【知识卡】{head}\n{body}'
 
 
-def retrieve(question: str, store):
-    """检索三分类(可叠加):明确鸟种 / 本园统计 / 非特定鸟种知识。返回 (blocks, refs)。"""
+def retrieve(question: str, store, user_id=None):
+    """检索三分类(可叠加):明确鸟种 / 本园统计 / 非特定鸟种知识。返回 (blocks, refs)。
+    知识卡全局共享;本园统计与记录按 user_id 在 SQL 阶段隔离,提示词不承担权限。"""
     blocks, refs = [], []
     species = _match_species(question, _knowledge_rows(store))
     for row in species:
@@ -160,7 +164,7 @@ def retrieve(question: str, store):
     is_stat = any(w in question for w in STAT_WORDS) and not any(
         w in question for w in ('世界', '全球', '地球上', '全国'))
     if is_stat:
-        blocks.append(_stats_block(question, store))
+        blocks.append(_stats_block(question, store, user_id))
         refs.append({'kind': 'stats'})
     if not species and any(w in question for w in KNOW_WORDS):
         for row in _match_knowledge(question, _knowledge_rows(store)):

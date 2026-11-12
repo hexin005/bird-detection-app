@@ -44,7 +44,7 @@ class VideoPipeline(VideoMonitor):
         self.selected = None
         self.last_task = None
 
-    def start(self, video_id=None):
+    def start(self, video_id=None, user_id=None):
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise Conflict('已有分析任务，请等待完成或停止')
@@ -52,24 +52,29 @@ class VideoPipeline(VideoMonitor):
                 raise Conflict('服务器缺少 FFmpeg，无法生成可播放视频')
             if video_id:
                 self.selected = self.library.video(video_id)
+                # 视频归属校验:仅可检测本人视频(存量归 or;历史 NULL 行视为公共)
+                if user_id is not None and self.selected.get('user_id') not in (None, user_id):
+                    raise Conflict('视频不存在或无权使用')
             else:
                 if not self.settings.video_path.is_file():
                     raise Conflict('请先上传视频，或配置默认演示视频')
-                self.selected = self.library.register(self.settings.video_path, '演示录像 · ' + self.settings.video_path.name)
-            self.library.already_processed(self.selected)
+                self.selected = self.library.register(self.settings.video_path, '演示录像 · ' + self.settings.video_path.name,
+                                                      user_id=user_id)
+            self.library.already_processed(self.selected, user_id)
             # Preserve legacy path checks without changing Settings for later default runs.
             original = self.settings.video_path
             try:
                 self.settings.video_path = Path(self.selected['path'])
-                result = super().start()
+                result = super().start(user_id)
             finally:
                 self.settings.video_path = original
             return result
 
-    def snapshot(self):
-        result = super().snapshot()
+    def snapshot(self, user_id=None):
+        result = super().snapshot(user_id)
         if self.selected:
-            result['source'] = self.selected['name']
+            if user_id is None or self.owner is None or self.owner == user_id:
+                result['source'] = self.selected['name']
         task_id = result.get('task_id')
         if task_id:
             rows = self.store.rows('SELECT progress,result_ready,duration,video_id FROM tasks WHERE id=?', (task_id,))

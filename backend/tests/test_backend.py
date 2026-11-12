@@ -496,12 +496,12 @@ class StatsApiTests(unittest.TestCase):
     def test_archived_task_peaks_drive_daily_series_and_species_ranking(self):
         def video_task(task_id, when, ready, species):
             with self.store.tx() as db:
-                db.execute('INSERT INTO videos (id,name,path,duration,fps,at) VALUES (?,?,?,?,?,?)',
-                           ('v-' + task_id, task_id, 'unused.mp4', 10, 25, when))
-                db.execute('INSERT INTO tasks (id,status,at,video_id,result_ready) VALUES (?,?,?,?,?)',
-                           (task_id, 'ended' if ready else 'running', when, 'v-' + task_id, int(ready)))
-                db.executemany('INSERT INTO samples VALUES (?,?,?,?,?,?)',
-                               [(task_id, name, i, count, .9, i) for i, (name, count) in enumerate(species)])
+                db.execute('INSERT INTO videos (id,name,path,duration,fps,at,user_id) VALUES (?,?,?,?,?,?,?)',
+                           ('v-' + task_id, task_id, 'unused.mp4', 10, 25, when, 1))
+                db.execute('INSERT INTO tasks (id,status,at,video_id,result_ready,user_id) VALUES (?,?,?,?,?,?)',
+                           (task_id, 'ended' if ready else 'running', when, 'v-' + task_id, int(ready), 1))
+                db.executemany('INSERT INTO samples (task_id,species,video_time,count,confidence,frame_id,user_id) VALUES (?,?,?,?,?,?,?)',
+                               [(task_id, name, i, count, .9, i, 1) for i, (name, count) in enumerate(species)])
 
         now = time.localtime()
         midnight = time.mktime((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0, 0, 0, -1))
@@ -649,6 +649,158 @@ class AutomationTests(unittest.TestCase):
             self.store.set_patrol(1, {'start_minute': 700, 'end_minute': 600})
         p = self.store.set_patrol(1, {'enabled': True, 'mode': 'infrared'})
         self.assertEqual((p['enabled'], p['mode'], p['interval_minutes']), (1, 'infrared', 120))
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class IsolationTests(unittest.TestCase):
+    """账号隔离矩阵:数据/规则/媒体/设备权限按 user_id 作用域(精简版回归资产)。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        settings = Settings(Path(self.tmp.name), Path('missing.pt'), Path('missing.mp4'),
+                            'tester', 'test-password', 'test-secret', worker_enabled=False)
+        self.app = create_app(settings)
+        self.store = self.app.state.store
+        self.client = TestClient(self.app).__enter__()
+        self.store.create_user('second@example.com', 'password123')  # user 2
+        self.h1 = {'Authorization': 'Bearer ' + self.client.post(
+            '/api/login', json={'username': 'tester', 'password': 'test-password'}).json()['token']}
+        self.h2 = {'Authorization': 'Bearer ' + self.client.post(
+            '/api/login', json={'username': 'second@example.com', 'password': 'password123'}).json()['token']}
+
+    def tearDown(self):
+        self.client.__exit__(None, None, None)
+        self.tmp.cleanup()
+
+    def _task(self, task_id, user_id, ready=True):
+        with self.store.tx() as db:
+            db.execute('INSERT INTO videos (id,name,path,duration,fps,at,user_id) VALUES (?,?,?,?,?,?,?)',
+                       ('v-' + task_id, task_id, 'unused.mp4', 10, 25, time.time(), user_id))
+            db.execute('INSERT INTO tasks (id,status,at,video_id,result_ready,user_id) VALUES (?,?,?,?,?,?)',
+                       (task_id, 'ended' if ready else 'running', time.time(), 'v-' + task_id, int(ready), user_id))
+
+    def _alarm(self, task_id, user_id, species='八哥'):
+        return self.store.alarm(task_id, species, 1, .9, 'x.jpg', 0, 1, 0, user_id=user_id)[0]
+
+    def test_state_history_detail_scoped(self):
+        self._task('t1', 1)
+        aid = self._alarm('t1', 1)
+        s2 = self.client.get('/api/state', headers=self.h2).json()
+        self.assertEqual((s2['counts']['total'], s2['alarms'], s2['commands'], s2['events']), (0, [], [], []))
+        s1 = self.client.get('/api/state', headers=self.h1).json()
+        self.assertEqual(s1['counts']['total'], 1)
+        self.assertEqual(s1['latest_detection']['id'], aid)
+        self.assertEqual(self.client.get('/api/history?kind=alarms', headers=self.h2).json()['items'], [])
+        self.assertEqual(len(self.client.get('/api/history?kind=alarms', headers=self.h1).json()['items']), 1)
+        self.assertEqual(self.client.get(f'/api/detail/alarms/{aid}', headers=self.h2).status_code, 404)
+        self.assertEqual(self.client.get(f'/api/detail/alarms/{aid}', headers=self.h1).status_code, 200)
+
+    def test_stats_scoped(self):
+        self._task('t1', 1)
+        self._alarm('t1', 1)
+        for headers, expect in ((self.h1, 1), (self.h2, 0)):
+            stats = self.client.get('/api/stats?range=7d', headers=headers).json()
+            self.assertEqual(sum(stats['trend']), expect)
+            self.assertEqual(stats['breakdown']['new'], expect)
+
+    def test_rules_match_only_owner(self):
+        self.store.create_rule(2, 'u2规则', 'alarm_any', 'acoustic', 3, 60)
+        self._task('t1', 1)
+        self._alarm('t1', 1)  # user2 的规则不得接管 user1 的告警
+        self.assertEqual(self.store.snapshot(1)['commands'], [])
+        self.assertEqual(self.store.snapshot(1)['alarms'][0]['status'], 'new')
+        self._task('t2', 2)
+        self._alarm('t2', 2)  # user2 的告警触发 user2 的规则
+        cmds = self.store.snapshot(2)['commands']
+        self.assertEqual(len(cmds), 1)
+        self.assertEqual((cmds[0]['automatic'], cmds[0]['user_id']), (1, 2))
+
+    def test_library_videos_summary_scoped(self):
+        self._task('t1', 1)
+        self._alarm('t1', 1)
+        self.assertEqual(self.client.get('/api/videos', headers=self.h2).json()['items'], [])
+        self.assertEqual(len(self.client.get('/api/videos', headers=self.h1).json()['items']), 1)
+        self.assertEqual(self.client.get('/api/library', headers=self.h2).json()['items'], [])
+        self.assertEqual(len(self.client.get('/api/library', headers=self.h1).json()['items']), 1)
+        self.assertEqual(self.client.get('/api/library/summary', headers=self.h2).json()['tasks_total'], 0)
+        self.assertEqual(self.client.get('/api/library/summary', headers=self.h1).json()['tasks_total'], 1)
+        self.assertEqual(self.client.get('/api/library/t1', headers=self.h2).status_code, 404)
+        self.assertEqual(self.client.get('/api/library/t1', headers=self.h1).status_code, 200)
+
+    def test_dedup_scoped_and_recheck_allowed(self):
+        from backend.video_library import VideoLibrary
+        self._task('t1', 1)
+        video = {'id': 'v-t1', 'sha256': 'sha-x'}
+        with self.assertRaises(Conflict):
+            self.store.app if False else self.app.state.monitor.library.already_processed(video, 1)
+        # 他人已归档不拦截;无任务行的新账号也不拦截
+        self.app.state.monitor.library.already_processed(video, 2)
+        self.app.state.monitor.library.already_processed({'id': 'v-none', 'sha256': 'sha-none'}, 2)
+
+    def test_media_ownership(self):
+        self._task('t1', 1)
+        capture = Path(self.tmp.name) / 'captures' / 't1-1.jpg'
+        capture.parent.mkdir(exist_ok=True)
+        capture.write_bytes(b'jpg')
+        ticket1 = self.client.get('/api/state', headers=self.h1).json()['media_ticket']
+        ticket2 = self.client.get('/api/state', headers=self.h2).json()['media_ticket']
+        self.assertEqual(self.client.get('/api/captures/t1-1.jpg?ticket=' + ticket1).status_code, 200)
+        self.assertEqual(self.client.get('/api/captures/t1-1.jpg?ticket=' + ticket2).status_code, 404)
+        self.assertEqual(self.client.get('/api/media/t1/result.mp4?ticket=' + ticket2).status_code, 404)
+        self.assertEqual(self.client.get('/api/media/t1/result.mp4?ticket=' + ticket1).status_code, 404)  # 文件不存在仍 404
+        self.assertEqual(self.client.get('/api/frame/t1-1.jpg?ticket=' + ticket2).status_code, 404)
+
+    def test_ignore_stop_settings_permissions(self):
+        aid = self._alarm('t1', 1)
+        c = self.store.start_command('iso-001', aid, 3, 1)
+        # 告警已被指令置 processing,忽略走 409;换一条 user2 的告警验证跨账号忽略
+        self._task('t2', 2)
+        aid2 = self._alarm('t2', 2)
+        self.assertEqual(self.client.post(f'/api/alarms/{aid2}/ignore', headers=self.h1).status_code, 409)
+        self.assertEqual(self.client.post(f'/api/alarms/{aid2}/ignore', headers=self.h2).status_code, 200)
+        self.assertEqual(self.client.post(f'/api/commands/{c["id"]}/stop', headers=self.h2).status_code, 409)
+        self.assertEqual(self.client.post(f'/api/commands/{c["id"]}/stop', headers=self.h1).status_code, 200)
+        body = {'scenario': 'normal', 'confidence': .5, 'consecutive': 2, 'cooldown': 20}
+        self.assertEqual(self.client.put('/api/settings', json=body, headers=self.h2).status_code, 403)
+        self.assertEqual(self.client.put('/api/settings', json=body, headers=self.h1).status_code, 200)
+
+    def test_monitor_stop_owner_only(self):
+        monitor = self.app.state.monitor
+        self.client.post('/api/monitor/start', headers=self.h2)  # 模型缺失 → 409,但 owner 不变
+        monitor.owner = 2  # 模拟 user2 占用
+        self.assertEqual(self.client.post('/api/monitor/stop', headers=self.h1).status_code, 403)
+        self.assertEqual(self.client.post('/api/monitor/stop', headers=self.h2).status_code, 200)
+        monitor.owner = None
+
+    def test_register_dedup_never_crosses_accounts(self):
+        """回归:同内容跨账号上传,各得各行(共享物理文件),不得复用他人 videos 行。"""
+        import cv2
+        import numpy as np
+        source = Path(self.tmp.name) / 'same.mp4'
+        writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 10, (64, 64))
+        for _ in range(3):
+            writer.write(np.zeros((64, 64, 3), dtype=np.uint8))
+        writer.release()
+        library = self.app.state.monitor.library
+        v1 = library.register(source, 'same.mp4', True, user_id=1)
+        v2 = library.register(source, 'same.mp4', True, user_id=2)
+        self.assertNotEqual(v1['id'], v2['id'])
+        self.assertEqual((v1['user_id'], v2['user_id']), (1, 2))
+        self.assertEqual(v1['path'], v2['path'])  # 物理文件共享
+        # 各自列表可见自己的行
+
+    def test_latest_detection_survives_auto_processing(self):
+        """P1 核心:告警被规则自动处理后,latest_detection 仍指向它(提醒链路不断)。"""
+        self._task('t1', 1)
+        self.store.create_rule(1, '自动驱离', 'alarm_any', 'acoustic', 3, 60)
+        aid = self._alarm('t1', 1)
+        s = self.client.get('/api/state', headers=self.h1).json()
+        self.assertEqual(s['latest_detection']['id'], aid)
+        self.assertEqual(s['alarms'][0]['status'], 'processing')  # 规则接管
+        self.assertEqual(s['counts']['pending'], 0)  # pending 不增 → 旧提醒链路失效,latest_detection 补位
 
 
 if __name__ == '__main__':

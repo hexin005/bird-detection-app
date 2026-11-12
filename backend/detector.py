@@ -40,37 +40,44 @@ class VideoMonitor:
         self.stop_event = threading.Event()
         self.thread = None
         self.model = None
+        self.owner = None  # 当前检测任务的账号归属;None=设备空闲
         self.frames = OrderedDict()
         self.current = {'status': 'idle', 'task_id': None, 'message': '选择开始监测，读取配置的录像', 'frame': None}
         latest = store.rows('SELECT * FROM tasks ORDER BY at DESC LIMIT 1')
         if latest:
             self.current.update(status=latest[0]['status'], task_id=latest[0]['id'], message=latest[0]['message'])
+            self.owner = latest[0]['user_id']
         (settings.data_dir / 'captures').mkdir(exist_ok=True)
 
-    def snapshot(self):
+    def snapshot(self, user_id=None):
+        """设备监控快照;非任务 owner 仅见占用状态,不见画面/来源/任务标识。"""
         with self.lock:
-            return {**self.current, 'source': self.settings.video_path.name, 'model': self.settings.model_path.name,
+            info = {**self.current, 'source': self.settings.video_path.name, 'model': self.settings.model_path.name,
                     'device': self.settings.device, 'sample_fps': self.settings.sample_fps,
                     'source_ready': self.settings.video_path.is_file(), 'model_ready': self.settings.model_path.is_file()}
+            if user_id is not None and self.owner is not None and user_id != self.owner:
+                info.update({'task_id': None, 'frame': None, 'source': '—', 'message': '设备使用中'})
+            return info
 
     def set_status(self, status, message=''):
         with self.lock:
             self.current.update(status=status, message=message)
             self.store.task(self.current['task_id'], status, message)
 
-    def start(self):
+    def start(self, user_id=None):
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise Conflict('检测任务已在运行或正在停止')
             if not self.settings.model_path.is_file() or not self.settings.video_path.is_file():
                 raise Conflict('模型或视频不存在，请检查服务器 local.json 配置')
             self.current = {'task_id': 'T' + secrets.token_hex(5), 'status': 'starting', 'message': '正在加载模型和录像', 'frame': None}
+            self.owner = user_id
             self.frames.clear()
             self.stop_event.clear()
-            self.store.task(self.current['task_id'], 'starting')
+            self.store.task(self.current['task_id'], 'starting', user_id=user_id)
             self.thread = threading.Thread(target=self.run, daemon=True, name='bird-inference')
             self.thread.start()
-        return self.snapshot()
+        return self.snapshot(user_id)
 
     def stop(self):
         with self.lock:

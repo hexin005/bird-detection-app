@@ -1075,10 +1075,11 @@ export function createOrchardScene(canvas, options = {}) {
     },
     /**
      * 执行一次驱离，返回剩余鸟数。
-     * force=0：剩最后一只时有 30% 概率抵抗不离开，形成「需多次驱离」的拟真节奏。
+     * force=0：剩最后一只时有 30% 概率抵抗不离开，形成「需多次驱离」的拟真节奏；
+     * force=1：全部驱散(用于"记录已处理"的任务复现场景)。
      */
-    disperse() {
-      return disperse(0)
+    disperse(force = 0) {
+      return disperse(force)
     },
     /** 当前留在场景里的鸟数（待驱离目标） */
     occupantCount() {

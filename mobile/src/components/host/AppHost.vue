@@ -2,7 +2,7 @@
 // AppHost:稳定业务宿主。持有跨主题状态与统一语义动作,provide 给主题布局/页面;
 // 主题切换只替换布局组件,本组件不卸载 → 页面位置/上传/指令/弹窗规则可控。
 import { computed, onMounted, provide, ref, watch } from 'vue'
-import { createHost, hostKey, time, names, clock, alarmClass } from './hostContext'
+import { createHost, hostKey, time, names, clock, alarmClass, notify } from './hostContext'
 import { useWorkspace } from './useWorkspace'
 import { useOrchard } from '../../store'
 import type { Preferences } from '../../types'
@@ -54,6 +54,15 @@ watch(() => host.s?.counts.pending, (now, prev) => {
   if ((now ?? 0) === 0) stopAlertTitleFlash()
 })
 watch(() => host.page, p => { if (p === 'alarms') stopAlertTitleFlash() })
+
+// P1 鸟情提醒:检测到鸟即提示(不限状态)——自动规则接管后 pending 不增,靠 latest_detection 补位
+let lastDetectionNotifyId = ''
+watch(() => host.s?.latest_detection?.id, (now, prev) => {
+  if (!now || now === prev || now === lastDetectionNotifyId) return
+  lastDetectionNotifyId = now
+  const d = host.s?.latest_detection
+  if (d) notify(`监测到鸟情：${d.species} ${d.count} 只`)
+})
 
 // 页面进入按需刷新(我的/分析为常驻组件)
 function onPageEnter(p: string) {

@@ -42,7 +42,7 @@ class Store:
           CREATE TABLE IF NOT EXISTS alarms (
             id TEXT PRIMARY KEY, task_id TEXT, site TEXT, species TEXT, count INTEGER,
             confidence REAL, at REAL, last_seen REAL, hits INTEGER, status TEXT,
-            snapshot TEXT, video_time REAL, frame_id INTEGER, bbox TEXT);
+            snapshot TEXT, video_time REAL, frame_id INTEGER, bbox TEXT, user_id INTEGER);
           CREATE TABLE IF NOT EXISTS commands (
             id TEXT PRIMARY KEY, request_id TEXT UNIQUE, alarm_id TEXT REFERENCES alarms(id),
             user_id INTEGER, duration INTEGER, scenario TEXT, status TEXT,
@@ -50,10 +50,10 @@ class Store:
           CREATE UNIQUE INDEX IF NOT EXISTS one_active_command ON commands((1))
             WHERE status IN ('pending','running');
           CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, ref_id TEXT, at REAL, message TEXT);
-          CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, status TEXT, at REAL, ended_at REAL, message TEXT);
-          CREATE TABLE IF NOT EXISTS videos (id TEXT PRIMARY KEY, name TEXT, path TEXT, duration REAL, fps REAL, at REAL);
-          CREATE TABLE IF NOT EXISTS samples (task_id TEXT, species TEXT, video_time REAL, count INTEGER, confidence REAL, frame_id INTEGER);
+            id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, ref_id TEXT, at REAL, message TEXT, user_id INTEGER);
+          CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, status TEXT, at REAL, ended_at REAL, message TEXT, user_id INTEGER);
+          CREATE TABLE IF NOT EXISTS videos (id TEXT PRIMARY KEY, name TEXT, path TEXT, duration REAL, fps REAL, at REAL, user_id INTEGER);
+          CREATE TABLE IF NOT EXISTS samples (task_id TEXT, species TEXT, video_time REAL, count INTEGER, confidence REAL, frame_id INTEGER, user_id INTEGER);
           CREATE INDEX IF NOT EXISTS sample_lookup ON samples(task_id,species,video_time);
         ''')
         if 'sha256' not in {r[1] for r in self.db.execute('PRAGMA table_info(videos)')}:
@@ -65,6 +65,8 @@ class Store:
                 self.db.execute(f'ALTER TABLE tasks ADD COLUMN {name} {kind}')
         if 'last_video_time' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
             self.db.execute('ALTER TABLE alarms ADD COLUMN last_video_time REAL')
+        if 'user_id' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
+            self.db.execute('ALTER TABLE alarms ADD COLUMN user_id INTEGER')
         if 'bbox' not in {r[1] for r in self.db.execute('PRAGMA table_info(alarms)')}:
             self.db.execute('ALTER TABLE alarms ADD COLUMN bbox TEXT')
         if 'mode' not in {r[1] for r in self.db.execute('PRAGMA table_info(commands)')}:
@@ -73,9 +75,14 @@ class Store:
             self.db.execute('ALTER TABLE commands ADD COLUMN automatic INTEGER DEFAULT 0')
         # 账号体系扩展:users 加列(旧库走 ALTER,种子账号 email/display_name 保持为空)
         user_columns = {r[1] for r in self.db.execute('PRAGMA table_info(users)')}
-        for name, kind in [('email', 'TEXT'), ('display_name', 'TEXT'), ('avatar_path', 'TEXT')]:
+        for name, kind in [('email', 'TEXT'), ('display_name', 'TEXT'), ('avatar_path', 'TEXT'),
+                           ('is_device_admin', 'INTEGER NOT NULL DEFAULT 0')]:
             if name not in user_columns:
                 self.db.execute(f'ALTER TABLE users ADD COLUMN {name} {kind}')
+        # 数据隔离:业务表补 user_id 列(旧库走 ALTER;存量归属见迁移脚本)
+        for name in ('tasks', 'videos', 'samples', 'events'):
+            if 'user_id' not in {r[1] for r in self.db.execute(f'PRAGMA table_info({name})')}:
+                self.db.execute(f'ALTER TABLE {name} ADD COLUMN user_id INTEGER')
         self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)')
         self.db.execute('''CREATE TABLE IF NOT EXISTS user_preferences (
           user_id INTEGER PRIMARY KEY REFERENCES users(id),
@@ -113,6 +120,8 @@ class Store:
                 # 显式列名:users 已迁移扩展列,按位置插入会失配
                 db.execute('INSERT INTO users (id, username, password) VALUES (1, ?, ?)',
                            (settings.username, hash_password(settings.password)))
+            # 设备管理员:首个种子账号固定持有;已存在管理员时不覆盖
+            db.execute('UPDATE users SET is_device_admin=1 WHERE id=1 AND NOT EXISTS (SELECT 1 FROM users WHERE is_device_admin=1)')
             defaults = {'scenario': 'normal', 'confidence': settings.confidence,
                         'consecutive': settings.consecutive, 'cooldown': settings.cooldown}
             db.execute('INSERT OR IGNORE INTO settings VALUES (1,?)', (json.dumps(defaults),))
@@ -140,9 +149,9 @@ class Store:
         with self.lock:
             return [dict(r) for r in self.db.execute(sql, args).fetchall()]
 
-    def event(self, db, kind, ref_id, message):
-        db.execute('INSERT INTO events(kind,ref_id,at,message) VALUES (?,?,?,?)',
-                   (kind, ref_id, time.time(), message))
+    def event(self, db, kind, ref_id, message, user_id=None):
+        db.execute('INSERT INTO events(kind,ref_id,at,message,user_id) VALUES (?,?,?,?,?)',
+                   (kind, ref_id, time.time(), message, user_id))
 
     def recover(self):
         with self.tx() as db:
@@ -238,7 +247,7 @@ class Store:
             db.execute('UPDATE settings SET value=? WHERE id=1', (json.dumps(config),))
         return config
 
-    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None, video_clock=False, bbox=None):
+    def alarm(self, task_id, species, count, confidence, snapshot, video_time, frame_id, cooldown, now=None, video_clock=False, bbox=None, user_id=None):
         now = now if now is not None else time.time()
         with self.tx() as db:
             old = db.execute('SELECT * FROM alarms WHERE task_id=? AND species=? ORDER BY last_seen DESC LIMIT 1', (task_id, species)).fetchone()
@@ -247,23 +256,30 @@ class Store:
                 # Preserve the original evidence/count; hits tracks repeated detections, not individual birds.
                 db.execute('UPDATE alarms SET last_seen=?,last_video_time=?,hits=hits+1 WHERE id=?', (now, video_time, old['id']))
                 return old['id'], False
+            # 告警归属跟随任务 owner；测试可显式传 user_id（无任务记录时回退种子账号）
+            if user_id is None:
+                row = db.execute('SELECT user_id FROM tasks WHERE id=?', (task_id,)).fetchone()
+                user_id = row['user_id'] if row and row['user_id'] is not None else 1
             aid = 'A' + secrets.token_hex(5)
             # bbox 记录的是"本条告警抓拍帧"里的检测框，保证 snapshot 图与框始终成对
             bbox_json = json.dumps(bbox) if bbox else None
-            db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time,bbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time, bbox_json))
-            self.event(db, 'detection', aid, f'检测到{species}，画面中 {count} 只')
-            rule = self._match_rules(db, now)
+            db.execute('INSERT INTO alarms(id,task_id,site,species,count,confidence,at,last_seen,hits,status,snapshot,video_time,frame_id,last_video_time,bbox,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (aid, task_id, '东区 · CAM 01', species, count, confidence, now, now, 1, 'new', snapshot, video_time, frame_id, video_time, bbox_json, user_id))
+            self.event(db, 'detection', aid, f'检测到{species}，画面中 {count} 只', user_id=user_id)
+            rule = self._match_rules(db, now, user_id)
             if rule:
                 self._fire_automation(db, rule, aid, now, '自动响应')
             return aid, True
 
-    def ignore(self, alarm_id):
+    def ignore(self, alarm_id, user_id=None):
         with self.tx() as db:
+            rows = db.execute('SELECT * FROM alarms WHERE id=?', (alarm_id,)).fetchall()
+            if rows and user_id is not None and rows[0]['user_id'] is not None and rows[0]['user_id'] != user_id:
+                raise Conflict('告警不存在或无权操作')
             result = db.execute("UPDATE alarms SET status='ignored' WHERE id=? AND status='new'", (alarm_id,))
             if result.rowcount != 1:
                 raise Conflict('告警已被处理或不存在，请刷新')
-            self.event(db, 'ignored', alarm_id, '人工忽略本次告警')
+            self.event(db, 'ignored', alarm_id, '人工忽略本次告警', user_id=user_id or (rows[0]['user_id'] if rows else None))
 
     def start_command(self, request_id, alarm_id, duration, user_id, mode='both', automatic=False):
         if duration not in (3, 5, 8):
@@ -294,20 +310,22 @@ class Store:
         db.execute('INSERT INTO commands(id,request_id,alarm_id,user_id,duration,scenario,status,at,started_at,ended_at,message,mode,automatic) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                    (cid, request_id, alarm_id, user_id, duration, config['scenario'], 'pending', time.time(), None, None, '等待模拟设备接收', mode, int(bool(automatic))))
         source = '自动策略触发' if automatic else '人工确认'
-        self.event(db, 'command', cid, f'{source}，指令已入队（模拟设备）')
+        self.event(db, 'command', cid, f'{source}，指令已入队（模拟设备）', user_id=user_id)
         return dict(db.execute('SELECT * FROM commands WHERE id=?', (cid,)).fetchone())
 
     def _finish(self, db, command, status, message):
         db.execute('UPDATE commands SET status=?,ended_at=?,message=? WHERE id=?', (status, time.time(), message, command['id']))
         if command['alarm_id']:
             db.execute('UPDATE alarms SET status=? WHERE id=?', ('handled' if status == 'completed' else 'new', command['alarm_id']))
-        self.event(db, status, command['id'], message)
+        self.event(db, status, command['id'], message, user_id=command['user_id'])
 
-    def stop_command(self, cid):
+    def stop_command(self, cid, user_id=None):
         with self.tx() as db:
             c = db.execute('SELECT * FROM commands WHERE id=?', (cid,)).fetchone()
             if not c:
                 raise Conflict('指令不存在')
+            if user_id is not None and c['user_id'] is not None and c['user_id'] != user_id:
+                raise Conflict('指令不存在或无权操作')
             if c['status'] in ('pending', 'running'):
                 self._finish(db, c, 'cancelled', '模拟执行器已确认停止')
         return self.rows('SELECT * FROM commands WHERE id=?', (cid,))[0]
@@ -318,7 +336,7 @@ class Store:
             for c in db.execute("SELECT * FROM commands WHERE status IN ('pending','running')").fetchall():
                 if c['status'] == 'pending':
                     db.execute("UPDATE commands SET status='running',started_at=?,message='模拟设备已接收，正在执行' WHERE id=?", (now, c['id']))
-                    self.event(db, 'running', c['id'], '模拟设备开始执行')
+                    self.event(db, 'running', c['id'], '模拟设备开始执行', user_id=c['user_id'])
                 elif now - c['started_at'] >= c['duration']:
                     timeout = c['scenario'] == 'timeout'
                     self._finish(db, c, 'failed' if timeout else 'completed',
@@ -389,13 +407,23 @@ class Store:
                         merged['interval_minutes'], merged['mode'], merged['duration'], merged['last_fired_at']))
         return self.patrol(user_id)
 
-    def _match_rules(self, db, now):
-        """挑选当前该触发的首条启用规则;burst 需 10 分钟内 ≥3 报,冷却期内静默跳过。"""
+    def _match_rules(self, db, now, user_id=None):
+        """挑选当前该触发的首条启用规则(按告警 owner 作用域);burst 需 10 分钟内 ≥3 报,冷却期内静默跳过。"""
         burst = None
-        for rule in db.execute('SELECT * FROM automation_rules WHERE enabled=1 ORDER BY id').fetchall():
+        rules_sql = 'SELECT * FROM automation_rules WHERE enabled=1'
+        args = ()
+        if user_id is not None:
+            rules_sql += ' AND user_id=?'
+            args = (user_id,)
+        for rule in db.execute(rules_sql + ' ORDER BY id', args).fetchall():
             if rule['trigger'] == 'alarm_burst':
                 if burst is None:
-                    burst = db.execute('SELECT COUNT(*) n FROM alarms WHERE at>=?', (now - 600,)).fetchone()[0]
+                    burst_sql = 'SELECT COUNT(*) n FROM alarms WHERE at>=?'
+                    burst_args = [now - 600]
+                    if user_id is not None:
+                        burst_sql += ' AND user_id=?'
+                        burst_args.append(user_id)
+                    burst = db.execute(burst_sql, tuple(burst_args)).fetchone()[0]
                 if burst < 3:
                     continue
             if rule['last_fired_at'] is not None and now - rule['last_fired_at'] < rule['cooldown_minutes'] * 60:
@@ -410,10 +438,10 @@ class Store:
             c = self._insert_command(db, request_id, alarm_id, rule['duration'], rule['user_id'], rule['mode'], True)
         except Conflict as exc:
             db.execute('UPDATE automation_rules SET last_fired_at=? WHERE id=?', (now, rule['id']))
-            self.event(db, 'automation', f'rule-{rule["id"]}', f'{source}未触发：规则「{rule["name"]}」，{exc}')
+            self.event(db, 'automation', f'rule-{rule["id"]}', f'{source}未触发：规则「{rule["name"]}」，{exc}', user_id=rule['user_id'])
             return None
         db.execute('UPDATE automation_rules SET last_fired_at=? WHERE id=?', (now, rule['id']))
-        self.event(db, 'automation', c['id'], f'{source}：规则「{rule["name"]}」→ {self.MODE_CN[rule["mode"]]} {rule["duration"]} 秒')
+        self.event(db, 'automation', c['id'], f'{source}：规则「{rule["name"]}」→ {self.MODE_CN[rule["mode"]]} {rule["duration"]} 秒', user_id=rule['user_id'])
         return c
 
     def automation_tick(self, now=None):
@@ -432,29 +460,40 @@ class Store:
                 request_id = f'patrol-{p["user_id"]}-{int(now)}'
                 try:
                     c = self._insert_command(db, request_id, None, p['duration'], p['user_id'], p['mode'], True)
-                    self.event(db, 'automation', c['id'], f'定时巡逻：{self.MODE_CN[p["mode"]]} {p["duration"]} 秒')
+                    self.event(db, 'automation', c['id'], f'定时巡逻：{self.MODE_CN[p["mode"]]} {p["duration"]} 秒', user_id=p['user_id'])
                 except Conflict as exc:
-                    self.event(db, 'automation', f'patrol-{p["user_id"]}', f'定时巡逻未触发：{exc}')
+                    self.event(db, 'automation', f'patrol-{p["user_id"]}', f'定时巡逻未触发：{exc}', user_id=p['user_id'])
                 db.execute('UPDATE patrol_schedules SET last_fired_at=? WHERE user_id=?', (now, p['user_id']))
 
-    def task(self, task_id, status, message=''):
+    def task(self, task_id, status, message='', user_id=None):
         with self.tx() as db:
-            db.execute('INSERT OR IGNORE INTO tasks(id,status,at,ended_at,message) VALUES (?,?,?,?,?)', (task_id, status, time.time(), None, message))
+            db.execute('INSERT OR IGNORE INTO tasks(id,status,at,ended_at,message,user_id) VALUES (?,?,?,?,?,?)',
+                       (task_id, status, time.time(), None, message, user_id))
             db.execute('UPDATE tasks SET status=?,message=?,ended_at=? WHERE id=?',
                        (status, message, None if status in ('starting', 'running', 'stopping') else time.time(), task_id))
 
-    def snapshot(self):
+    def snapshot(self, user_id=None):
+        """按账号作用域的快照;user_id=None 时为全库视图(仅测试/内部使用)。"""
         with self.lock:
-            alarms = self.rows('SELECT * FROM alarms ORDER BY at DESC LIMIT 100')
-            commands = self.rows('SELECT * FROM commands ORDER BY at DESC LIMIT 100')
-            events = self.rows('SELECT * FROM events ORDER BY id DESC LIMIT 100')
-            counts = self.rows("SELECT COUNT(*) total,SUM(status='new') pending FROM alarms")[0]
-            counts['completed'] = self.rows("SELECT COUNT(*) n FROM commands WHERE status='completed'")[0]['n']
+            w, args = ('WHERE user_id=?', (user_id,)) if user_id is not None else ('', ())
+            aw, aargs = ('AND user_id=?', (user_id,)) if user_id is not None else ('', ())
+            alarms = self.rows(f'SELECT * FROM alarms {w} ORDER BY at DESC LIMIT 100', args)
+            commands = self.rows(f'SELECT * FROM commands {w} ORDER BY at DESC LIMIT 100', args)
+            events = self.rows(f'SELECT * FROM events {w} ORDER BY id DESC LIMIT 100', args)
+            counts = self.rows(f"SELECT COUNT(*) total,SUM(status='new') pending FROM alarms {w}", args)[0]
+            counts['completed'] = self.rows(f"SELECT COUNT(*) n FROM commands WHERE status='completed' {aw}", aargs)[0]['n']
             counts['pending'] = counts['pending'] or 0
-            return {'alarms': alarms, 'commands': commands, 'events': events, 'counts': counts, 'settings': self.config()}
+            return {'alarms': alarms, 'commands': commands, 'events': events, 'counts': counts,
+                    'latest_detection': self.latest_detection(user_id), 'settings': self.config()}
 
-    def stats(self, days):
-        """果园数据分析聚合(所有账号共享果园数据,口径见接口文档):
+    def latest_detection(self, user_id=None):
+        """最近一次检测告警(任意状态):驱动 App 端"监测到鸟情"提醒,自动处理过的告警也能被看到。"""
+        w, args = ('WHERE user_id=?', (user_id,)) if user_id is not None else ('', ())
+        rows = self.rows(f'SELECT id,species,count,at FROM alarms {w} ORDER BY at DESC, rowid DESC LIMIT 1', args)
+        return rows[0] if rows else None
+
+    def stats(self, days, user_id=None):
+        """果园数据分析聚合(口径见接口文档;user_id 给定时仅统计该账号数据):
 
         - 范围:服务器本地时区自然日,含今天,共 days 个日桶;
         - trend = 按天告警事件数(口径=检测告警,非逐帧识别次数),缺失日期补 0;
@@ -471,35 +510,39 @@ class Store:
         start_date = dates[0]
         start = time.mktime(time.strptime(start_date, '%Y-%m-%d'))
         date_index = {day: i for i, day in enumerate(dates)}
+        aw, aargs = ('AND user_id=?', (user_id,)) if user_id is not None else ('', ())
+        qargs = (start, user_id) if user_id is not None else (start,)
+        tw = 'AND t.user_id=?' if user_id is not None else ''
+        targs = (start, user_id) if user_id is not None else (start,)
         trend = [0] * days
-        for row in self.rows("SELECT date(at, 'unixepoch', 'localtime') day, COUNT(*) n FROM alarms WHERE at>=? GROUP BY day", (start,)):
+        for row in self.rows(f"SELECT date(at, 'unixepoch', 'localtime') day, COUNT(*) n FROM alarms WHERE at>=? {aw} GROUP BY day", qargs):
             if row['day'] in date_index:
                 trend[date_index[row['day']]] = row['n']
-        species = self.rows('SELECT species, COUNT(*) count FROM alarms WHERE at>=? GROUP BY species ORDER BY count DESC, species LIMIT 5', (start,))
+        species = self.rows(f'SELECT species, COUNT(*) count FROM alarms WHERE at>=? {aw} GROUP BY species ORDER BY count DESC, species LIMIT 5', qargs)
         task_trend = [0] * days
         bird_trend = [0] * days
-        archived = '''FROM tasks t JOIN videos v ON v.id=t.video_id
-            WHERE t.result_ready=1 AND t.at>=?'''
-        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, COUNT(*) n {archived} GROUP BY day", (start,)):
+        archived = f'''FROM tasks t JOIN videos v ON v.id=t.video_id
+            WHERE t.result_ready=1 AND t.at>=? {tw}'''
+        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, COUNT(*) n {archived} GROUP BY day", targs):
             if row['day'] in date_index:
                 task_trend[date_index[row['day']]] = row['n']
-        peaks = '''FROM (SELECT s.task_id,s.species,MAX(s.count) peak FROM samples s
+        peaks = f'''FROM (SELECT s.task_id,s.species,MAX(s.count) peak FROM samples s
             JOIN tasks t ON t.id=s.task_id JOIN videos v ON v.id=t.video_id
-            WHERE t.result_ready=1 AND t.at>=? GROUP BY s.task_id,s.species) p
+            WHERE t.result_ready=1 AND t.at>=? {tw} GROUP BY s.task_id,s.species) p
             JOIN tasks t ON t.id=p.task_id'''
-        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, SUM(p.peak) n {peaks} GROUP BY day", (start,)):
+        for row in self.rows(f"SELECT date(t.at, 'unixepoch', 'localtime') day, SUM(p.peak) n {peaks} GROUP BY day", targs):
             if row['day'] in date_index:
                 bird_trend[date_index[row['day']]] = row['n']
-        bird_species = self.rows(f'SELECT p.species, SUM(p.peak) count {peaks} GROUP BY p.species ORDER BY count DESC,p.species LIMIT 5', (start,))
+        bird_species = self.rows(f'SELECT p.species, SUM(p.peak) count {peaks} GROUP BY p.species ORDER BY count DESC,p.species LIMIT 5', targs)
         hourly = [0] * 24
-        for row in self.rows("SELECT CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms WHERE at>=? GROUP BY h", (start,)):
+        for row in self.rows(f"SELECT CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms WHERE at>=? {aw} GROUP BY h", qargs):
             if 0 <= row['h'] < 24:
                 hourly[row['h']] = row['n']
         breakdown = {'new': 0, 'processing': 0, 'handled': 0, 'ignored': 0}
-        for row in self.rows('SELECT status, COUNT(*) n FROM alarms WHERE at>=? GROUP BY status', (start,)):
+        for row in self.rows(f'SELECT status, COUNT(*) n FROM alarms WHERE at>=? {aw} GROUP BY status', qargs):
             if row['status'] in breakdown:
                 breakdown[row['status']] = row['n']
-        commands = self.rows('SELECT status, COUNT(*) n FROM commands WHERE at>=? GROUP BY status', (start,))
+        commands = self.rows(f'SELECT status, COUNT(*) n FROM commands WHERE at>=? {aw} GROUP BY status', qargs)
         counts = {r['status']: r['n'] for r in commands}
         total = sum(counts.values())
         completed = counts.get('completed', 0)
@@ -507,9 +550,9 @@ class Store:
         def avg(sql, args=()):
             rows = self.rows(sql, args)
             return round(rows[0]['avg'], 2) if rows and rows[0]['avg'] is not None else None
-        avg_start = avg('SELECT AVG(started_at-at) avg FROM commands WHERE at>=? AND started_at IS NOT NULL', (start,))
-        avg_done = avg("SELECT AVG(ended_at-at) avg FROM commands WHERE at>=? AND status='completed' AND ended_at IS NOT NULL", (start,))
-        dual = self.rows("SELECT COUNT(*) n FROM commands WHERE at>=? AND status='completed' AND mode='both'", (start,))[0]['n']
+        avg_start = avg(f'SELECT AVG(started_at-at) avg FROM commands WHERE at>=? AND started_at IS NOT NULL {aw}', qargs)
+        avg_done = avg(f"SELECT AVG(ended_at-at) avg FROM commands WHERE at>=? AND status='completed' AND ended_at IS NOT NULL {aw}", qargs)
+        dual = self.rows(f"SELECT COUNT(*) n FROM commands WHERE at>=? AND status='completed' AND mode='both' {aw}", qargs)[0]['n']
         return {'range_days': days, 'dates': dates, 'trend': trend, 'species': species, 'hourly': hourly,
                 'task_trend': task_trend, 'bird_trend': bird_trend, 'bird_species': bird_species,
                 'breakdown': breakdown,
@@ -521,11 +564,12 @@ class Store:
         """知识库原始行(不含本园统计);统计由路由层合并现有聚合,保证口径一致。"""
         return self.rows('SELECT * FROM species_knowledge ORDER BY sort')
 
-    def knowledge_hours(self):
-        """全历史告警按一天 0-23 时聚合(服务器本地时间,口径同 stats 的 hourly),
-        供知识卡展示各鸟种活动规律;返回 {species: [24 桶]}。"""
+    def knowledge_hours(self, user_id=None):
+        """全历史告警按一天 0-23 时聚合(服务器本地时间,口径同 stats 的 hourly;
+        user_id 给定时仅统计该账号),供知识卡展示各鸟种活动规律;返回 {species: [24 桶]}。"""
+        w, args = ('WHERE user_id=?', (user_id,)) if user_id is not None else ('', ())
         buckets = {}
-        for row in self.rows("SELECT species, CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms GROUP BY species, h"):
+        for row in self.rows(f"SELECT species, CAST(strftime('%H', at, 'unixepoch', 'localtime') AS INTEGER) h, COUNT(*) n FROM alarms {w} GROUP BY species, h", args):
             if 0 <= row['h'] < 24:
                 buckets.setdefault(row['species'], [0] * 24)[row['h']] = row['n']
         return buckets
