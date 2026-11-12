@@ -3,6 +3,7 @@
 // 告警打开走 emit('open')(详情弹窗);内联驱离走 host.quickRepel(确认弹窗),忽略走 host.requestIgnore。
 import { computed, ref, watch, onMounted } from 'vue'
 import { useHost } from './host/hostContext'
+import AlarmSpeciesPicker from './host/AlarmSpeciesPicker.vue'
 import { useOrchard } from '../store'
 import type { Alarm } from '../types'
 const emit = defineEmits<{ open:[alarm:Alarm] }>()
@@ -11,9 +12,7 @@ const host = useHost()
 // 物种过滤状态提升到 host(hostContext.alarmSpecies):图鉴「查看该鸟告警」等入口可外部设置
 const species = computed(() => host.alarmSpecies)
 const items = ref<Alarm[]>([])
-type Group = { species:string; total:number; pending:number; cover?:string; best_confidence?:number }
-const groups = ref<Group[]>([])
-const error = ref(''), more = ref(false), loading = ref(false)
+const error = ref(''), doneError = ref(''), more = ref(false), loading = ref(false)
 const doneOpen = ref(false), doneLoading = ref(false), doneItems = ref<Alarm[]>([])
 /** 首屏只取 4 条，之后每次追 4 条 */
 const PAGE = 4
@@ -29,45 +28,39 @@ async function load(append = false) {
   loading.value = true; error.value = ''
   try {
     const query = new URLSearchParams()
-    if (!species.value) query.set('pending','true')
+    query.set('pending','true')
     if (species.value) query.set('species', species.value)
-    const [alarms, index] = await Promise.all([
-      store.request<{items:Alarm[]}>('/alarm-list?' + query),
-      store.request<{alarm_groups:Group[]}>('/library')
-    ])
+    const alarms = await store.request<{items:Alarm[]}>('/alarm-list?' + query)
     if (current !== version) return
-    const all = alarms.items
     const shown = append ? items.value.length + PAGE : PAGE
-    items.value = all.slice(0, shown)
-    more.value = all.length > shown
-    groups.value = index.alarm_groups
+    items.value = alarms.items.slice(0, shown)
+    more.value = alarms.items.length > shown
     if (doneOpen.value) void loadDone()
   } catch(e) {
-    error.value = (e as Error).message
+    if (current === version) error.value = (e as Error).message
   } finally {
     if (current === version) loading.value = false
   }
 }
 /** 已处理/已忽略折叠区:展开时按当前筛选拉全量,过滤出已结条目 */
 async function loadDone() {
-  doneLoading.value = true
+  const current = version
+  doneLoading.value = true; doneError.value = ''
   try {
     const query = new URLSearchParams()
-    query.set('pending', 'false')
     if (species.value) query.set('species', species.value)
     const all = await store.request<{items:Alarm[]}>('/alarm-list?' + query)
-    doneItems.value = all.items.filter(a => a.status !== 'new' && a.status !== 'processing')
-  } catch { doneItems.value = [] } finally { doneLoading.value = false }
+    if (current === version) doneItems.value = all.items.filter(a => a.status !== 'new' && a.status !== 'processing')
+  } catch (e) {
+    if (current === version) doneError.value = (e as Error).message
+  } finally { if (current === version) doneLoading.value = false }
 }
 function toggleDone() {
   doneOpen.value = !doneOpen.value
   if (doneOpen.value && !doneItems.value.length) void loadDone()
 }
 
-function pick(name: string) {
-  host.alarmSpecies = host.alarmSpecies === name ? '' : name
-}
-watch(species, () => { items.value = []; doneItems.value = []; void load() })
+watch(species, () => { items.value = []; doneItems.value = []; doneOpen.value = false; void load() })
 watch(() => store.state?.counts.pending, () => { void load() })
 onMounted(() => { void load() })
 </script>
@@ -80,15 +73,7 @@ onMounted(() => { void load() })
     </view>
   </view>
 
-  <!-- 物种筛选 chips(常驻横滑,不再藏在图标后) -->
-  <scroll-view scroll-x class="al-chips" :show-scrollbar="false">
-    <view class="al-chips__row">
-      <text class="al-chip" :class="{ 'is-on': !species }" @click="pick('')">全部</text>
-      <text v-for="g in groups" :key="g.species" class="al-chip" :class="{ 'is-on': species === g.species }" @click="pick(g.species)">
-        {{ g.species }}<text class="al-chip__n"> {{ g.pending || g.total }}</text>
-      </text>
-    </view>
-  </scroll-view>
+  <AlarmSpeciesPicker />
 
   <!-- 最新一报:大卡 + 内联动作 -->
   <view v-if="hero" class="qh-card al-hero">
@@ -124,7 +109,7 @@ onMounted(() => { void load() })
   </view>
 
   <!-- 已处理/已忽略折叠 -->
-  <view v-if="!species || doneItems.length" class="qh-card al-donebar" @click="toggleDone">
+  <view class="qh-card al-donebar" @click="toggleDone">
     <text class="al-donebar__t">已处理与已忽略</text>
     <text class="al-donebar__s">{{ doneOpen ? '收起 ▴' : (doneLoading ? '加载中…' : '展开 ▾') }}</text>
   </view>
@@ -137,7 +122,8 @@ onMounted(() => { void load() })
       </view>
       <text class="qh-badge" :class="'qh-badge--' + item.status">{{ statusLabel[item.status] }}</text>
     </view>
-    <view v-if="!doneItems.length && !doneLoading" style="padding:10px 0;text-align:center"><text class="qh-note">还没有已处理的记录</text></view>
+    <view v-if="doneError" style="padding:10px 14px"><text class="qh-note">历史告警读取失败：{{ doneError }} </text><text class="qh-note" @click="loadDone">重试</text></view>
+    <view v-else-if="!doneItems.length && !doneLoading" style="padding:10px 0;text-align:center"><text class="qh-note">该范围暂无已处理记录</text></view>
   </template>
 
   <!-- 加载更多:分页而非一次渲染全部 -->
@@ -145,20 +131,14 @@ onMounted(() => { void load() })
     {{ loading ? '加载中…' : '加载更多待处理' }}
   </button>
 
-  <view v-if="!items.length && !loading" style="padding:40px 0;text-align:center">
-    <text class="qh-note">{{ species ? '本分类暂无待处理告警' : '当前没有待处理告警' }}</text>
+  <view v-if="!items.length && !loading && !error" style="padding:40px 0;text-align:center">
+    <text class="qh-note">{{ species ? '该鸟种暂无进行中告警，可展开下方查看历史' : '当前没有待处理告警' }}</text>
   </view>
 
-  <text v-if="error" class="qh-note" style="display:block">{{ error }}</text>
+  <text v-if="error" class="qh-note" style="display:block">告警读取失败：{{ error }} <text @click="load()">重试</text></text>
 </template>
 
 <style scoped>
-/* 物种 chips:常驻横滑 */
-.al-chips{margin:4px 0 2px;white-space:nowrap}
-.al-chips__row{display:inline-flex;gap:7px;padding:4px 14px 8px}
-.al-chip{display:inline-flex;align-items:center;border:2px solid var(--ink-900);background:var(--surface-card);font-size:11.5px;font-weight:700;padding:4px 11px;color:var(--ink-900);flex-shrink:0}
-.al-chip.is-on{background:var(--ink-900);color:var(--surface-card)}
-.al-chip__n{font-family:var(--font-num);font-size:10px;margin-left:2px}
 /* 最新一报 hero */
 .al-hero{padding:0;overflow:hidden}
 .al-hero__hd{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px solid var(--ink-900)}

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // C 告警「挂牌告警墙」:待处理上挂杆挂牌(牌内联驱离/忽略),执行中挂黄章牌;
-// 物种筛选 = 横滑 chips + 「全部物种 ▾」底部弹层(13 类全收);
-// 图鉴「查看该鸟告警」→ host.alarmSpecies 过滤直达,弹层/筛选条均可清除。
+// 物种筛选复用 AlarmSpeciesPicker,图鉴「查看该鸟告警」→ host.alarmSpecies 过滤直达。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useHost, names, shortTime } from '../host/hostContext'
+import AlarmSpeciesPicker from '../host/AlarmSpeciesPicker.vue'
 import { useOrchard } from '../../store'
 import type { Alarm } from '../../types'
 
@@ -14,8 +14,6 @@ const items = ref<Alarm[]>([])
 const loading = ref(false)
 const error = ref('')
 const hasMore = ref(false)
-const groups = ref<{ species: string; total: number; pending?: number }[]>([])
-const sheetOpen = ref(false)
 let sequence = 0
 
 const pending = computed(() => filtered.value ? items.value.filter(a => a.status === 'new') : host.pending)
@@ -28,15 +26,9 @@ const history = computed(() => {
 })
 const pendingCount = computed(() => filtered.value ? pending.value.length : (host.s?.counts.pending || 0))
 
-async function loadGroups() {
-  try {
-    const data = await store.request<{ alarm_groups: { species: string; total: number; pending?: number }[] }>('/library?offset=0')
-    groups.value = data.alarm_groups || []
-  } catch { groups.value = [] }
-}
 /** 物种筛选时按需拉全量(含历史);清除筛选回到快照 */
 async function load(append = false) {
-  if (!host.alarmSpecies) { items.value = []; hasMore.value = false; return }
+  if (!host.alarmSpecies) { items.value = []; hasMore.value = false; error.value = ''; loading.value = false; return }
   const current = ++sequence
   loading.value = true; error.value = ''
   try {
@@ -54,13 +46,9 @@ async function load(append = false) {
   }
 }
 watch(() => host.alarmSpecies, () => { ++sequence; items.value = []; void load() })
-onMounted(() => { void loadGroups(); if (host.alarmSpecies) void load() })
+onMounted(() => { if (host.alarmSpecies) void load() })
 onBeforeUnmount(() => { ++sequence })
 
-function pickSpecies(name: string) {
-  host.alarmSpecies = host.alarmSpecies === name ? '' : name
-  sheetOpen.value = false
-}
 function activeOf(a: Alarm): string {
   return host.store.active && host.store.active.alarm_id === a.id ? '信号升空 · 剩余 ' + Math.max(0, host.remaining) + 's' : '双模联挂执行中'
 }
@@ -80,16 +68,7 @@ function activeOf(a: Alarm): string {
   <text v-if="filtered && loading && !items.length" class="alw-feedback">正在读取该鸟种告警…</text>
   <text v-if="filtered && error" class="alw-feedback err">告警读取失败：{{ error }} <text class="retry" @click="load()">重试</text></text>
 
-  <!-- 物种筛选:一排横滑 + 全部物种弹层 -->
-  <view class="alw-chipstrip">
-    <view class="chips">
-      <text class="chip" :class="{ on: !filtered }" @click="host.alarmSpecies = ''">全部</text>
-      <text v-for="g in groups" :key="g.species" class="chip" :class="{ on: host.alarmSpecies === g.species }" @click="pickSpecies(g.species)">{{ g.species }}<text class="n"> {{ g.pending || g.total }}</text></text>
-      <text class="chip all" @click="sheetOpen = true">全部物种 ▾</text>
-    </view>
-    <view class="fade"/>
-  </view>
-  <text class="alw-hint">← 常用物种一排横滑 · 点「全部物种 ▾」弹层选全部 {{ groups.length }} 类 →</text>
+  <AlarmSpeciesPicker />
 
   <!-- 挂杆 + 挂牌墙 -->
   <view class="alw-rail"/>
@@ -121,7 +100,7 @@ function activeOf(a: Alarm): string {
         <text class="meta mono">{{ shortTime(a.at) }} · {{ a.site }} · {{ activeOf(a) }}</text>
       </view>
     </view>
-    <view v-if="!pending.length && !processing.length && !loading" class="hang">
+    <view v-if="!pending.length && !processing.length && !loading && !error" class="hang">
       <view class="string"/>
       <view class="tag empty"><text class="sp">{{ filtered ? '该鸟种暂无进行中告警' : '无进行中告警' }}</text><text class="meta">历史处置见下方工单</text></view>
     </view>
@@ -137,26 +116,9 @@ function activeOf(a: Alarm): string {
     <text class="st" :class="{ dim: a.status === 'ignored' }">{{ names(a.status) }}</text>
     <text class="chev">›</text>
   </view>
-  <text v-if="!history.length && !loading && !error" class="alw-feedback">暂无历史处置记录</text>
+  <text v-if="!history.length && !loading && !error" class="alw-feedback">{{ filtered ? '该鸟种暂无历史处置记录' : '暂无历史处置记录' }}</text>
   <button v-if="filtered && hasMore" class="alw-more" :disabled="loading" @click="load(true)">{{ loading ? '加载中…' : '加载更早的该鸟种告警' }}</button>
 
-  <!-- 全部物种弹层 -->
-  <view v-if="sheetOpen" class="qh-mask qh-mask--bottom is-open" @click.self="sheetOpen = false">
-    <view class="qh-sheet alw-sheet">
-      <view class="qh-sheet__grab"/>
-      <view class="qh-sheet__titlerow">
-        <text class="qh-sheet__title">选择物种 · 全部 {{ groups.length }} 类</text>
-        <view class="qh-iconbtn--sm" @click="sheetOpen = false"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></view>
-      </view>
-      <view class="alw-grid">
-        <text v-for="g in groups" :key="g.species" class="gchip" :class="{ on: host.alarmSpecies === g.species }" @click="pickSpecies(g.species)">{{ g.species }}<text class="n"> {{ g.pending || g.total }}</text></text>
-      </view>
-      <view class="alw-sheetbtns">
-        <text class="ghost" @click="host.alarmSpecies = ''; sheetOpen = false">清除筛选</text>
-        <text class="ok" @click="sheetOpen = false">关闭</text>
-      </view>
-    </view>
-  </view>
 </template>
 
 <style scoped>
@@ -174,17 +136,6 @@ function activeOf(a: Alarm): string {
 .alw-feedback{display:block;margin:2px 16px;padding:6px 2px;font-size:10px;color:var(--ink-400)}
 .alw-feedback.err{color:#d3212c;font-weight:700}
 .alw-feedback .retry{text-decoration:underline;cursor:pointer}
-/* 横滑 chips */
-.alw-chipstrip{position:relative;margin:0 14px 4px}
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex-shrink:0;border:2px solid var(--ink-900);background:var(--surface-card);font-size:10px;font-weight:800;padding:4px 9px;color:var(--ink-900);cursor:pointer;white-space:nowrap}
-.chip .n{font-size:8px;color:var(--ink-400)}
-.chip.on{background:var(--ink-900);color:#f5c400}
-.chip.on .n{color:#9a9a92}
-.chip.all{background:#f5c400}
-.fade{position:absolute;right:0;top:0;bottom:6px;width:26px;background:linear-gradient(90deg,rgba(242,241,234,0),var(--surface-canvas));pointer-events:none}
-.alw-hint{display:block;font-size:8.5px;color:var(--ink-400);margin:0 14px 6px;letter-spacing:.5px}
 /* 挂杆 + 挂牌 */
 .alw-rail{margin:8px 14px 0;height:6px;background:var(--ink-900)}
 .alw-wall{padding:0 18px;position:relative}
@@ -220,14 +171,4 @@ function activeOf(a: Alarm): string {
 .alw-ticket .st.dim{border-color:var(--ink-400);color:var(--ink-400)}
 .alw-ticket .chev{color:var(--ink-400);font-weight:900}
 .alw-more{margin:6px 14px;border:2px solid var(--ink-900);background:var(--surface-card);padding:9px;color:var(--ink-900);font-size:11px;font-weight:800}
-/* 物种弹层 */
-.alw-sheet{padding-bottom:10px}
-.alw-grid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 2px}
-.alw-grid .gchip{border:2px solid var(--ink-900);background:var(--surface-card);font-size:11px;font-weight:800;padding:6px 10px;color:var(--ink-900);cursor:pointer}
-.alw-grid .gchip .n{font-size:9px;color:var(--ink-400)}
-.alw-grid .gchip.on{background:var(--ink-900);color:#f5c400}
-.alw-grid .gchip.on .n{color:#9a9a92}
-.alw-sheetbtns{display:flex;gap:8px;padding:10px 12px 4px}
-.alw-sheetbtns text{flex:1;text-align:center;font-size:11px;font-weight:900;border:2px solid var(--ink-900);padding:9px 0;cursor:pointer;background:var(--surface-card);color:var(--ink-900)}
-.alw-sheetbtns .ok{background:var(--ink-900);color:#f5c400}
 </style>

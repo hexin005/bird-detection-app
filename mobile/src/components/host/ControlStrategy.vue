@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 控制页策略层共享组件(S1):自动响应规则 + 定时巡逻 + 设备参数。
 // 结构与文案四主题一致,观感随主题 token 换肤;语义动作全部走 host。
-import { reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useHost, modeCn, triggerCn, type RepelMode } from './hostContext'
 import type { AutoRule, Patrol, Preferences } from '../../types'
 
@@ -21,16 +21,35 @@ const toggleRule = (r: AutoRule) => host.run(() => host.saveRule({ enabled: r.en
 const removeRule = (r: AutoRule) => host.run(() => host.removeRule(r.id))
 
 /* ---- 定时巡逻(本地草稿,保存一次提交) ---- */
-const patrolDraft = reactive({ enabled: 0, startH: 6, endH: 19, interval: 120, mode: 'acoustic' as RepelMode, duration: 3 })
+const patrolDraft = reactive({ enabled: 0, start_minute: 360, end_minute: 1140, interval: 120, mode: 'acoustic' as RepelMode, duration: 3 })
+const patrolError = ref('')
+const formatMinute = (value: number) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`
+const timeSide = ref<'start_minute' | 'end_minute'>('start_minute')
+const hours = computed(() => Array.from({ length: timeSide.value === 'start_minute' ? 24 : 25 }, (_, hour) => hour))
+const minutes = Array.from({ length: 60 }, (_, minute) => minute)
+const wheelValue = computed(() => {
+  const value = patrolDraft[timeSide.value]
+  return [Math.floor(value / 60), value % 60]
+})
+function setWheelTime(event: { detail: { value: number[] } }) {
+  const [hour, minute] = event.detail.value
+  patrolDraft[timeSide.value] = hour * 60 + (hour === 24 ? 0 : minute)
+  patrolError.value = ''
+}
 watch(() => host.patrol, p => {
   if (!p) return
-  Object.assign(patrolDraft, { enabled: p.enabled, startH: Math.floor(p.start_minute / 60), endH: Math.floor(p.end_minute / 60), interval: p.interval_minutes, mode: p.mode, duration: p.duration })
+  Object.assign(patrolDraft, { enabled: p.enabled, start_minute: p.start_minute, end_minute: p.end_minute, interval: p.interval_minutes, mode: p.mode, duration: p.duration })
+  patrolError.value = ''
 }, { immediate: true })
 async function savePatrol() {
-  await host.savePatrol({ enabled: patrolDraft.enabled ? 1 : 0, start_minute: patrolDraft.startH * 60, end_minute: patrolDraft.endH * 60,
+  if (patrolDraft.start_minute >= patrolDraft.end_minute) {
+    patrolError.value = '开始时间须早于结束时间'
+    return
+  }
+  patrolError.value = ''
+  await host.savePatrol({ enabled: patrolDraft.enabled ? 1 : 0, start_minute: patrolDraft.start_minute, end_minute: patrolDraft.end_minute,
     interval_minutes: patrolDraft.interval, mode: patrolDraft.mode, duration: patrolDraft.duration })
 }
-const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 /* ---- 设备参数(与设置弹窗共用 PUT /settings;两处均可改) ---- */
 const params = reactive({ scenario: 'normal' as Preferences['scenario'], confidence: .4, consecutive: 2, cooldown: 20 })
@@ -43,7 +62,6 @@ const bump = (k: 'confidence' | 'consecutive', d: number) => {
 }
 const saveParams = () => host.run(async() => { await host.store.mutate('/settings', 'PUT', { ...params }); paramsDirty.value = false; host.notify('参数已保存') })
 
-import { ref } from 'vue'
 </script>
 
 <template>
@@ -86,17 +104,22 @@ import { ref } from 'vue'
       <view class="cs-switch" :class="{ 'is-on': patrolDraft.enabled }" @click="patrolDraft.enabled = patrolDraft.enabled ? 0 : 1"><view class="knob"/></view>
     </view>
     <view class="cs-patrol">
-      <view class="cs-frow"><text class="lab">时段</text>
+      <view class="cs-frow cs-frow--time"><text class="lab">时段</text>
         <view class="cs-hours">
-          <scroll-view scroll-x :show-scrollbar="false"><view class="cs-chips">
-            <text v-for="h in HOURS" :key="'s' + h" class="cs-chip sm" :class="{ 'is-on': patrolDraft.startH === h }" @click="patrolDraft.startH = h">{{ String(h).padStart(2, '0') }}</text>
-          </view></scroll-view>
-          <text class="mono sep">–</text>
-          <scroll-view scroll-x :show-scrollbar="false"><view class="cs-chips">
-            <text v-for="h in HOURS" :key="'e' + h" class="cs-chip sm" :class="{ 'is-on': patrolDraft.endH === h }" @click="patrolDraft.endH = h">{{ String(h).padStart(2, '0') }}</text>
-          </view></scroll-view>
+          <view class="cs-time" :class="{ 'is-on': timeSide === 'start_minute' }" @click="timeSide = 'start_minute'"><text class="cs-time__label">开始</text><text class="mono">{{ formatMinute(patrolDraft.start_minute) }}</text></view>
+          <text class="cs-time__dash">—</text>
+          <view class="cs-time" :class="{ 'is-on': timeSide === 'end_minute' }" @click="timeSide = 'end_minute'"><text class="cs-time__label">结束</text><text class="mono">{{ formatMinute(patrolDraft.end_minute) }}</text></view>
         </view>
       </view>
+      <view class="cs-wheel-area">
+        <text class="cs-wheel-caption">滚动设置{{ timeSide === 'start_minute' ? '开始' : '结束' }}时间</text>
+        <picker-view class="cs-wheel" :value="wheelValue" indicator-style="height:36px" @change="setWheelTime">
+          <picker-view-column><view v-for="hour in hours" :key="hour" class="cs-wheel__item mono">{{ String(hour).padStart(2, '0') }}</view></picker-view-column>
+          <picker-view-column><view v-for="minute in minutes" :key="minute" class="cs-wheel__item mono">{{ String(minute).padStart(2, '0') }}</view></picker-view-column>
+        </picker-view>
+        <text class="cs-wheel-colon">:</text>
+      </view>
+      <text v-if="patrolError" class="cs-patrol__error">{{ patrolError }}</text>
       <view class="cs-frow"><text class="lab">间隔</text>
         <view class="cs-chips"><text v-for="i in [30, 60, 120, 240]" :key="i" class="cs-chip" :class="{ 'is-on': patrolDraft.interval === i }" @click="patrolDraft.interval = i">{{ i }} 分</text></view>
       </view>
@@ -157,10 +180,19 @@ import { ref } from 'vue'
 .cs-chip.is-on{background:var(--ink-900);color:var(--surface-card)}
 .cs-chip.sm{padding:3px 7px;font-size:10.5px}
 .cs-patrol{padding:8px 13px 12px}
-.cs-hours{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
-.cs-hours scroll-view{min-width:0;flex:1}
-.cs-hours .sep{font-size:11px;color:var(--ink-400)}
-.cs-hours .cs-chips{flex-wrap:nowrap;white-space:nowrap}
+.cs-hours{display:flex;align-items:center;gap:5px;flex:1;min-width:0}
+.cs-time{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border:2px solid var(--ink-900);color:var(--ink-900);background:var(--surface-card);cursor:pointer}
+.cs-time.is-on{background:var(--ink-900);color:var(--surface-card)}
+.cs-time .mono{font-size:15px;font-weight:700;white-space:nowrap}
+.cs-time__label{font-size:10px;color:var(--ink-400)}
+.cs-time.is-on .cs-time__label{color:var(--surface-card)}
+.cs-time__dash{color:var(--ink-400)}
+.cs-wheel-area{position:relative;margin:6px 0 8px 44px;border:2px solid var(--ink-900);background:var(--surface-card);max-width:250px}
+.cs-wheel-caption{display:block;border-bottom:1px dashed var(--line-strong);padding:3px 8px;font-size:10px;color:var(--ink-400);text-align:center}
+.cs-wheel{height:108px;width:100%}
+.cs-wheel__item{height:36px;line-height:36px;text-align:center;font-size:16px;font-weight:700;color:var(--ink-900)}
+.cs-wheel-colon{position:absolute;left:50%;top:50%;transform:translate(-50%,0);font-weight:800;pointer-events:none;color:var(--ink-900)}
+.cs-patrol__error{display:block;margin:2px 0 4px 44px;color:var(--accent);font-size:11px;font-weight:700}
 .cs-param{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 13px;border-bottom:1px dashed var(--line-strong)}
 .cs-param .lab{font-size:12px;font-weight:600;color:var(--ink-900)}
 .cs-step{display:flex;align-items:center;gap:10px}

@@ -279,7 +279,7 @@ function onPieBg() { selectedSlice.value = null }
       <text class="qh-page-title">果园数据分析</text>
       <text class="qh-page-subtitle">{{ isSignal ? '东区观察手册 · 按自然日统计告警' : '统计覆盖整个演示果园 · 自然日口径' }}</text>
     </view>
-    <button v-if="isB" class="qh-an-export" :disabled="!stats || loading" @click="exportOpen = true">↓ 导出</button>
+    <button v-if="isB || isSignal" class="qh-an-export" :class="{ 'is-signal': isSignal }" :disabled="!stats || loading" @click="exportOpen = true">↓ 导出</button>
   </view>
 
   <template v-if="isB">
@@ -559,7 +559,7 @@ function onPieBg() { selectedSlice.value = null }
   <text v-if="loading && !isSignal" class="qh-note">加载中…</text>
   <text class="qh-note">图表随主题联动换肤 · 数据来自果园服务实时统计</text>
 
-  <view v-if="isB && exportOpen" class="qh-mask qh-mask--bottom is-open" @click.self="exportOpen = false">
+  <view v-if="(isB || isSignal) && exportOpen" class="qh-mask qh-mask--bottom is-open" @click.self="exportOpen = false">
     <view class="qh-sheet qh-an-sheet">
       <view class="qh-sheet__grab" />
       <view class="qh-sheet__titlerow"><text class="qh-sheet__title">导出统计数据</text><button class="qh-iconbtn--sm" aria-label="关闭导出弹层" @click="exportOpen = false">×</button></view>
@@ -577,6 +577,9 @@ function onPieBg() { selectedSlice.value = null }
 </template>
 
 <style scoped>
+/* 导出入口:B 走 1-bit 硬边; C 用信号黄底,与统计板色标一致 */
+.qh-an-export.is-signal{background:#f5c400;font-weight:900;letter-spacing:1px}
+.qh-an-export.is-signal:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--shadow-ink)}
 /* ============ C 鸟情统计板 ============ */
 .sgb{display:flex;flex-direction:column;color:var(--ink-900)}
 .sgb-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px 10px}
