@@ -47,6 +47,14 @@ class Settings:
                 'video_path': str(ROOT / 'assets/demo-bird.mp4'),
             }, ensure_ascii=False, indent=2), encoding='utf-8')
         values = json.loads(config.read_text(encoding='utf-8'))
+        # 升级合并:新版本新增的可选字段缺省补进旧 local.json(不覆盖已填值),
+        # 让升级后的用户能直接看到新配置项,与数据库迁移"幂等补列"同一思路。
+        optional_defaults = {'deepseek_key': '', 'deepseek_base_url': 'https://api.deepseek.com',
+                             'deepseek_model': 'deepseek-chat'}
+        if any(key not in values for key in optional_defaults):
+            for key, default in optional_defaults.items():
+                values.setdefault(key, default)
+            config.write_text(json.dumps(values, ensure_ascii=False, indent=2), encoding='utf-8')
         return cls(data, Path(os.getenv('BIRD_MODEL_PATH', values['model_path'])),
                    Path(os.getenv('BIRD_VIDEO_PATH', values['video_path'])),
                    values['username'], values['password'], values['secret'],
