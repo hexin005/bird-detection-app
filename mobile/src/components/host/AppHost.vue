@@ -181,6 +181,7 @@ function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value:
         <button class="qh-btn qh-btn--half qh-btn--ghost-danger" :disabled="host.store.busy" @click="host.alarm!.status === 'new' ? host.run(async() => { await host.store.mutate('/alarms/' + host.alarm!.id + '/ignore'); host.modal = '' }) : host.replayAlarm(host.alarm!)">{{ host.alarm!.status === 'new' ? '忽略' : '回看视频' }}</button>
         <button class="qh-btn qh-btn--half qh-btn--primary" :disabled="host.store.busy" @click="host.alarm!.status === 'new' ? host.handle() : host.modal = ''">{{ host.alarm!.status === 'new' ? '确认驱离' : '关闭' }}</button>
       </view>
+      <button class="qh-btn qh-btn--secondary as-ask-btn" @click="host.askAIAbout(host.alarm!)">问 AI 怎么处理</button>
     </view>
   </view>
 
@@ -233,5 +234,13 @@ function updatePreference(key: 'confidence' | 'consecutive' | 'cooldown', value:
   bottom: var(--tabbar-height);
   z-index: 12;
   background: var(--dither-light);
+}
+/* 告警详情「问 AI 怎么处理」:全宽次级按钮,accent 描边以示 AI 入口 */
+.as-ask-btn {
+  width: 100%;
+  margin-top: 8px;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  background: var(--surface-card);
 }
 </style>

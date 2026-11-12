@@ -3,7 +3,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useOrchard } from '../../store'
 import type { Alarm, AutoRule, Command, Event, LibrarySummary, Patrol, Preferences } from '../../types'
-import { resetAssistant, stopAssistant } from '../../data/assistantStore'
+import { askAssistant, assistantState, resetAssistant, stopAssistant } from '../../data/assistantStore'
 import { applyTheme, type ThemeId } from '../../theme'
 
 export type PageId = 'monitor' | 'alarms' | 'control' | 'records' | 'guide' | 'me' | 'themes' | 'analytics'
@@ -206,6 +206,19 @@ export function createHost() {
     guideSpecies.value = name
     nav('guide')
   }
+  /** 告警详情「问 AI 怎么处理」:打开助手小窗并携带告警上下文自动提问;流式进行中则预填草稿 */
+  function askAIAbout(a: Alarm) {
+    const pct = Math.round((a.confidence || 0) * 100)
+    const question = `刚检测到${a.species} ${a.count} 只（置信度 ${pct}%），这条告警现在该怎么处理？`
+    assistantOpen.value = true
+    assistantMax.value = false
+    if (assistantState.busy) {
+      assistantState.draft = question
+      notify('AI 正在回答上一条，问题已填入输入框')
+    } else {
+      void askAssistant(question, { server: store.server, token: store.token })
+    }
+  }
   /** S1 自动哨兵:规则/巡逻的读取与变更(错误经 run→toast 呈现) */
   async function loadAutomation() {
     const [r, p] = await Promise.all([
@@ -256,7 +269,7 @@ export function createHost() {
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
     rules, patrol, recordsSummary, alarmSpecies, guideSpecies, assistantOpen, assistantMax,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms, viewSpeciesGuide,
-    quickRepel, loadAutomation, saveRule, removeRule, savePatrol,
+    quickRepel, loadAutomation, saveRule, removeRule, savePatrol, askAIAbout,
     inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,
   })
   return host

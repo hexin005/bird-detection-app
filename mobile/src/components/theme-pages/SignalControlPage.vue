@@ -52,7 +52,8 @@ const durs = [
   </view>
 
   <view class="rc-sec"><text class="b">自动策略</text><text class="s">触发条件满足时自动升牌</text></view>
-  <ControlStrategy />
+  <!-- 设备参数统一收进「设置」弹层(首页右上角齿轮),此处不再重复展示 -->
+  <ControlStrategy :show-params="false" />
 </template>
 
 <style scoped>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>C · 胶片舷窗</title>
+<style>
+:root{ --ink:#171a14; --paper:#e8e6da; --detect:#d3e856; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#111310;font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+.phone{width:390px;height:844px;margin:30px auto;background:#0c0e0a;box-shadow:0 0 0 8px #000,0 30px 70px rgba(0,0,0,.5);position:relative;overflow:hidden}
+.hole{position:absolute;inset:0;display:flex;gap:6px;padding:12px}
+.sash{flex:1;position:relative;overflow:hidden;background:#1d2118;border-radius:3px}
+.sash.main{flex:2.35}
+.sash img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.06) brightness(.82)}
+.sash.main img{filter:none}
+.sash .cap{position:absolute;left:0;right:0;bottom:0;padding:26px 12px 12px;background:linear-gradient(transparent,rgba(8,10,6,.9));color:#e8e6da}
+.sash .cap .t{font-size:13px;font-weight:700;color:#fff}
+.sash .cap .m{font-family:"Consolas",monospace;font-size:9.5px;color:rgba(232,230,218,.6);margin-top:3px;letter-spacing:1px}
+.vtext{writing-mode:vertical-rl;position:absolute;top:12px;left:10px;font-size:10px;letter-spacing:4px;color:rgba(232,230,218,.55)}
+.sash .cap2{position:absolute;top:14px;left:12px;right:12px;font-size:11px;font-weight:700;color:#e8e6da;border-bottom:1px solid rgba(232,230,218,.25);padding-bottom:6px;letter-spacing:2px}
+.sash .num{position:absolute;bottom:64px;left:12px;font-family:"Consolas",monospace;font-size:26px;color:rgba(232,230,218,.85)}
+.sash .num small{font-size:11px;color:var(--detect)}
+.punch{position:absolute;top:0;bottom:0;width:14px;background:
+  radial-gradient(circle at 7px 26px,#0c0e0a 5.5px,transparent 6px) 0 0/14px 46px repeat-y,
+  linear-gradient(#22251c,#22251c);z-index:5}
+.punch.l{left:0}.punch.r{right:0}
+.dbox{position:absolute;border:2px solid var(--detect);box-shadow:0 0 18px rgba(211,232,86,.4)}
+.dbox .tag{position:absolute;left:0;top:-24px;padding:3px 8px;background:var(--detect);color:#1c2318;font-family:"Consolas",monospace;font-size:11px;font-weight:700;white-space:nowrap}
+.rec{position:absolute;top:16px;left:0;right:0;text-align:center;z-index:6}
+.rec span{display:inline-flex;align-items:center;gap:6px;background:#000;padding:4px 12px;font-family:"Consolas",monospace;font-size:10px;letter-spacing:2px;color:var(--detect);border:1px solid rgba(211,232,86,.4)}
+.rec i{width:7px;height:7px;border-radius:50%;background:#ff4d3d;animation:bk 1.2s steps(2) infinite}
+@keyframes bk{50%{opacity:.15}}
+.bar{position:absolute;left:0;right:0;bottom:0;height:52px;background:rgba(8,10,6,.92);z-index:6;display:flex;align-items:center;gap:10px;padding:0 12px;border-top:1px solid rgba(211,232,86,.25)}
+.bar .pb{flex:1;height:3px;background:rgba(232,230,218,.22);position:relative}
+.bar .pb i{position:absolute;left:0;top:0;bottom:0;width:40%;background:var(--detect)}
+.bar .tc{font-family:"Consolas",monospace;font-size:10px;color:#e8e6da;white-space:nowrap}
+.topbar{position:absolute;top:12px;left:0;right:0;z-index:6;display:flex;justify-content:space-between;align-items:center;padding:0 26px}
+.topbar .b{background:#000;border:1px solid rgba(211,232,86,.35);color:var(--detect);font-family:"Consolas",monospace;font-size:9.5px;padding:4px 9px;letter-spacing:1px}
+.hudrow{position:absolute;top:52px;left:26px;right:26px;z-index:6;display:flex;justify-content:space-between;font-family:"Consolas",monospace;font-size:9px;color:rgba(232,230,218,.55);letter-spacing:1px}
+.hudrow b{color:var(--detect)}
+</style></head><body>
+<div class="phone">
+  <div class="punch l"></div><div class="punch r"></div>
+  <div class="rec"><span><i/>FIELD RECORD · CAM-01 · 24 FPS</span></div>
+  <div class="topbar">
+    <span class="b">REC 00:12:44</span>
+    <span class="b">东区果园 · 晴 26°C</span>
+  </div>
+  <div class="hudrow"><span>DET <b>128</b> ↑12%</b></span><span>ALARM <b>3</b></span><span>PATROL <b>2</b></span><span>GUARD <b>365D</b></span></div>
+  <div class="hole">
+    <div class="sash">
+      <img src="../../.runtime/captures/T1bc13630fa-15.jpg" alt="">
+      <span class="vtext">最近告警 · RECENT</span>
+      <div class="cap2">园区出现鸟类活动</div>
+      <div class="num">3 <small>待处理</small></div>
+      <div class="cap"><div class="t">八哥 · 置信度 85%</div><div class="m">23:58 · 已驱离</div></div>
+    </div>
+    <div class="sash main">
+      <img src="../../.runtime/captures/T9311ae2050-15.jpg" alt="">
+      <div class="dbox" style="left:26%;top:20%;width:46%;height:56%">
+        <span class="tag">珠颈斑鸠 0.97</span>
+      </div>
+      <div class="cap">
+        <div class="t">正在监测 · 珠颈斑鸠进入画面</div>
+        <div class="m">ACOUSTIC + INFRARED 双模待命 · 农户在岗小屋</div>
+      </div>
+    </div>
+    <div class="sash">
+      <img src="../../.runtime/captures/T0622dc4097-15.jpg" alt="">
+      <span class="vtext">驱离队列 · QUEUE</span>
+      <div class="cap2">驱离执行队列</div>
+      <div class="num">1 <small>执行中</small></div>
+      <div class="cap"><div class="t">白喉红臀鹎 · 96%</div><div class="m">16:00 · 双模 · 5 秒</div></div>
+    </div>
+  </div>
+  <div class="bar">
+    <svg width="14" height="14" viewBox="0 0 10 12" fill="none"><rect width="3.4" height="12" rx="1" fill="#d3e856"/><rect x="6.6" width="3.4" height="12" rx="1" fill="#d3e856"/></svg>
+    <div class="pb"><i></i></div>
+    <span class="tc">00:12 / 00:30</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="#d3e856" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </div>
+</div>
+</body></html>

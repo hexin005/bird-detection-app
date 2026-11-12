@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>D · 鸟情节气历</title>
+<style>
+:root{ --paper:#f6f2e6; --ink:#2c2a22; --cinnabar:#b5482a; --green:#4c6b3c; --gold:#9a7b34; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#d8d2bf;font-family:"Source Han Serif SC","Noto Serif SC","Songti SC","SimSun",serif;color:var(--ink)}
+.phone{width:390px;height:844px;margin:30px auto;background:
+  linear-gradient(rgba(154,123,52,.05) 1px,transparent 1px) 0 0/100% 56px,
+  radial-gradient(circle at 82% 8%, rgba(181,72,42,.08), transparent 34%),
+  var(--paper);
+  box-shadow:0 0 0 8px #6e3a28,0 30px 60px rgba(0,0,0,.4);position:relative;overflow:hidden;padding:30px 24px}
+.ringbar{position:absolute;top:12px;left:24px;right:24px;height:2px;background:var(--cinnabar);opacity:.55}
+.holebar{position:absolute;top:8px;left:0;right:0;height:10px;display:flex;justify-content:space-evenly}
+.holebar i{width:9px;height:9px;border-radius:50%;background:#d8d2bf;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)}
+.vtitle{position:absolute;right:30px;top:52px;writing-mode:vertical-rl;font-size:44px;font-weight:700;letter-spacing:10px;color:var(--ink)}
+.vsub{position:absolute;right:96px;top:56px;writing-mode:vertical-rl;font-size:13px;letter-spacing:8px;color:var(--gold)}
+.dateblock{position:relative;padding-right:110px}
+.jieqi{font-size:15px;letter-spacing:6px;color:var(--cinnabar);font-weight:700}
+.big{font-size:64px;font-weight:700;line-height:1.05;letter-spacing:2px}
+.big small{font-size:18px;letter-spacing:4px;color:#7a705c;font-weight:400;margin-left:10px}
+.lunar{margin-top:10px;font-size:12px;color:#7a705c;letter-spacing:2px}
+.seal{margin-top:16px;width:64px;height:64px;background:var(--cinnabar);color:#f6f2e6;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:15px;font-weight:700;line-height:1.25;border-radius:4px;box-shadow:0 3px 8px rgba(120,40,20,.35);transform:rotate(-3deg);letter-spacing:2px}
+.photo{position:absolute;left:24px;top:212px;width:230px;border:10px solid #fbf8ee;box-shadow:0 12px 28px rgba(60,48,24,.3);transform:rotate(-1.2deg)}
+.photo img{width:100%;display:block}
+.photo .cap{padding:7px 9px;font-size:12px;letter-spacing:2px;color:#6a6250;background:#fbf8ee}
+.yiji{position:absolute;left:24px;right:24px;top:436px}
+.yj{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-top:1px solid rgba(90,80,60,.3)}
+.yj .zi{flex-shrink:0;width:34px;height:34px;border:2px solid var(--ink);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+.yj.yi .zi{border-color:var(--green);color:var(--green)}
+.yj.ji .zi{border-color:var(--cinnabar);color:var(--cinnabar)}
+.yj .bd{flex:1}
+.yj .t{font-size:15px;font-weight:700;letter-spacing:2px}
+.yj .t small{font-size:11px;color:#7a705c;font-weight:400;margin-left:8px;letter-spacing:1px}
+.yj .d{font-size:11.5px;color:#6a6250;margin-top:3px;line-height:1.7;font-family:"Noto Sans SC",sans-serif}
+.stats{position:absolute;left:24px;right:24px;bottom:96px;display:flex;gap:20px;padding:0 6px}
+.stat b{font-size:30px;font-weight:700}
+.stat b i{font-style:normal;color:var(--cinnabar);font-size:13px;vertical-align:top;margin-left:3px}
+.stat span{display:block;font-size:10.5px;color:#7a705c;letter-spacing:3px;margin-top:2px}
+.foot{position:absolute;left:24px;right:24px;bottom:36px;font-size:10.5px;color:#8a8069;letter-spacing:2px;display:flex;justify-content:space-between}
+.foot b{color:var(--cinnabar)}
+</style></head><body>
+<div class="phone">
+  <div class="holebar"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></i></i></div>
+  <div class="ringbar"></div>
+  <div class="vtitle">鸟情历</div>
+  <div class="vsub">青禾果园守护 · 柒拾贰候</div>
+  <div class="dateblock">
+    <div class="jieqi">立 冬 · 后 一 日</div>
+    <div class="big">八日<small>十一月 · 星期日</small></div>
+    <div class="lunar">农历 九月廿九 · 东区果园 · 晴 26°C</div>
+    <div class="seal"><span>双模</span><span>巡护</span></div>
+  </div>
+  <div class="photo">
+    <img src="../../.runtime/captures/T9311ae2050-15.jpg" alt="">
+    <div class="cap">今日候鸟 · 珠颈斑鸠（置信度 97%）</div>
+  </div>
+  <div class="yiji">
+    <div class="yj yi">
+      <div class="zi">宜</div>
+      <div class="bd">
+        <div class="t">晨间巡护<small>06:00 - 08:00</small></div>
+        <div class="d">鸟类活动低峰，宜检修栅栏与红外镜头；识别 128 次，环比升 12%。</div>
+      </div>
+    </div>
+    <div class="yj ji">
+      <div class="zi">忌</div>
+      <div class="bd">
+        <div class="t">开放投喂区<small>昨日 17:32 起活动频繁</small></div>
+        <div class="d">5 分钟内记录 5 次鸟类活动；待处理告警 55 条，忌单人离岗。</div>
+      </div>
+    </div>
+  </div>
+  <div class="stats">
+    <div><b>365 天</b><span>连续守护</span></div>
+    <div><b>97<i>↑</i></b><span>今日识别</span></div>
+    <div><b>55 条</b><span>告警记录</span></div>
+    <div><b>2 次</b><span>今日巡护</span></div>
+  </div>
+  <div class="foot"><span>模拟执行器 · 不会控制真实硬件</span><b>青禾 · 果园守护</b></div>
+</div>
+</body></html>

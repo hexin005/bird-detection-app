@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>B · 磷光雷达站</title>
+<style>
+:root{ --ph:#d3e856; --ph2:#9ec247; --dim:#4d5c2e; --bg:#080c06; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#000;font-family:"Consolas","Courier New",monospace}
+.phone{width:390px;height:844px;margin:30px auto;background:
+  radial-gradient(circle at 50% 42%, #101708 0 34%, transparent 35%),
+  repeating-linear-gradient(0deg,var(--bg) 0 3px, #0b1106 3px 4px);
+  box-shadow:0 0 0 8px #1a1d14,0 0 60px rgba(211,232,86,.12),inset 0 0 120px rgba(211,232,86,.05);
+  position:relative;overflow:hidden;color:var(--ph)}
+.scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.28) 2px 4px);pointer-events:none;z-index:9}
+.glow{text-shadow:0 0 6px rgba(211,232,86,.75),0 0 14px rgba(211,232,86,.3)}
+.frame{position:absolute;inset:10px;border:1px solid rgba(211,232,86,.35)}
+.frame::before,.frame::after{content:'';position:absolute;width:14px;height:14px;border:2px solid var(--ph)}
+.frame::before{left:-2px;top:-2px;border-right:0;border-bottom:0}
+.frame::after{right:-2px;top:-2px;border-left:0;border-bottom:0}
+.c1{position:absolute;inset:10px;border:1px solid rgba(211,232,86,.35)}
+.c1::before{content:'';position:absolute;left:-2px;bottom:-2px;width:14px;height:14px;border:2px solid var(--ph);border-right:0;border-top:0}
+.c1::after{content:'';position:absolute;right:-2px;bottom:-2px;width:14px;height:14px;border:2px solid var(--ph);border-left:0;border-top:0}
+.top{position:relative;z-index:2;display:flex;justify-content:space-between;padding:22px 26px 0;font-size:10px;letter-spacing:1px}
+.top .r{color:var(--dim)}
+.status{position:relative;z-index:2;text-align:center;margin-top:10px;font-size:12px;letter-spacing:3px}
+.status b{color:var(--ph)}
+.radar{position:absolute;left:50%;top:308px;transform:translateX(-50%);width:296px;height:296px;border-radius:50%;
+  background:radial-gradient(circle,rgba(211,232,86,.09) 0 2px,transparent 3px),radial-gradient(circle,rgba(211,232,86,.05) 0 55%,transparent 56%);
+  border:1px solid rgba(211,232,86,.5);box-shadow:0 0 40px rgba(211,232,86,.18),inset 0 0 50px rgba(211,232,86,.07)}
+.radar::before,.radar::after{content:'';position:absolute;background:rgba(211,232,86,.3)}
+.radar::before{left:50%;top:0;bottom:0;width:1px}
+.radar::after{top:50%;left:0;right:0;height:1px}
+.rr{position:absolute;border:1px solid rgba(211,232,86,.32);border-radius:50%}
+.rr.r2{inset:24%}.rr.r3{inset:47%}
+.sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(211,232,86,.4),rgba(211,232,86,.06) 60deg,transparent 120deg);animation:sw 3.4s linear infinite;transform-origin:center}
+@keyframes sw{to{transform:rotate(360deg)}}
+.blip{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--ph);box-shadow:0 0 10px var(--ph)}
+.blip.a{left:38%;top:30%}.blip.b{left:63%;top:55%}.blip.c{left:30%;top:62%;background:var(--ph);opacity:.65}
+.lbl{position:absolute;font-size:9px;color:var(--ph2);letter-spacing:1px}
+.lbl.a{left:41%;top:24%}.lbl.b{left:66%;top:58%}.lbl.c{left:15%;top:66%}
+.readout{position:absolute;left:26px;top:130px;font-size:10px;line-height:2;letter-spacing:1px}
+.readout .k{color:var(--dim)}
+.readout .v{color:var(--ph)}
+.readout2{position:absolute;right:26px;top:130px;text-align:right;font-size:10px;line-height:2;letter-spacing:1px}
+.ticks{position:absolute;left:50%;top:308px;transform:translateX(-50%);width:296px;font-size:9px;color:var(--dim);display:flex;justify-content:space-between;margin-top:6px}
+.events{position:absolute;left:26px;right:26px;top:636px;font-size:10.5px;line-height:2.1;letter-spacing:.5px}
+.events .hd{color:var(--dim);letter-spacing:3px;font-size:9px;margin-bottom:4px}
+.events .row{display:flex;justify-content:space-between;border-bottom:1px dashed rgba(211,232,86,.22);padding:1px 0}
+.events .sp{color:#eef7d8}
+.events .c{color:var(--ph2)}
+.events .cf{color:var(--ph)}
+.brk{position:absolute;left:50%;transform:translateX(-50%);bottom:30px;width:210px;text-align:center;font-size:10px;color:var(--dim);letter-spacing:2px}
+.brk b{color:var(--ph);font-size:12px;letter-spacing:4px}
+</style></head><body>
+<div class="phone">
+  <div class="scan"></div>
+  <div class="frame"></div><div class="c1"></div>
+  <div class="top">
+    <span class="glow">QINGHE-01 · E.N45.2</span>
+    <span class="r">PWR ▮▮▮▮▯ NET:WS-OK</span>
+  </div>
+  <div class="status glow">█ 双模监测 <b>RUNNING</b> · 立冬后一日</div>
+  <div class="readout">
+    <div><span class="k">TODAY_DET</span> <span class="v">097</span></div>
+    <div><span class="k">ALARM_NEW</span> <span class="v">055</span></div>
+    <div><span class="k">GUARD</span> <span class="v">365D</span></div>
+    <div><span class="k">WX</span> <span class="v">26C SUN</span></div>
+  </div>
+  <div class="readout2">
+    <div><span class="k">ACOUSTIC</span> <span class="v">ARMED</span></div>
+    <div><span class="k">INFRARED</span> <span class="v">ARMED</span></div>
+    <div><span class="k">CAM</span> <span class="v">PATROL</span></div>
+    <div><span class="k">FARMER</span> <span class="v">IN-HUT</span></div>
+  </div>
+  <div class="radar">
+    <div class="rr r2"></div><div class="rr r3"></div>
+    <div class="sweep"></div>
+    <span class="blip a"></span><span class="blip b"></span><span class="blip c"></span>
+    <span class="lbl a">珠颈斑鸠 0.97</span>
+    <span class="lbl b" style="left:67%;top:60%">八哥 0.85</span>
+    <span class="lbl c">残留信号</span>
+  </div>
+  <div class="ticks"><span>000</span><span>090</span><span>180</span><span>270</span><span>360</span></div>
+  <div class="events">
+    <div class="hd">— DETECTION LOG · 24H —</div>
+    <div class="row"><span class="sp">珠颈斑鸠 ×1</span><span class="c">00:27</span><span class="cf">CONF 0.97</span></div>
+    <div class="row"><span class="sp">八哥 ×1</span><span class="c">23:58</span><span class="cf">CONF 0.85</span></div>
+    <div class="row"><span class="sp">白喉红臀鹎 ×2</span><span class="c">16:00</span><span class="cf">CONF 0.96</span></div>
+    <div class="row"><span class="sp">红外自检 IR-02</span><span class="c">10:30</span><span class="c">PASS</span></div>
+  </div>
+  <div class="brk">GUARDING ORCHARD <b>365 DAYS</b> · SIMULATED ACTUATOR</div>
+</div>
+</body></html>

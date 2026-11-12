@@ -51,7 +51,14 @@ body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans S
   </div>
   <div class="card"><span class="no">A</span><div><h3><a href="monitor-a.html">首页方案A「态势只读台」</a></h3>
     <p>首页<b>完全去操作化</b>：告警牌区 → “最新鸟情”只读列表（时间+物种+状态章，无按钮）；升降面板整体移除。所有处置/驱离动作回归「告警」「升降」专页。</p></div><a class="go" href="monitor-a.html">查看 ›</a></div>
-  <div class="card"><span class="no">B</span><div><h3><a href="monitor-b.html">首页方案B「态势+应急条」<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">推荐</span></a></h3>
+  <div class="card"><span class="no">B</span><div><h3><a href="monitor-b.html">首页方案B「态势+应急条」<span style="background:#f5c400;border:2px solid #191919;font-size:10px;padding:1px 6px;margin-left:6px;letter-spacing:1px">已选定</span></a></h3>
     <p>告警牌区 → <b>最新一报条</b>（最新一报+待处理计数+去告警墙）；升降面板 → <b>应急驱离条</b>（保留一键升起，方式/时长只显摘要，调整进升降页）。既去重，又保住“看到信号变红→立刻升起”的应急路径。</p></div><a class="go" href="monitor-b.html">查看 ›</a></div>
+
+  <div class="head" style="margin-top:30px"><b>批次 03 · C 底色背景</b><span>SIGNAL BACKGROUND · 4 CANDIDATES</span></div>
+  <div class="scope" style="margin-top:14px">
+    C 当前未覆写背景 token，继承了 B 的灰白棋盘格。4 个候选均<b>非黑、暖色系</b>，与 B 的冷灰棋盘彻底区分；实现只改 <b>c-signal.css 的 --dither-light/--dither-dark</b>，进度条/头像占位/空态等全组件联动，B 不受影响。
+  </div>
+  <div class="card"><span class="no">★</span><div><h3><a href="background.html">底色候选 · 4 选 1</a></h3>
+    <p><b>A 值勤日志纸（推荐）</b> / B 弱化警示斜纹 / C 打孔告示板 / D 纯色暖纸——每格都放了挂牌卡+按钮的实际观感。</p></div><a class="go" href="background.html">查看 ›</a></div>
 </div>
 </body></html>

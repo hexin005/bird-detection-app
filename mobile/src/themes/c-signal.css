@@ -24,7 +24,23 @@
   --shadow-float: 4px 4px 0 rgba(25, 25, 25, 0.3);
   --shell-1: #e4e2d6;
   --shell-2: #262624;
+
+  /* ---- 背景:值勤日志纸(A 方案)——暖米黄 + 淡棕横格线,与 B 的冷灰棋盘格区分 ---- */
+  --dither-light: repeating-linear-gradient(0deg, #f1ecdb 0 25px, rgba(107, 94, 63, 0.16) 25px 26px);
+  --dither-dark: repeating-linear-gradient(45deg, #3c352a 0 4px, #e9e2cf 4px 8px);
+  --mask-dither: rgba(31, 27, 18, 0.55);
 }
+
+/* 组件层对底纹设了 background-size:6px/4px(为 B 的 6px 棋盘设计),C 的横格线按原尺寸铺,重置为 auto */
+[data-theme="signal"] .qh-progress,
+[data-theme="signal"] .qh-me-avatar,
+[data-theme="signal"] .qh-badge--failed,
+[data-theme="signal"] .qh-tl__dot--running,
+[data-theme="signal"] .qh-birdrow__cover--empty { background-size: auto; }
+
+/* 主题选择器里的 B 缩略图保持 B 的黑白小样,不随 C 底纹联动 */
+[data-theme="signal"] .qh-shot-b { background: #f4f4f0; }
+[data-theme="signal"] .qh-shot-b .ln.o { background: #c8c8c2; background-size: auto; }
 
 /* ---- 信号站专属修饰 ---- */
 /* 主按钮 = "升起驱离信号":黑底黄字 */

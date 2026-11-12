@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>C 主题底色背景 · 4 候选</title>
+<style>
+:root{--ink:#191919;--grey:#6f6f68;--y:#f5c400;--r:#d3212c;--card:#fbf8ec}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d8d0;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:var(--ink);padding:30px 18px 60px}
+.wrap{max-width:1700px;margin:0 auto}
+.head{background:var(--ink);color:var(--paper,#f2f1ea);padding:14px 20px;display:flex;justify-content:space-between;align-items:baseline}
+.head b{font-size:18px;font-weight:900;letter-spacing:3px;color:#f2f1ea}
+.head span{font-size:10px;letter-spacing:2px;color:#9a9a92}
+.scope{border:2px dashed var(--ink);background:#fbfaf4;margin:14px 0;padding:11px 15px;font-size:11.5px;line-height:1.9}
+.scope b{color:var(--r)}
+.grid{display:flex;flex-wrap:wrap;gap:18px}
+.panel{width:400px;border:2px solid var(--ink);box-shadow:4px 5px 0 rgba(25,25,25,.25)}
+.panel .ph{height:300px;position:relative;padding:14px;overflow:hidden}
+.panel .info{padding:10px 13px;background:#fbfaf4;border-top:2px solid var(--ink)}
+.panel .info h3{font-size:13px;font-weight:900;letter-spacing:1px}
+.panel .info h3 em{font-style:normal;font-size:10px;font-weight:900;background:var(--y);border:1.5px solid var(--ink);padding:1px 6px;margin-left:6px}
+.panel .info p{font-size:10.5px;color:var(--grey);line-height:1.7;margin-top:4px}
+.panel .info code{font-family:Consolas,monospace;font-size:9.5px;color:var(--ink);background:#eee9d6;padding:1px 5px}
+/* 样板内容(四格相同,只换底纹) */
+.demo-tag{width:150px;background:var(--card);border:2px solid var(--ink);box-shadow:3px 4px 0 rgba(25,25,25,.22);position:relative;padding:11px 8px 9px;text-align:center;margin:0 auto}
+.demo-tag::before{content:'';position:absolute;left:50%;top:-2px;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:var(--paper,#f2f1ea);border:2px solid var(--ink)}
+.demo-tag b{font-size:12px;font-weight:900;display:block}
+.demo-tag span{display:block;font-size:8.5px;color:var(--grey);margin-top:2px}
+.demo-tag .st{display:inline-block;font-size:9px;font-weight:900;border:2px solid var(--ink);padding:1px 7px;margin-top:5px;transform:rotate(-3deg);background:var(--r);color:#fff}
+.demo-note{width:190px;margin:10px auto 0;background:var(--card);border:2px solid var(--ink);padding:7px 9px;text-align:left}
+.demo-note i{display:block;font-style:normal;font-size:9.5px;font-weight:900;border-bottom:2px solid var(--ink);padding-bottom:3px}
+.demo-note span{display:block;font-size:8.5px;color:var(--grey);margin-top:3px}
+.demo-btn{display:block;width:170px;margin:12px auto 0;background:var(--ink);color:var(--y);font-size:11px;font-weight:900;letter-spacing:2px;text-align:center;padding:8px 0}
+/* ———— 候选底纹 ———— */
+.ph.a{background:repeating-linear-gradient(0deg,#f1ecdb 0 25px,rgba(107,94,63,.16) 25px 26px)}
+.ph.b{background:repeating-linear-gradient(-45deg,#f2f1ea 0 16px,rgba(245,196,0,.14) 16px 19px,rgba(25,25,25,.045) 19px 30px)}
+.ph.c{background:#f0ead9;background-image:radial-gradient(rgba(25,25,25,.11) 1.6px,transparent 1.7px);background-size:18px 18px}
+.ph.d{background:#f1ecdb}
+</style></head><body>
+<div class="wrap">
+  <div class="head"><b>C 主题 · 底色背景候选</b><span>BACKGROUND BATCH 03 · 只改 --dither-light/--dither-dark token，B 不受影响</span></div>
+  <div class="scope">
+    现状：C 未覆写背景 token，直接继承 B 的<b>灰白棋盘格抖动纹</b>。以下 4 个候选都保持<b>非黑、暖色调</b>，与 B 的冷灰棋盘彻底区分；
+    卡片仍为象牙白 <b>#fbf8ec</b>，挂牌/告示语义不变。选一个，我改 c-signal.css 的 token（一处改，进度条/头像占位/空态等所有底纹处联动），经你验收后提交。
+  </div>
+  <div class="grid">
+    <div class="panel"><div class="ph a">
+      <div class="demo-tag"><b>珠颈斑鸠 ×2</b><span>09:41 · 93%</span><span class="st">待处理</span></div>
+      <div class="demo-note"><i>最新鸟情</i><span>打开告警墙 · 逐条处置 ›</span></div>
+      <span class="demo-btn">升起驱离信号</span>
+    </div><div class="info"><h3>A · 值勤日志纸 <em>推荐</em></h3>
+      <p>暖米黄底 + 淡棕横格线，像一页<b>值勤记录纸</b>——与"观测/挂牌/告示"语义最贴，色温与 B 的冷灰棋盘完全反向，纹理安静不抢内容。</p>
+      <p><code>--dither-light: #f1ecdb + 横线 25px</code></p></div></div>
+
+    <div class="panel"><div class="ph b">
+      <div class="demo-tag"><b>珠颈斑鸠 ×2</b><span>09:41 · 93%</span><span class="st">待处理</span></div>
+      <div class="demo-note"><i>最新鸟情</i><span>打开告警墙 · 逐条处置 ›</span></div>
+      <span class="demo-btn">升起驱离信号</span>
+    </div><div class="info"><h3>B · 弱化警示斜纹</h3>
+      <p>象牙白底 + 极淡的信号黄/墨色 45° 细斜纹——把主杆上的<b>警示纹降调为底纹质感</b>，主题辨识度最强，但底纹存在感比 A 高。</p>
+      <p><code>--dither-light: #f2f1ea + 45° 斜纹</code></p></div></div>
+
+    <div class="panel"><div class="ph c">
+      <div class="demo-tag"><b>珠颈斑鸠 ×2</b><span>09:41 · 93%</span><span class="st">待处理</span></div>
+      <div class="demo-note"><i>最新鸟情</i><span>打开告警墙 · 逐条处置 ›</span></div>
+      <span class="demo-btn">升起驱离信号</span>
+    </div><div class="info"><h3>C · 打孔告示板</h3>
+      <p>暖纸底 + 均匀<b>铆钉点阵</b>，金属告示牌的打孔板质感——工业感最强，和挂牌打孔元素呼应；点阵在低分屏上略"麻"。</p>
+      <p><code>--dither-light: #f0ead9 + 点阵 18px</code></p></div></div>
+
+    <div class="panel"><div class="ph d">
+      <div class="demo-tag"><b>珠颈斑鸠 ×2</b><span>09:41 · 93%</span><span class="st">待处理</span></div>
+      <div class="demo-note"><i>最新鸟情</i><span>打开告警墙 · 逐条处置 ›</span></div>
+      <span class="demo-btn">升起驱离信号</span>
+    </div><div class="info"><h3>D · 纯色暖纸</h3>
+      <p>纯暖米黄、<b>无边纹</b>——最安静、最不显脏，长期盯着最舒服；代价是底色与卡片的区分只剩色温差，质感最弱。</p>
+      <p><code>--dither-light: #f1ecdb 纯色</code></p></div></div>
+  </div>
+</div>
+</body></html>

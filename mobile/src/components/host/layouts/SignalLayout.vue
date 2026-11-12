@@ -26,7 +26,12 @@ const tabs = [
         <svg width="16" height="13" viewBox="0 0 16 13" fill="none"><path d="M2 11V6L6 2h6l2 3v6h-3V8H5v3z" fill="currentColor"/><rect x="6" y="4" width="2" height="2" style="fill:var(--surface-card)"/></svg>
         <text class="qh-menubar__ttl">信号台</text>
         <text class="qh-menubar__item">ST.01 东区</text>
-        <view class="qh-menubar__right"><text class="time">9:41</text></view>
+        <view class="qh-menubar__right">
+          <button class="sgn-set" aria-label="设置" @click="host.settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg>
+          </button>
+          <text class="time">9:41</text>
+        </view>
       </view>
     </view>
     <view class="page__content"><SignalMonitor /></view>
@@ -90,4 +95,8 @@ const tabs = [
 
 <style scoped>
 .sgn-tab-cn { letter-spacing:2px; }
+/* 信号台右上角设置:黄描边小齿轮,与 3D 沙盘按钮同族 */
+.sgn-set { width:26px; height:22px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid #f5c400; color:#f5c400; padding:0; cursor:pointer; }
+.sgn-set:active { background:rgba(245,196,0,.18); }
+.sgn-set + .time { margin-left:6px; }
 </style>
