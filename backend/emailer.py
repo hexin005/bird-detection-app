@@ -17,6 +17,21 @@ class MailSendError(Exception):
 PURPOSE_LABELS = {'register': '注册', 'reset': '找回密码'}
 
 
+def _smtp_detail(exc):
+    """提炼底层拒收原文（如 SMTP 550 收件账号不存在），让页面报错可见真实原因。
+
+    smtplib 的 SMTPDataError/SMTPRecipientsRefused 携带 smtp_code/smtp_error(bytes)，
+    其余异常回退到 str(exc)。截断 160 字符防止 toast 过长。
+    """
+    code = getattr(exc, 'smtp_code', None)
+    text = getattr(exc, 'smtp_error', None)
+    if isinstance(text, bytes):
+        text = text.decode('utf-8', 'replace')
+    text = (str(text).strip() if text else '') or str(exc).strip()
+    detail = f'SMTP {code}: {text}' if code and text else (text or exc.__class__.__name__)
+    return detail[:160]
+
+
 def send_code_mail(settings, email, code, purpose):
     """返回 True 表示演示模式(demo_code 可回显);真发成功返回 False;失败抛异常。"""
     label = PURPOSE_LABELS.get(purpose, '验证')
@@ -42,7 +57,7 @@ def send_code_mail(settings, email, code, purpose):
                         server.login(settings.smtp_user, settings.smtp_pass)
                     server.send_message(message)
         except Exception as exc:
-            raise MailSendError(f'验证码邮件发送失败({exc.__class__.__name__})，请检查 SMTP 配置') from exc
+            raise MailSendError(f'验证码邮件发送失败（{_smtp_detail(exc)}）') from exc
         return False
     if not settings.email_demo:
         raise MailSendError('邮件服务未配置，且演示模式未开启（local.json: email_demo）')

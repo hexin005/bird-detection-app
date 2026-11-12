@@ -160,6 +160,38 @@ $env:BIRD_VIDEO_PATH = 'D:\your\path\to\your.mp4'
 
 **首次启动会自动生成账号**：用户名固定为 `orchard`，密码为 `local.json` 中的 `password`；若未手动创建 `local.json`，程序会生成随机密码，密码打印在启动终端，也可在 `.runtime/local.json` 中查看。
 
+#### 4.2a 附：`local.json` 全量字段模板与环境变量一览
+
+日常按需改单个字段即可（见上文与第六节）；这里一次列全，供快速核对（**注释仅作说明，实际文件不能带注释**）。**除 `username`/`password`/`secret` 建议保留自动生成的值外，其余字段均可留空/省略**，省略时取内置默认值：
+
+```jsonc
+{
+  "username": "orchard",                        // 初始账号名（仅建库时生效）
+  "password": "你的初始密码",                    // 初始密码（仅建库时生效）
+  "secret": "自动生成，保留即可",                 // token 签名密钥；缺失会导致启动失败，勿删
+  "model_path": "assets/best.pt",               // YOLOv8 权重
+  "video_path": "assets/demo-bird.mp4",         // 默认演示视频
+  "deepseek_key": "",                           // AI 助手 Key（见第六节，不配则该功能引导配置）
+  "deepseek_base_url": "https://api.deepseek.com",
+  "deepseek_model": "deepseek-chat",
+  "smtp_host": "", "smtp_port": 465, "smtp_user": "", "smtp_pass": "", "smtp_from": "",
+  "email_demo": true                            // true=演示验证码；false=SMTP 真发
+}
+```
+
+> 检测参数（置信度阈值/连续帧数/冷却秒数/采样率/推理设备）**不在本文件**：置信度等在应用「控制」页可调并存于数据库，推理设备用环境变量 `BIRD_DEVICE` 指定。
+
+环境变量（优先级高于 `local.json`，全部可选）：
+
+| 变量 | 作用 | 默认 |
+|---|---|---|
+| `BIRD_DATA_DIR` | 运行时数据目录（含 `local.json`/数据库/抓拍） | `<项目>/.runtime` |
+| `BIRD_MODEL_PATH` | 覆盖模型权重路径 | `local.json` 的 `model_path` |
+| `BIRD_VIDEO_PATH` | 覆盖默认视频路径 | `local.json` 的 `video_path` |
+| `BIRD_DEVICE` | 推理设备 | `cpu` |
+| `BIRD_DEEPSEEK_KEY` | 覆盖 AI 助手 Key | `local.json` 的 `deepseek_key` |
+| `BIRD_FFMPEG` | FFmpeg 路径（启动脚本找不到时才需要） | 自动探测 PATH / WinGet |
+
 #### 4.3 大文件进仓库的替代方案（Git LFS）
 
 如果托管的 Git 平台（或学院内部 GitLab）限制单文件大小、导致 64 MB 视频推不上去，用 Git LFS 托管 `assets/` 即可，其他同学/评委拉代码时同样能拿到完整文件：
@@ -303,11 +335,12 @@ SMTP 与演示开关的可选字段（写进 `.runtime/local.json`，均可留�
 
 ### AI 助手（DeepSeek 问答）
 
-首页右缘有「AI 助手」悬浮小按钮：点击弹出聊天小窗，点 ■ 最大化成整页视图，点 — 缩回按钮；三种状态间会话与未发送草稿均保留（页面刷新后清空）。
+首页右缘有「AI 助手」悬浮小按钮：点击弹出聊天小窗，点 ■ 最大化成整页视图，点 — 缩回按钮；三种状态间会话与未发送草稿均保留（页面刷新后清空）。发送后回答前显示阶段指示（“正在检索本园记录”→“正在思考”），首字到达后进入流式打字机输出。
 
 - **问答策略（RAG 优先）**：问题先经本地检索——明确鸟种（名称/学名/别名，别名一对多映射）、本园统计（意图词 + 按时间范围取数，附口径说明：告警次数≠鸟类个体数）、非特定鸟种知识（对知识卡字段做关键词匹配）；命中内容作为“参考资料”注入 DeepSeek 整理作答，前端展示可点击的参考资料标签（跳知识卡/数据分析）；未命中则标注“AI 通用回答 · 未引用本园知识库”。
+- **图片提问（拍照识鸟）**：输入框左侧「＋图」选择一张鸟类照片（JPG/PNG/WebP，≤8MB），随问题（可留空，默认追问“这是什么鸟？该怎么处理？”）一并发送；后端用同一 YOLO 权重对图片做单帧检测，把识别物种并入知识卡检索，回答会先说明识别结果与置信度，并声明“识别结果是检索候选而非鉴定结论”；数据与文本问答同样按账号隔离。
 - **只读边界**：AI 不连接驱鸟设备接口，不能执行任何驱离操作；涉及操作时引导用户在应用内人工处理。
-- **接口**：`GET /api/assistant/status`（配置状态）、`POST /api/assistant/chat`（SSE 流式：meta→delta*→done）；同一时刻仅允许一条回答在生成（409 防重复提交）。
+- **接口**：`GET /api/assistant/status`（配置状态）、`POST /api/assistant/chat`（SSE 流式：meta→delta*→done）、`POST /api/assistant/chat-image?question=…`（请求体为图片字节，同样 SSE 流式）；同一时刻仅允许一条回答在生成（409 防重复提交）。
 - **配置 DeepSeek**（不配置时界面显示引导、发送禁用）：在 `.runtime/local.json` 增加：
 
 ```json

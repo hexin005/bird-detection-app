@@ -25,6 +25,7 @@ export type LibraryDetail = LibraryItem & { intervals: { species: string; start:
 export type State = {
   alarms: Alarm[]; commands: Command[]; events: Event[];
   counts: { total: number; pending: number; completed: number }; settings: Preferences;
+  latest_detection?: { id: string; species: string; count: number; at: number } | null;
   monitor: { status: string; task_id: string | null; message: string; frame: Frame | null; source: string; model: string; device: string; sample_fps: number; source_ready: boolean; model_ready: boolean; progress?: number; result_ready?: boolean; stream_ready?: boolean; video_id?: string };
   media_ticket: string; server_time: number;
 }
@@ -57,4 +58,6 @@ export type ChatMsg = {
   streaming?: boolean
   error?: boolean
   stopped?: boolean
+  image?: string // 用户提问附带的图片预览(dataURL)
+  phase?: 'retrieve' | 'think' // 流式回答阶段指示:meta(检索完成)前检索,后思考,首字后清除
 }

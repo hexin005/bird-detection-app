@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import json
+import os
 import re
 import threading
 import time
@@ -22,7 +23,7 @@ from . import assistant as assistant_mod
 from .config import ROOT, Settings
 from .detector import NAMES
 from .emailer import MailSendError, send_code_mail
-from .video_pipeline import VideoPipeline
+from .video_pipeline import VideoPipeline, build_task_summary
 from .security import check_media, digest, hash_password, media_ticket, verify_password
 from .store import Conflict, Store, normalize_email
 from .verification import RateLimited, VerificationService
@@ -152,6 +153,33 @@ def _reencode_avatar(data):
     return buffer.tobytes()
 
 
+def _detect_birds(monitor, store, frame):
+    """单帧 YOLO 推理:返回 [(物种中文名, 置信度)] 去重后按置信度降序,最多 3 个。
+
+    模型懒加载与检测线程共用同一实例(重复加载会双倍占内存);加载在 monitor.lock 内,
+    推理同锁执行——检测线程仅在状态更新时短暂取锁,不会造成长阻塞。
+    识别结果只作检索候选,物种鉴定语义由【图片识别】块声明。
+    """
+    with monitor.lock:
+        if monitor.model is None:
+            config_dir = monitor.settings.data_dir / 'yolo'
+            config_dir.mkdir(exist_ok=True)
+            os.environ['YOLO_CONFIG_DIR'] = str(config_dir)
+            from ultralytics import YOLO
+            monitor.model = YOLO(str(monitor.settings.model_path))
+        conf_threshold = store.config()['confidence']
+        result = monitor.model.predict(frame, conf=conf_threshold, imgsz=640,
+                                       device=monitor.settings.device, verbose=False)[0]
+    found = {}
+    for box in result.boxes:
+        label = monitor.model.names[int(box.cls[0])]
+        species = NAMES.get(label, label)
+        conf = float(box.conf[0])
+        if species not in found or conf > found[species]:
+            found[species] = conf
+    return sorted(found.items(), key=lambda kv: -kv[1])[:3]
+
+
 def create_app(settings=None):
     settings = settings or Settings.load()
     store = Store(settings)
@@ -221,11 +249,24 @@ def create_app(settings=None):
         sid = check_media(ticket, settings.secret)
         if not sid or not store.session(sid):
             raise HTTPException(401, '画面授权已过期')
+        return sid
+
+    def uid_of_sid(sid):
+        rows = store.rows('SELECT user_id FROM sessions WHERE id=?', (sid,))
+        return rows[0]['user_id'] if rows else None
+
+    def last_task_of(uid):
+        """最近一次已归档任务(按账号),重建与快照同构的汇总;替代仅存内存的 monitor.last_task。"""
+        if uid is None:
+            return None
+        rows = store.rows("SELECT id,status FROM tasks WHERE user_id=? AND status IN ('ended','stopped') AND result_ready=1 ORDER BY ended_at DESC LIMIT 1", (uid,))
+        return build_task_summary(store, rows[0]['id'], rows[0]['status']) if rows else None
 
     def snapshot(sid):
-        return {**store.snapshot(), 'monitor': monitor.snapshot(), 'server_time': time.time(),
+        uid = uid_of_sid(sid)
+        return {**store.snapshot(uid), 'monitor': monitor.snapshot(uid), 'server_time': time.time(),
                 'media_ticket': media_ticket(sid, settings.secret), 'simulated_device': True,
-                'last_task': getattr(monitor, 'last_task', None)}
+                'last_task': last_task_of(uid)}
 
     @app.get('/api/health')
     def health():
@@ -392,8 +433,8 @@ def create_app(settings=None):
 
     @app.get('/api/stats')
     def statistics(scope: Literal['today', '7d', '30d'] = Query('7d', alias='range'), user=Depends(auth)):
-        """果园数据分析聚合(口径见 store.stats)。共享果园数据,不区分账号。"""
-        return store.stats({'today': 1, '7d': 7, '30d': 30}[scope])
+        """果园数据分析聚合(口径见 store.stats);按账号作用域,只统计本人数据。"""
+        return store.stats({'today': 1, '7d': 7, '30d': 30}[scope], user[1])
 
     @app.get('/api/state')
     def state(user=Depends(auth)):
@@ -402,20 +443,21 @@ def create_app(settings=None):
     @app.get('/api/history')
     def history(kind: Literal['alarms', 'commands', 'events'], offset: int = Query(0, ge=0), before: Optional[int] = None, user=Depends(auth)):
         order = 'id' if kind == 'events' else 'at'
+        scope = 'AND user_id=?'
         if kind == 'events' and before is not None:
-            return {'items': store.rows('SELECT * FROM events WHERE id<? ORDER BY id DESC LIMIT 100', (before,))}
-        return {'items': store.rows(f'SELECT * FROM {kind} ORDER BY {order} DESC LIMIT 100 OFFSET ?', (offset,))}
+            return {'items': store.rows(f'SELECT * FROM events WHERE id<? {scope} ORDER BY id DESC LIMIT 100', (before, user[1]))}
+        return {'items': store.rows(f'SELECT * FROM {kind} WHERE 1=1 {scope} ORDER BY {order} DESC LIMIT 100 OFFSET ?', (user[1], offset))}
 
     @app.get('/api/detail/{kind}/{record_id}')
     def detail(kind: Literal['alarms', 'commands'], record_id: str, user=Depends(auth)):
         rows = store.rows(f'SELECT * FROM {kind} WHERE id=?', (record_id,))
-        if not rows:
+        if not rows or (rows[0]['user_id'] is not None and rows[0]['user_id'] != user[1]):
             raise HTTPException(404, '记录不存在')
         return rows[0]
 
     @app.post('/api/monitor/start')
     def start(body: Optional[StartVideo] = None, user=Depends(auth)):
-        return monitor.start(body.video_id if body else None)
+        return monitor.start(body.video_id if body else None, user[1])
 
     @app.post('/api/videos')
     async def upload(request: Request, x_filename: str = Header(default='video.mp4'), user=Depends(auth)):
@@ -433,7 +475,7 @@ def create_app(settings=None):
                     if size > 500 * 1024 * 1024:
                         raise HTTPException(413, '视频不能超过 500 MB')
                     output.write(chunk)
-            video = await run_in_threadpool(monitor.library.register, target, name, True)
+            video = await run_in_threadpool(monitor.library.register, target, name, True, user[1])
             if video['path'] != str(target.resolve()):
                 target.unlink(missing_ok=True)
             return {key: value for key, value in video.items() if key != 'path'}
@@ -445,12 +487,12 @@ def create_app(settings=None):
 
     @app.get('/api/videos')
     def videos(user=Depends(auth)):
-        return {'items': store.rows('SELECT id,name,duration,fps,at FROM videos ORDER BY at DESC LIMIT 30')}
+        return {'items': store.rows('SELECT id,name,duration,fps,at FROM videos WHERE user_id=? ORDER BY at DESC LIMIT 30', (user[1],))}
 
     @app.get('/api/library')
     def library(species: Optional[str] = None, offset: int = Query(0, ge=0), user=Depends(auth)):
-        return {'items': monitor.library.list(species, offset), 'species': monitor.library.species(),
-                'alarm_groups': monitor.library.alarm_groups(),
+        return {'items': monitor.library.list(species, offset, user[1]), 'species': monitor.library.species(user[1]),
+                'alarm_groups': monitor.library.alarm_groups(user[1]),
                 'guide_images': [name for name in species_names if species_image(name)]}
 
     @app.get('/api/species-images/{name}', dependencies=[Depends(media_auth)])
@@ -464,19 +506,25 @@ def create_app(settings=None):
     @app.get('/api/library/summary')
     def library_summary(user=Depends(auth)):
         """记录页统计:今日/累计的检测场次与发现鸟数(口径=已归档任务,鸟数=各场峰值合计)。"""
-        return monitor.library.summary()
+        return monitor.library.summary(user[1])
 
     @app.get('/api/library/{task_id}')
     def video_detail(task_id: str, user=Depends(auth)):
-        return monitor.library.detail(task_id)
+        row = monitor.library.detail(task_id)
+        if row.get('user_id') is not None and row['user_id'] != user[1]:
+            raise HTTPException(404, '记录不存在')
+        return row
 
-    def knowledge_items():
+    def knowledge_items(user_id=None):
         """知识行 + 本园记录:聚合直接复用 /api/library 同源数据(alarm_groups/species),
-        列表与详情共用本函数,统计口径必然一致。"""
-        hours = store.knowledge_hours()
-        alarm_map = {r['species']: r for r in monitor.library.alarm_groups()}
-        sample_map = {r['species']: r for r in monitor.library.species()}
-        last_seen = {r['species']: r['last_seen'] for r in store.rows('SELECT species, MAX(at) last_seen FROM alarms GROUP BY species')}
+        列表与详情共用本函数,统计口径必然一致;统计按账号作用域,知识卡本体全局共享。"""
+        hours = store.knowledge_hours(user_id)
+        alarm_map = {r['species']: r for r in monitor.library.alarm_groups(user_id)}
+        sample_map = {r['species']: r for r in monitor.library.species(user_id)}
+        last_seen_rows = (store.rows('SELECT species, MAX(at) last_seen FROM alarms WHERE user_id=? GROUP BY species', (user_id,))
+                          if user_id is not None else
+                          store.rows('SELECT species, MAX(at) last_seen FROM alarms GROUP BY species'))
+        last_seen = {r['species']: r['last_seen'] for r in last_seen_rows}
         items = []
         for row in store.knowledge_rows():
             a, s = alarm_map.get(row['name'], {}), sample_map.get(row['name'], {})
@@ -492,12 +540,12 @@ def create_app(settings=None):
 
     @app.get('/api/knowledge')
     def knowledge_list(user=Depends(auth)):
-        return {'items': knowledge_items(),
+        return {'items': knowledge_items(user[1]),
                 'guide_images': [name for name in species_names if species_image(name)]}
 
     @app.get('/api/knowledge/{name}')
     def knowledge_detail(name: str, user=Depends(auth)):
-        for item in knowledge_items():
+        for item in knowledge_items(user[1]):
             if item['name'] == name:
                 return item
         raise HTTPException(404, '知识卡不存在')
@@ -507,15 +555,8 @@ def create_app(settings=None):
         """前端打开聊天即查;configured=False 时前端展示配置引导并禁用发送。"""
         return {'configured': bool(settings.deepseek_key), 'model': settings.deepseek_model}
 
-    @app.post('/api/assistant/chat')
-    async def assistant_chat(body: AssistantAsk, user=Depends(auth)):
-        """SSE 流式问答:meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
-        if not assistant_mod.IN_FLIGHT.acquire():
-            raise HTTPException(409, '上一条回答仍在生成，请稍候')
-        blocks, refs = assistant_mod.retrieve(body.question, store)
-        messages = assistant_mod.build_messages(body.question, blocks,
-                                                [item.model_dump() for item in body.history])
-
+    def _assistant_stream(messages, refs):
+        """SSE 流式响应(文本/图片提问共用):meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
         def sse(obj) -> str:
             return 'data: ' + json.dumps(obj, ensure_ascii=False) + '\n\n'
 
@@ -539,20 +580,63 @@ def create_app(settings=None):
         return StreamingResponse(events(), media_type='text/event-stream',
                                  headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
+    @app.post('/api/assistant/chat')
+    async def assistant_chat(body: AssistantAsk, user=Depends(auth)):
+        """SSE 流式问答:meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
+        if not assistant_mod.IN_FLIGHT.acquire():
+            raise HTTPException(409, '上一条回答仍在生成，请稍候')
+        blocks, refs = assistant_mod.retrieve(body.question, store, user[1])
+        messages = assistant_mod.build_messages(body.question, blocks,
+                                                [item.model_dump() for item in body.history])
+        return _assistant_stream(messages, refs)
+
+    @app.post('/api/assistant/chat-image')
+    async def assistant_chat_image(request: Request, question: str = '', user=Depends(auth)):
+        """图片提问:YOLO 识别图中鸟类 → 识别结果并入检索词取知识卡 → 同一 SSE 流程作答。
+
+        图片走请求体原始字节(与头像上传同款约定,免 multipart 依赖),question 走 query。
+        识别结果是检索候选而非鉴定结论:由【图片识别】块与系统提示词双重声明,不写死结论。
+        """
+        data = await request.body()
+        if not data:
+            raise HTTPException(400, '未收到图片')
+        if len(data) > 8 * 1024 * 1024:
+            raise HTTPException(413, '图片不能超过 8 MB')
+        frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(415, '仅支持 JPG / PNG / WebP 图片')
+        detections = await run_in_threadpool(_detect_birds, monitor, store, frame)
+        q = (question or '').strip() or '这是什么鸟？该怎么处理？'
+        if not assistant_mod.IN_FLIGHT.acquire():
+            raise HTTPException(409, '上一条回答仍在生成，请稍候')
+        names = ' '.join(name for name, _ in detections)
+        # 识别物种并入检索词:命中知识卡走既有一对多别名/名称匹配,统计意图词不受影响
+        blocks, refs = assistant_mod.retrieve((q + ' ' + names).strip(), store, user[1])
+        if detections:
+            detail = '、'.join(f'{name}(置信度{int(conf * 100)}%)' for name, conf in detections)
+            blocks.insert(0, '【图片识别】用户上传的图片经 YOLO 检出: ' + detail +
+                             '。识别结果是检索候选而非鉴定结论,回答时须向用户说明这一点。')
+        return _assistant_stream(assistant_mod.build_messages(q, blocks, []), refs)
+
     @app.get('/api/alarm-list')
     def alarm_list(species: Optional[str] = None, pending: bool = False, before: Optional[float] = None, user=Depends(auth)):
-        clauses, values = [], []
+        clauses, values = ['user_id=?'], [user[1]]
         if species:
             clauses.append('species=?'); values.append(species)
         if pending:
             clauses.append("status='new'")
         if before is not None:
             clauses.append('at<?'); values.append(before)
-        condition = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
+        condition = ' WHERE ' + ' AND '.join(clauses)
         return {'items': store.rows('SELECT * FROM alarms' + condition + ' ORDER BY at DESC LIMIT 100', tuple(values))}
 
-    @app.get('/api/media/{task_id}/{name}', dependencies=[Depends(media_auth)])
-    def video_media(task_id: str, name: str, ticket: str, download: bool = False):
+    @app.get('/api/media/{task_id}/{name}')
+    def video_media(task_id: str, name: str, ticket: str, download: bool = False, sid: str = Depends(media_auth)):
+        uid = uid_of_sid(sid)
+        owner_rows = store.rows('SELECT user_id FROM tasks WHERE id=?', (task_id,))
+        # 媒体归属:任务 owner 与票据账号不一致 → 404;无任务行的历史归档目录保持可读(老版本兼容)
+        if owner_rows and owner_rows[0]['user_id'] is not None and uid is not None and owner_rows[0]['user_id'] != uid:
+            raise HTTPException(404, '视频不存在或无权访问')
         if name == 'source':
             import mimetypes
             from pathlib import Path
@@ -578,15 +662,21 @@ def create_app(settings=None):
 
     @app.post('/api/monitor/stop')
     def stop(user=Depends(auth)):
+        # 仅任务归属者(或设备空闲时)可停止检测
+        if monitor.owner is not None and user[1] != monitor.owner:
+            raise HTTPException(403, '设备被其他账号占用，无法停止')
         return monitor.stop()
 
     @app.put('/api/settings')
     def configure(body: Preferences, user=Depends(auth)):
+        admin = store.rows('SELECT is_device_admin FROM users WHERE id=?', (user[1],))
+        if not admin or not admin[0]['is_device_admin']:
+            raise HTTPException(403, '仅设备管理员可修改设备参数')
         return store.configure(body.model_dump())
 
     @app.post('/api/alarms/{alarm_id}/ignore')
     def ignore(alarm_id: str, user=Depends(auth)):
-        store.ignore(alarm_id)
+        store.ignore(alarm_id, user[1])
         return {'ok': True}
 
     @app.post('/api/commands')
@@ -595,17 +685,27 @@ def create_app(settings=None):
 
     @app.post('/api/commands/{command_id}/stop')
     def stop_command(command_id: str, user=Depends(auth)):
-        return store.stop_command(command_id)
+        return store.stop_command(command_id, user[1])
 
-    @app.get('/api/frame/{key}.jpg', dependencies=[Depends(media_auth)])
-    def frame(key: str):
+    @app.get('/api/frame/{key}.jpg')
+    def frame(key: str, sid: str = Depends(media_auth)):
+        uid = uid_of_sid(sid)
+        task_id = key.rsplit('-', 1)[0]
+        owner_rows = store.rows('SELECT user_id FROM tasks WHERE id=?', (task_id,))
+        if not owner_rows or (owner_rows[0]['user_id'] is not None and uid is not None and owner_rows[0]['user_id'] != uid):
+            raise HTTPException(404, '该帧已过期，等待新画面')
         data = monitor.get_frame(key)
         if not data:
             raise HTTPException(404, '该帧已过期，等待新画面')
         return Response(data, media_type='image/jpeg', headers={'Cache-Control': 'no-store'})
 
-    @app.get('/api/captures/{name}', dependencies=[Depends(media_auth)])
-    def capture(name: str):
+    @app.get('/api/captures/{name}')
+    def capture(name: str, sid: str = Depends(media_auth)):
+        uid = uid_of_sid(sid)
+        task_id = name.rsplit('-', 1)[0]
+        owner_rows = store.rows('SELECT user_id FROM tasks WHERE id=?', (task_id,))
+        if not owner_rows or (owner_rows[0]['user_id'] is not None and uid is not None and owner_rows[0]['user_id'] != uid):
+            raise HTTPException(404)
         path = (settings.data_dir / 'captures' / name).resolve()
         if path.parent != (settings.data_dir / 'captures').resolve() or not path.is_file():
             raise HTTPException(404)

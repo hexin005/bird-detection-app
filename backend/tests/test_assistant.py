@@ -236,3 +236,91 @@ class AssistantApiTests(unittest.TestCase):
         self.assertEqual(events[-1]['type'], 'error')
         deltas = ''.join(e['text'] for e in events if e['type'] == 'delta')
         self.assertEqual(deltas, '部分')
+
+
+class AssistantImageChatTests(unittest.TestCase):
+    """图片提问:cv2 可解码图 → mock YOLO 单帧检测 → 识别物种并入检索 → SSE 全链路。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.settings = Settings(Path(self.tmp.name), Path('missing.pt'), Path('missing.mp4'),
+                                 'tester', 'test-password', 'test-secret', worker_enabled=False,
+                                 deepseek_key='test-key', deepseek_base_url='http://upstream.test')
+        self.app = create_app(self.settings)
+        self.client = TestClient(self.app)
+        self.client.__enter__()
+        token = self.client.post('/api/login', json={'username': 'tester', 'password': 'test-password'}).json()['token']
+        self.headers = {'Authorization': 'Bearer ' + token}
+        import cv2
+        import numpy as np
+        ok, buf = cv2.imencode('.png', np.zeros((24, 24, 3), dtype=np.uint8))
+        assert ok
+        self.image_bytes = buf.tobytes()
+        self._patch_detect([('八哥', 0.91), ('树麻雀', 0.43)])
+
+    def tearDown(self):
+        self.client.__exit__(None, None, None)
+        self.tmp.cleanup()
+
+    def _patch_detect(self, detections):
+        """替换 main._detect_birds:测试不加载真实 YOLO 权重,只验证检索与流式接线。"""
+        import backend.main as m
+        original = m._detect_birds
+        m._detect_birds = lambda monitor, store, frame: list(detections)
+        self.addCleanup(lambda: setattr(m, '_detect_birds', original))
+
+    def _patch_transport(self, transport):
+        import backend.assistant as m
+        original = m.stream_answer
+
+        async def patched(messages, settings, transport_=None):
+            async for d in original(messages, settings, transport):
+                yield d
+        m.stream_answer = patched
+        self.addCleanup(lambda: setattr(m, 'stream_answer', original))
+
+    def _post_image(self, question=''):
+        from urllib.parse import quote
+        url = '/api/assistant/chat-image' + (f'?question={quote(question)}' if question else '')
+        return self.client.stream('POST', url, content=self.image_bytes,
+                                  headers={**self.headers, 'Content-Type': 'image/png'})
+
+    def test_image_question_streams_with_species_refs(self):
+        self._patch_transport(upstream_sse('图片', '回答'))
+        with self._post_image('这只鸟怎么防') as resp:
+            self.assertEqual(resp.status_code, 200)
+            events = [json.loads(line[5:]) for line in resp.iter_lines() if line.startswith('data:')]
+        self.assertEqual(events[0]['type'], 'meta')
+        self.assertEqual(events[-1]['type'], 'done')
+        deltas = ''.join(e['text'] for e in events if e['type'] == 'delta')
+        self.assertEqual(deltas, '图片回答')
+        # 识别物种(八哥)并入检索词 → 命中其知识卡;低置信树麻雀同卡命中
+        names = {r.get('name') for r in events[0]['refs'] if r['kind'] == 'species'}
+        self.assertIn('八哥', names)
+        self.assertIn('树麻雀', names)
+
+    def test_image_question_default_question_and_empty_detection(self):
+        self._patch_detect([])
+        self._patch_transport(upstream_sse('通用', '回答'))
+        with self._post_image() as resp:  # 不带 question → 用默认追问
+            self.assertEqual(resp.status_code, 200)
+            events = [json.loads(line[5:]) for line in resp.iter_lines() if line.startswith('data:')]
+        self.assertEqual(events[-1]['type'], 'done')
+        self.assertEqual(''.join(e['text'] for e in events if e['type'] == 'delta'), '通用回答')
+
+    def test_image_requires_body_and_valid_image(self):
+        self._patch_transport(upstream_sse('x'))
+        resp = self.client.post('/api/assistant/chat-image', content=b'', headers=self.headers)
+        self.assertEqual(resp.status_code, 400)
+        resp = self.client.post('/api/assistant/chat-image', content=b'not-an-image', headers=self.headers)
+        self.assertEqual(resp.status_code, 415)
+
+    def test_image_in_flight_409(self):
+        self._patch_transport(upstream_sse('x'))
+        self.assertTrue(mod.IN_FLIGHT.acquire())
+        try:
+            resp = self.client.post('/api/assistant/chat-image?question=x',
+                                    content=self.image_bytes, headers=self.headers)
+            self.assertEqual(resp.status_code, 409)
+        finally:
+            mod.IN_FLIGHT.release()
