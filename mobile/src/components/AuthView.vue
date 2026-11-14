@@ -16,6 +16,22 @@ const form = reactive({
 })
 const passwordFocused = ref(false)
 const focusPassword = () => { passwordFocused.value = true }
+
+/* 记住密码(演示级):Base64 混淆存本地仅省去重复输入,可被还原;正式产品应使用长会话令牌 */
+const remember = ref(false)
+const rememberKey = (server: string) => 'bird-remember:' + server.replace(/^https?:\/\//, '')
+const b64 = {
+  enc: (v: string) => window.btoa(unescape(encodeURIComponent(v))),
+  dec: (v: string) => decodeURIComponent(escape(window.atob(v))),
+}
+try {
+  const saved = uni.getStorageSync(rememberKey(form.server)) as { account?: string; password?: string } | ''
+  if (saved && saved.account && saved.password) {
+    form.account = saved.account
+    form.password = b64.dec(saved.password)
+    remember.value = true
+  }
+} catch { /* 本地存储不可用则忽略 */ }
 const demoCode = ref(''), sending = ref(false), countdown = ref(0), busy = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
 /* 密码小眼睛:每个密码框独立切换明文/密文 */
@@ -39,6 +55,11 @@ async function run(action: () => Promise<unknown>) {
 function doLogin() {
   void run(async () => {
     await store.login(form.server, form.account.trim(), form.password)
+    if (remember.value) {
+      uni.setStorageSync(rememberKey(form.server), { account: form.account.trim(), password: b64.enc(form.password) })
+    } else {
+      uni.removeStorageSync(rememberKey(form.server))
+    }
     form.password = ''
   })
 }
@@ -112,7 +133,13 @@ function doReset() {
     <view class="qh-input"><input v-model="form.account" type="text" placeholder="邮箱或用户名" confirm-type="next" @confirm="focusPassword" @keyup.enter="focusPassword" @focus="passwordFocused = false" /></view>
     <text class="qh-auth-lbl">密码</text>
     <view class="qh-input"><input v-model="form.password" :focus="passwordFocused" :type="eyes.login ? 'text' : 'password'" placeholder="请输入密码" confirm-type="done" @confirm="doLogin" @keyup.enter="doLogin" /><button class="qh-eye" @click="toggleEye('login')"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><template v-if="eyes.login"><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></template><template v-else><path d="M1.5 9C3.5 5 6 3.4 9 3.4S14.5 5 16.5 9C14.5 13 12 14.6 9 14.6S3.5 13 1.5 9z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15.5L15.5 2.6" stroke="currentColor" stroke-width="1.5"/></template></svg></button></view>
-    <view style="display:flex;justify-content:flex-end;margin-top:8px"><text class="qh-auth-link" @click="switchMode('forgot')">忘记密码?</text></view>
+    <view style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <view class="qh-remember" @click="remember = !remember">
+        <view class="qh-remember-box" :class="{ on: remember }"><text v-if="remember">✓</text></view>
+        <text class="qh-remember-t">记住密码</text>
+      </view>
+      <text class="qh-auth-link" @click="switchMode('forgot')">忘记密码?</text>
+    </view>
     <button class="qh-btn qh-btn--primary" style="margin-top:10px" :disabled="busy || !form.account || !form.password" @click="doLogin">{{ busy ? '正在连接…' : '登录并进入果园' }}</button>
   </view>
 
@@ -155,3 +182,9 @@ function doReset() {
 
   <text class="qh-auth-foot" style="display:block">没有账号?切换到「注册」,邮箱 + 验证码即可加入 · 密码 PBKDF2 加盐存储</text>
 </template>
+<style scoped>
+.qh-remember{display:flex;align-items:center;gap:7px;cursor:pointer}
+.qh-remember-box{width:16px;height:16px;border:2px solid var(--ink-900);background:var(--surface-card);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:var(--ink-900)}
+.qh-remember-box.on{background:var(--ink-900);color:var(--surface-card)}
+.qh-remember-t{font-size:var(--text-xs);font-weight:700;color:var(--ink-700)}
+</style>

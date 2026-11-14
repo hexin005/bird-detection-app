@@ -55,10 +55,11 @@ watch(() => host.s?.counts.pending, (now, prev) => {
 })
 watch(() => host.page, p => { if (p === 'alarms') stopAlertTitleFlash() })
 
-// P1 鸟情提醒:检测到鸟即提示(不限状态)——自动规则接管后 pending 不增,靠 latest_detection 补位
+// P1 鸟情提醒:检测到鸟即提示(不限状态)——自动规则接管后 pending 不增,靠 latest_detection 补位。
+// 首屏守卫:第一次快照(prev===undefined)只记基线不弹窗,登录/刷新不重复播报历史鸟情。
 let lastDetectionNotifyId = ''
 watch(() => host.s?.latest_detection?.id, (now, prev) => {
-  if (!now || now === prev || now === lastDetectionNotifyId) return
+  if (!now || prev === undefined || now === prev || now === lastDetectionNotifyId) return
   lastDetectionNotifyId = now
   const d = host.s?.latest_detection
   if (d) notify(`监测到鸟情：${d.species} ${d.count} 只`)

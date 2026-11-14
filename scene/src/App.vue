@@ -322,8 +322,10 @@ function taskFromDetail(detail) {
   }
 }
 
-/** 检测完成 → 按任务汇总出鸟;自动模式下果农随即集结(后续走既有作业/驱离/返回链) */
-function adoptTaskSummary(task) {
+/** 检测完成 → 按任务汇总出鸟;自动模式下果农随即集结(后续走既有作业/驱离/返回链)。
+ * replay=true(深链 ?task= 显式回看)时始终正常落鸟——回看是为了再次演示驱离;
+ * "已处理即散鸟"只作用于实时链路(后端推送 last_task),保持与记录一致。 */
+function adoptTaskSummary(task, replay = false) {
   if (!handle || !task || !Array.isArray(task.species) || !task.species.length) return
   if (task.task_id && task.task_id === seenTaskId.value) return
   seenTaskId.value = task.task_id || ''
@@ -331,16 +333,17 @@ function adoptTaskSummary(task) {
   const count = handle.adoptFromSummary(task.species)
   birdCount.value = count
   taskSummary.value = task
-  // P3:该任务告警已全部处理(自动规则/人工) → 3D 与记录一致,复现即散去
   const taskAlarms = state.alarms.filter((a) => a.task_id === task.task_id)
   const allProcessed = taskAlarms.length > 0 && taskAlarms.every((a) => a.status !== 'new')
-  if (allProcessed && count > 0) {
+  if (!replay && allProcessed && count > 0) {
     handle.disperse(1)
     birdCount.value = 0
     flash(`检测完成复现 · ${task.species.length} 种 · 鸟情已处理，鸟群已散去`)
     return
   }
-  flash(`检测完成复现 · ${task.species.length} 种 · ${count} 只鸟已落位`)
+  flash(replay && allProcessed
+    ? `检测完成复现 · ${task.species.length} 种 · ${count} 只鸟已落位（该任务告警已处理 · 复现演示）`
+    : `检测完成复现 · ${task.species.length} 种 · ${count} 只鸟已落位`)
   if (responseMode.value === 'auto' && crewPhase.value === 'patrol' && count > 0) {
     crewPhase.value = 'alert' // 集结 → onCrewAlertReady → 前往设备 → 自动驱离
   }
@@ -366,7 +369,7 @@ function fetchDeepTask() {
     headers: { Authorization: 'Bearer ' + state.token },
   })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
-    .then((detail) => { if (detail) adoptTaskSummary(taskFromDetail(detail)) })
+    .then((detail) => { if (detail) adoptTaskSummary(taskFromDetail(detail), true) })
     .catch(() => {
       deepTaskRetries += 1
       if (deepTaskRetries < deepTaskMaxRetries) setTimeout(fetchDeepTask, 2000)

@@ -260,7 +260,7 @@ class UserStoreTests(unittest.TestCase):
         self.store.set_user_theme(1, 'pixel')
         self.assertEqual(self.store.get_profile(1)['theme'], 'pixel')
         other = self.store.create_user('other@x.com', 'password123')
-        self.assertEqual(other['theme'], 'b1bit')
+        self.assertEqual(other['theme'], 'signal')
 
     def test_set_password_revokes_sessions(self):
         token = self.store.login('tester', 'test-password')
@@ -304,7 +304,7 @@ class AuthApiTests(unittest.TestCase):
         me = self.client.get('/api/me', headers={'Authorization': 'Bearer ' + token}).json()
         self.assertEqual(me['email'], 'new@example.com')
         self.assertEqual(me['display_name'], '果园用户')
-        self.assertEqual(me['theme'], 'b1bit')
+        self.assertEqual(me['theme'], 'signal')
         via_email = self.client.post('/api/login', json={'username': 'new@example.com', 'password': 'password123'})
         self.assertEqual(via_email.status_code, 200)
         duplicate = self.client.post('/api/auth/register', json={'email': 'NEW@example.com', 'code': '123456', 'password': 'password123'})
@@ -363,7 +363,7 @@ class AuthApiTests(unittest.TestCase):
         registered = self._send('second@x.com', 'register').json()
         second = self.client.post('/api/auth/register', json={'email': 'second@x.com', 'code': registered['demo_code'], 'password': 'password123'}).json()
         me_second = self.client.get('/api/me', headers={'Authorization': 'Bearer ' + second['token']}).json()
-        self.assertEqual(me_second['theme'], 'b1bit')
+        self.assertEqual(me_second['theme'], 'signal')
 
     def test_display_name_update(self):
         response = self.client.put('/api/me', json={'display_name': '果园老周'}, headers=self.headers)

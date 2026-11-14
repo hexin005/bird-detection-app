@@ -194,6 +194,8 @@ class Store:
             db.execute('INSERT INTO users (username, password, email, display_name) VALUES (?,?,?,?)',
                        (username, hash_password(password), email, '果园用户'))
             user_id = db.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()[0]
+            # 新账号默认主题 C(信号台);用户选定主题后按账号持久化,登录恢复走 /me
+            db.execute('INSERT INTO user_preferences (user_id, theme) VALUES (?,?)', (user_id, 'signal'))
         return self.get_profile(user_id)
 
     def set_username(self, user_id, username):

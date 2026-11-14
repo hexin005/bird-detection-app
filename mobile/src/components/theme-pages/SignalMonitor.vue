@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // 信号站监控主页 —— 1:1 复刻 docs/ui-y/c-signal.html(真实数据 + 语义事件)
 // 口径:信号等级=「待处理等级」(counts.pending 全量);0 条=独立"静止"态,不高亮警示。
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useHost, clock, shortTime, modeCn } from '../host/hostContext'
 import { useWorkspace } from '../host/useWorkspace'
 import { useOrchard } from '../../store'
 import VideoPlayer from '../VideoPlayer.vue'
-import type { Stats } from '../../types'
+import type { LibraryDetail, Stats } from '../../types'
 
 const host = useHost()
 const store = useOrchard()
@@ -28,7 +28,44 @@ const ticker = computed(() => {
 const fmtSec = (v: number | null | undefined) => v == null ? '暂无' : `${v.toFixed(1)}s`
 
 async function loadStats() { try { stats.value = await store.request<Stats>('/stats?range=today') } catch { /* 观测带显示 0 */ } }
-onMounted(loadStats)
+
+// 今日观测带实时刷新:新增告警/指令完成/回前台 → 防抖重拉,数字口径不变
+let statsTimer = 0
+function scheduleStats() {
+  clearTimeout(statsTimer)
+  statsTimer = setTimeout(() => { void loadStats() }, 800) as unknown as number
+}
+watch(() => JSON.stringify([host.s?.counts.total, host.s?.counts.completed, host.s?.counts.pending]), scheduleStats)
+onMounted(() => {
+  void loadStats()
+  document.addEventListener('visibilitychange', scheduleStats)
+})
+onBeforeUnmount(() => {
+  clearTimeout(statsTimer)
+  document.removeEventListener('visibilitychange', scheduleStats)
+})
+
+// 本次检测汇总卡(对齐 VideoWorkspace 完成态):仅「本会话内看到完成」的任务展示,3D 深链复现
+const summary = ref<LibraryDetail | null>(null)
+const freshTask = ref('')
+const showSummary = computed(() =>
+  !!freshTask.value && freshTask.value === ws.monitor.value?.task_id &&
+  !!ws.monitor.value?.result_ready && ws.sameVideo.value)
+const totalBirds = computed(() => summary.value?.species.reduce((n, s) => n + s.peak_count, 0) ?? 0)
+watch(() => ws.monitor.value?.status, st => {
+  const task = ws.monitor.value?.task_id
+  if ((st === 'ended' || st === 'stopped') && task && task !== freshTask.value) {
+    freshTask.value = task; summary.value = null
+    void store.request<LibraryDetail>('/library/' + task).then(d => { summary.value = d }).catch(() => { summary.value = null })
+  }
+})
+/** 汇总卡 → 记录页深链(复用 DetectionRecords 的自动展开) */
+function goRecord() {
+  const task = ws.monitor.value?.task_id
+  if (!task) return
+  host.archiveTask = task; host.archiveTime = 0; host.archiveNonce++
+  host.nav('records')
+}
 
 function requestRepel() {
   if (!canRepel.value) return
@@ -131,6 +168,26 @@ function requestRepel() {
     </view>
   </view>
 
+  <!-- 本次检测汇总卡(一检一记):检测完成自动出现,3D 深链复现驱赶 -->
+  <view v-if="showSummary" class="sgn-sum">
+    <view class="sgn-sum-hd">
+      <text class="sgn-sum-t">本次检测</text>
+      <text v-if="summary" class="sgn-sum-badge mono">{{ summary.species.length }} 种 · {{ totalBirds }} 只</text>
+      <text v-else class="sgn-sum-badge sgn-sum-badge--idle mono">汇总中…</text>
+    </view>
+    <template v-if="summary">
+      <view v-for="s in summary.species" :key="s.species" class="sgn-sum-row">
+        <text class="sp">{{ s.species }}</text><view class="dots"/><text class="n mono">{{ s.peak_count }}</text>
+      </view>
+      <text v-if="!summary.species.length" class="sgn-sum-empty">本次未检出鸟类 — 结果已归档，可回看完整视频</text>
+      <text class="sgn-sum-meta">逐帧明细与回放已归档到「检测记录」 · 检测中产生 {{ summary.alarms.length }} 条告警</text>
+      <view class="sgn-sum-btns">
+        <button class="sgn-sum-btn ghost" @click="goRecord">查看记录</button>
+        <button class="sgn-sum-btn" @click="host.openScene(ws.monitor.value?.task_id)">3D 场景复现驱赶</button>
+      </view>
+    </template>
+  </view>
+
   <!-- 今日观测带 -->
   <view class="sgn-obs">
     <view><text class="b mono">{{ stats ? stats.breakdown.new + stats.breakdown.processing + stats.breakdown.handled + stats.breakdown.ignored : 0 }}</text><text class="s">今日告警</text></view>
@@ -214,6 +271,21 @@ function requestRepel() {
 .sgn-ws-prog .bar { flex:1; height:10px; border:2px solid #191919; }
 .sgn-ws-prog .bar view { height:100%; background:#191919; }
 .sgn-ws-err { font-size:10px; color:#d3212c; font-weight:700; }
+/* 本次检测汇总卡 */
+.sgn-sum { margin-top:12px; border:2px solid #191919; background:var(--surface-card); box-shadow:3px 4px 0 var(--shadow-ink); }
+.sgn-sum-hd { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:2px solid #191919; }
+.sgn-sum-t { font-size:12px; font-weight:900; letter-spacing:2px; }
+.sgn-sum-badge { font-size:10px; font-weight:900; background:#f5c400; border:2px solid #191919; padding:2px 8px; color:#191919; }
+.sgn-sum-badge--idle { background:var(--surface-muted); color:var(--ink-400); border-color:var(--ink-400); }
+.sgn-sum-row { display:flex; align-items:baseline; gap:8px; padding:7px 12px; border-bottom:1px dashed var(--line-strong); }
+.sgn-sum-row .sp { font-size:13px; font-weight:900; }
+.sgn-sum-row .dots { flex:1; border-bottom:2px dotted #6f6f68; transform:translateY(-3px); }
+.sgn-sum-row .n { font-size:15px; font-weight:700; }
+.sgn-sum-empty { display:block; padding:8px 12px; font-size:10.5px; color:var(--ink-400); }
+.sgn-sum-meta { display:block; padding:7px 12px 0; font-size:9px; color:var(--ink-400); }
+.sgn-sum-btns { display:flex; gap:8px; padding:10px 12px 12px; }
+.sgn-sum-btn { flex:1; min-height:36px; border:2px solid #191919; background:#191919; color:#f5c400; font-size:12px; font-weight:900; letter-spacing:1px; cursor:pointer; }
+.sgn-sum-btn.ghost { background:var(--surface-card); color:#191919; }
 /* 今日观测带 */
 .sgn-obs { display:flex; margin-top:12px; border:2px solid #191919; background:var(--surface-card); }
 .sgn-obs > view { flex:1; text-align:center; padding:9px 0 8px; border-right:2px solid #191919; display:flex; flex-direction:column; gap:2px; }
