@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PREVIEW 3 · 视频档案 · 挂绳日历下拉筛选</title>
+<style>
+  :root{--ink:#191919;--yellow:#f5c400;--red:#d3212c;--paper:#f4f3ec;--muted:#6f6f68;--card:#ffffff}
+  *{box-sizing:border-box}
+  body{margin:0;background:#d8d6cb;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+  .phone{width:390px;margin:0 auto;min-height:844px;background:var(--paper);padding-bottom:64px;position:relative}
+  .back{padding:12px 92px 4px 14px;display:flex;justify-content:space-between;align-items:center}
+  .back .bk{font-size:13px;font-weight:900;cursor:pointer}
+  .back .sub{font-size:10px;color:var(--muted)}
+  .subtabs{display:flex;margin:8px 14px 0;border:2px solid var(--ink);background:var(--card)}
+  .subtab{flex:1;text-align:center;padding:9px 0;font-size:12.5px;font-weight:900;letter-spacing:2px;cursor:pointer;color:var(--muted)}
+  .subtab.on{color:var(--ink);background:var(--yellow)}
+  /* 唯一新增:挂绳小牌 + 点击垂下日历 */
+  .hang{position:absolute;top:0;right:18px;z-index:60;display:flex;flex-direction:column;align-items:center}
+  .rope{width:0;height:12px;border-left:2px dashed var(--ink)}
+  .tag{display:flex;align-items:center;gap:4px;border:2px solid var(--ink);background:var(--card);color:var(--ink);font-size:10.5px;font-weight:900;padding:4px 8px;cursor:pointer;letter-spacing:1px;box-shadow:2px 2px 0 rgba(25,25,25,.25);font-family:inherit}
+  .tag:hover{background:var(--yellow)}
+  .tag.on{background:var(--yellow)}
+  .cal{position:absolute;top:calc(100% + 3px);right:-10px;width:288px;border:2px solid var(--ink);background:var(--card);box-shadow:6px 8px 0 rgba(25,25,25,.3);padding:9px 11px 11px;transform-origin:top center;transform:translateY(-10px);opacity:0;visibility:hidden;transition:transform .26s ease-out,opacity .22s ease-out,visibility .26s;cursor:default}
+  .hang.open .cal{transform:none;opacity:1;visibility:visible}
+  .cal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+  .cal-hd .nav{font-size:12.5px;font-weight:900}
+  .cal-hd .nav span{cursor:pointer;padding:0 6px}
+  .cal-hd .r{display:flex;align-items:center;gap:9px}
+  .cal-hd .clr{font-size:9.5px;font-weight:800;color:var(--red);text-decoration:underline;cursor:pointer}
+  .cal-hd .x{font-size:10px;font-weight:900;cursor:pointer;border:2px solid var(--ink);width:18px;height:18px;display:flex;align-items:center;justify-content:center}
+  .week,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .week span{text-align:center;font-size:9px;font-weight:800;color:var(--muted);padding:2px 0}
+  .cell{height:31px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;border:2px solid transparent;background:var(--paper);cursor:pointer}
+  .cell:hover{border-color:var(--ink)}
+  .cell.empty{background:transparent;border:none;cursor:default}
+  .cell.sel{background:var(--yellow);border-color:var(--ink)}
+  .cell.today{border-color:var(--red)}
+  .cal-hint{margin-top:7px;font-size:9px;color:var(--muted)}
+  /* 原布局:档案卡列表,未改动(平铺,无分组标题) */
+  .card{margin:10px 14px 0;border:2px solid var(--ink);background:var(--card);box-shadow:4px 4px 0 rgba(25,25,25,.2);padding:11px 12px;cursor:pointer}
+  .card .top{display:flex;align-items:center;gap:8px}
+  .card .cover{width:30px;height:30px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .card .name{font-size:13px;font-weight:900;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{flex-shrink:0;font-size:9.5px;font-weight:900;border:2px solid var(--ink);padding:2px 7px}
+  .badge.handled{background:var(--yellow)}
+  .card .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .card .sp{font-size:10px;border:1.5px solid var(--ink);padding:1px 7px;font-weight:700}
+  .card .bottom{display:flex;justify-content:space-between;margin-top:9px;font-size:10px;color:var(--muted)}
+  .card .go{font-weight:900;color:var(--ink)}
+  .emptynote{margin:18px 14px 0;border:2px dashed var(--ink);padding:18px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
+  .tabbar{display:flex;position:absolute;left:0;right:0;bottom:0;z-index:40;border-top:2px solid var(--ink);background:var(--paper)}
+  .tabbar div{flex:1;text-align:center;padding:11px 0;font-size:14px;font-weight:800;border-right:1px solid var(--ink)}
+  .tabbar div:last-child{border-right:none}
+  .tabbar .on{background:var(--ink);color:var(--yellow)}
+  .more{display:block;width:calc(100% - 28px);margin:12px 14px 0;border:2px solid var(--ink);background:var(--card);font-size:12px;font-weight:900;padding:9px 0;cursor:pointer;letter-spacing:1px}
+  .more span{font-weight:400;font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 挂绳小牌:点一下日历垂下来 -->
+  <div class="hang" id="hang">
+    <i class="rope"></i>
+    <button class="tag" id="tag">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5.5h11M4.5 1v3M9.5 1v3" stroke="currentColor" stroke-width="1.5"/></svg>
+      日期
+    </button>
+    <div class="cal">
+      <div class="cal-hd">
+        <span class="nav"><span>‹</span> 2026年11月 <span>›</span></span>
+        <span class="r"><span class="clr" id="clr">清除筛选</span><span class="x" id="close">✕</span></span>
+      </div>
+      <div class="week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="grid" id="grid"></div>
+      <div class="cal-hint">点某一天 = 只看该日 · 清除筛选恢复全部</div>
+    </div>
+  </div>
+
+  <div class="back"><span class="bk">◂ 返回时间轴</span><span class="sub">视频档案 · 18 卷</span></div>
+
+  <div class="subtabs">
+    <div class="subtab on">按视频</div>
+    <div class="subtab">按鸟类</div>
+  </div>
+
+  <div class="card" data-day="11月14日">
+    <div class="top">
+      <div class="cover"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4.5v7l5.5-3.5L6 4.5z" fill="#191919"/></svg></div>
+      <span class="name">11-14 果园东冠层巡查.mp4</span>
+      <span class="badge handled">已归档</span>
+    </div>
+    <div class="chips"><span class="sp">树麻雀</span><span class="sp">白喉红臀鹎</span></div>
+    <div class="bottom"><span>11-14 09:12 · 86.4 秒</span><span class="go">回看 ›</span></div>
+  </div>
+
+  <div class="card" data-day="11月13日">
+    <div class="top">
+      <div class="cover"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4.5v7l5.5-3.5L6 4.5z" fill="#191919"/></svg></div>
+      <span class="name">11-13 demo-bird 演示录像.mp4</span>
+      <span class="badge handled">已归档</span>
+    </div>
+    <div class="chips"><span class="sp">东方喜鹊</span><span class="sp">八哥</span></div>
+    <div class="bottom"><span>11-13 17:01 · 45.0 秒</span><span class="go">回看 ›</span></div>
+  </div>
+
+  <div class="card" data-day="11月12日">
+    <div class="top">
+      <div class="cover"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4.5v7l5.5-3.5L6 4.5z" fill="#191919"/></svg></div>
+      <span class="name">11-12 果园北侧围栏定点.mp4</span>
+      <span class="badge" style="background:var(--surface-muted)">未检出</span>
+    </div>
+    <div class="chips"><span class="sp" style="color:var(--muted);border-color:var(--muted)">未检出鸟类</span></div>
+    <div class="bottom"><span>11-12 15:31 · 60.2 秒</span><span class="go">回看 ›</span></div>
+  </div>
+
+  <div class="emptynote" id="empty" style="display:none">该日暂无视频档案 · 点右上挂绳「清除筛选」查看全部</div>
+
+  <button class="more" id="more">加载更多 ▾ <span>· 已显示 6 / 18 卷</span></button>
+
+  <div class="tabbar"><div>信号台</div><div>告警</div><div>升降</div><div class="on">记录</div><div>我的</div></div>
+</div>
+
+<script>
+  // 挂绳日历:点挂绳开合;点某天=只看该日;清除恢复全部。纯预览演示。
+  const TODAY=15, DAYS=30
+  const hang=document.getElementById('hang'),tag=document.getElementById('tag'),
+        grid=document.getElementById('grid'),clr=document.getElementById('clr'),
+        close=document.getElementById('close'),more=document.getElementById('more')
+  const cards=[...document.querySelectorAll('.card[data-day]')]
+  const ICON='<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5.5h11M4.5 1v3M9.5 1v3" stroke="currentColor" stroke-width="1.5"/></svg>'
+  let active=null
+  for(let d=1;d<=DAYS;d++){
+    const c=document.createElement('div')
+    c.className='cell'+(d===TODAY?' today':'')
+    c.textContent=d;c.dataset.d=d
+    grid.appendChild(c)
+  }
+  grid.addEventListener('click',e=>{
+    const c=e.target.closest('.cell');if(!c)return
+    active=Number(c.dataset.d);render();hang.classList.remove('open')
+  })
+  tag.addEventListener('click',()=>hang.classList.toggle('open'))
+  close.addEventListener('click',()=>hang.classList.remove('open'))
+  clr.addEventListener('click',()=>{active=null;render();hang.classList.remove('open')})
+  function render(){
+    cards.forEach(el=>{el.style.display=(!active||el.dataset.day==='11月'+active+'日')?'':'none'})
+    more.style.display=active?'none':''
+    const visible=cards.filter(el=>el.style.display!=='none').length
+    document.getElementById('empty').style.display=(active&&visible===0)?'block':'none'
+    ;[...grid.children].forEach(c=>c.classList.toggle('sel',Number(c.dataset.d)===active))
+    if(active){tag.classList.add('on');tag.innerHTML='11·'+String(active).padStart(2,'0')}
+    else{tag.classList.remove('on');tag.innerHTML=ICON+'日期'}
+  }
+</script>
+</body>
+</html>

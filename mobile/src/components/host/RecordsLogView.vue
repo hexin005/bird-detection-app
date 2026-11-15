@@ -1,15 +1,24 @@
 <script setup lang="ts">
 // R1 巡逻日志共享组件:按日分组 + 指令链归并(确认→执行→回执合并为组)。
 // 四主题记录页复用;观感走主题 token。
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useHost, names, clock, type EventGroup } from './hostContext'
 
 const host = useHost()
 
+/** 初始只渲染 20 组,「加载更多 ▾」渐进 +20;当前批耗尽且还有更早时续拉 loadHistory */
+const visible = ref(20)
+const shownGroups = computed(() => host.groupedEvents.slice(0, visible.value))
+const hasHiddenGroups = computed(() => visible.value < host.groupedEvents.length)
+function loadMore() {
+  if (hasHiddenGroups.value) { visible.value += 20; return }
+  if (!host.historyEnd) void host.run(host.loadHistory)
+}
+
 /** 日桶:组按天再聚合,今天标注"今天" */
 const dayBuckets = computed(() => {
   const buckets: { label: string; today: boolean; groups: EventGroup[] }[] = []
-  for (const g of host.groupedEvents) {
+  for (const g of shownGroups.value) {
     const last = buckets[buckets.length - 1]
     if (last && last.label === g.day) last.groups.push(g)
     else buckets.push({ label: g.day, today: g.today, groups: [g] })
@@ -55,7 +64,7 @@ async function inspectGroup(g: EventGroup) {
     </template>
   </template>
   <view v-if="!host.groupedEvents.length" class="rl-empty"><text class="qh-note">开始巡护，留下第一条记录</text></view>
-  <button v-if="!host.historyEnd && ((host.s?.events.length || 0) >= 100 || host.older.length)" class="qh-btn qh-btn--secondary qh-btn--sm rl-more" :disabled="host.store.busy" @click="host.run(host.loadHistory)">加载更早记录</button>
+  <button v-if="hasHiddenGroups || !host.historyEnd" class="qh-btn qh-btn--secondary qh-btn--sm rl-more" :disabled="host.store.busy" @click="loadMore">加载更多 ▾</button>
 </template>
 
 <style scoped>

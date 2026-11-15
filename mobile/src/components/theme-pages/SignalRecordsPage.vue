@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import { useHost, clock } from '../host/hostContext'
 import VideoLibrary from '../VideoLibrary.vue'
+import RecordsDateFilter from '../host/RecordsDateFilter.vue'
 import type { Alarm } from '../../types'
 
 const host = useHost()
@@ -15,22 +16,44 @@ function openArchive() { view.value = 'archive' }
 function backTimeline() { view.value = 'timeline' }
 
 type TimelineRow = { key: string; at: number; message: string; ref: string; alarm?: Alarm }
-type DayBucket = { label: string; today: boolean; rows: TimelineRow[] }
 function alarmOf(refId: string): Alarm | undefined {
   return host.s?.alarms.find(a => a.id === refId)
 }
-/** 只保留检测发现,按日分组(共用 groupedEvents 的归并结果,不含指令链/忽略/自动化) */
-const days = computed<DayBucket[]>(() => {
-  const buckets: DayBucket[] = []
+/** 只保留检测发现(挂绳日历选日时按 recordDate 客户端过滤),先平铺再按日分组 */
+const allRows = computed<TimelineRow[]>(() => {
+  const rows: TimelineRow[] = []
   for (const g of host.groupedEvents) {
     if (g.kind !== 'detection') continue
-    const row: TimelineRow = { key: g.key, at: g.at, message: g.title, ref: g.ref, alarm: alarmOf(g.ref) }
+    if (host.recordDate) {
+      const d = new Date(g.at * 1000)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (key !== host.recordDate) continue
+    }
+    rows.push({ key: g.key, at: g.at, message: g.title, ref: g.ref, alarm: alarmOf(g.ref) })
+  }
+  return rows
+})
+/** 初始只渲染 20 条,「加载更多 ▾」渐进 +20;当前批耗尽且还有更早时续拉 loadHistory */
+const visible = ref(20)
+const shownRows = computed(() => allRows.value.slice(0, visible.value))
+const dayBuckets = computed(() => {
+  const now = new Date(), today = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`
+  const buckets: { label: string; today: boolean; rows: TimelineRow[] }[] = []
+  for (const row of shownRows.value) {
+    const d = new Date(row.at * 1000)
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    const label = key === today ? `${d.getMonth() + 1}月${d.getDate()}日 · 今天` : `${d.getMonth() + 1}月${d.getDate()}日`
     const last = buckets[buckets.length - 1]
-    if (last && last.label === g.day) last.rows.push(row)
-    else buckets.push({ label: g.day, today: g.today, rows: [row] })
+    if (last && last.label === label) last.rows.push(row)
+    else buckets.push({ label, today: key === today, rows: [row] })
   }
   return buckets
 })
+const hasHiddenRows = computed(() => visible.value < allRows.value.length)
+function loadMore() {
+  if (hasHiddenRows.value) { visible.value += 20; return }
+  if (!host.historyEnd) void host.run(host.loadHistory)
+}
 function openRow(ref: string, at: number) {
   void host.inspectEvent({ id: 0, kind: 'detection', ref_id: ref, at, message: '' })
 }
@@ -41,15 +64,16 @@ function openRow(ref: string, at: number) {
   <template v-if="view === 'timeline'">
     <view class="tl-head">
       <view class="tl-title"><text class="tl-big">观测时间轴</text><text class="tl-tag">TIMELINE</text></view>
-      <view class="tl-vol"><text>ST.01 东区</text><text>发现即记录</text></view>
+      <!-- 挂绳日历:点牌垂下选天,只看该日(头部右侧让位,原「ST.01 东区/发现即记录」删除) -->
+      <RecordsDateFilter />
     </view>
     <view class="tl-strip">
       <view><text class="n mono">{{ host.recordsSummary?.today_tasks ?? '—' }}</text><text class="l">今日检测</text></view>
       <view><text class="n mono">{{ host.recordsSummary?.tasks_total ?? '—' }}</text><text class="l">累计档案</text></view>
     </view>
 
-    <template v-for="d in days" :key="d.label">
-      <view class="tl-day" :class="{ grey: !d.today }"><i class="sq"/><text class="d">{{ d.label }}<text v-if="d.today"> · 今天</text></text><i class="ln"/><text class="n2">{{ d.rows.length }} 次发现</text></view>
+    <template v-for="d in dayBuckets" :key="d.label">
+      <view class="tl-day" :class="{ grey: !d.today }"><i class="sq"/><text class="d">{{ d.label }}</text><i class="ln"/><text class="n2">{{ d.rows.length }} 次发现</text></view>
       <view class="tl-list">
         <view v-for="r in d.rows" :key="r.key" class="tl-ev" @click="openRow(r.ref, r.at)">
           <view class="r1">
@@ -63,8 +87,8 @@ function openRow(ref: string, at: number) {
         </view>
       </view>
     </template>
-    <view v-if="!days.length" class="tl-empty"><text class="qh-note">暂无鸟情发现 · 开始观测后按日记录在这里</text></view>
-    <button v-if="!host.historyEnd && ((host.s?.events.length || 0) >= 100 || host.older.length)" class="qh-btn qh-btn--secondary qh-btn--sm tl-more" :disabled="host.store.busy" @click="host.run(host.loadHistory)">加载更早发现</button>
+    <view v-if="!allRows.length" class="tl-empty"><text class="qh-note">{{ host.recordDate ? '该日暂无鸟情发现 · 点右上挂绳「清除筛选」查看全部' : '暂无鸟情发现 · 开始观测后按日记录在这里' }}</text></view>
+    <button v-if="hasHiddenRows || !host.historyEnd" class="qh-btn qh-btn--secondary qh-btn--sm tl-more" :disabled="host.store.busy" @click="loadMore">加载更多 ▾</button>
 
     <view class="tl-librow" @click="openArchive"><text>打开视频档案<text v-if="host.recordsSummary?.tasks_total != null"> · {{ host.recordsSummary.tasks_total }} 卷</text></text><text class="sub">按视频 / 按鸟类检索 ›</text></view>
     <text class="tl-note">时间轴只记鸟情发现，驱离操作以信号台播报为准 · 点卡片回看检测片段</text>
@@ -83,8 +107,6 @@ function openRow(ref: string, at: number) {
 .tl-title{display:flex;align-items:center;gap:8px}
 .tl-big{font-size:19px;font-weight:900;letter-spacing:3px;color:var(--ink-900)}
 .tl-tag{background:#f5c400;border:2px solid var(--ink-900);color:var(--ink-900);font-size:9px;font-weight:900;letter-spacing:2px;padding:3px 8px;box-shadow:2px 2px 0 var(--shadow-ink)}
-.tl-vol{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.tl-vol text{font-size:9px;color:var(--ink-400);letter-spacing:1px}
 /* 统计带 */
 .tl-strip{display:flex;border:2px solid var(--ink-900);background:var(--surface-card);margin:0 14px}
 .tl-strip>view{flex:1;text-align:center;padding:9px 0 8px;border-right:2px solid var(--ink-900);display:flex;flex-direction:column;gap:2px}

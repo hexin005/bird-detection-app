@@ -35,21 +35,28 @@ const dayGroups = computed(() => {
 })
 
 let offset = 0
+const PAGE = 20
 async function load(append = false) {
   const current = ++version; loading.value = true
   try {
-    const data = await host.store.request<{ items: LibraryItem[] }>(`/library?offset=${append ? offset : 0}`)
+    const query = new URLSearchParams({ offset: String(append ? offset : 0), limit: String(PAGE) })
+    if (host.recordDate) query.set('date', host.recordDate)
+    const data = await host.store.request<{ items: LibraryItem[] }>('/library?' + query)
     if (current !== version) return
     // 偏移量按原始分页累计(列表经 result_ready 过滤后长度不等于原始页大小)
     offset = append ? offset + data.items.length : data.items.length
     items.value = append ? [...items.value, ...data.items] : data.items
-    more.value = data.items.length === 30
+    more.value = data.items.length === PAGE
     error.value = ''
   } catch (e) { if (current === version) error.value = (e as Error).message } finally { if (current === version) loading.value = false }
 }
+// 挂绳日历换日:重置分页重拉(date 过滤在服务端,offset 语义随筛选变化)
+watch(() => host.recordDate, () => { offset = 0; void load() })
 
-/** 深链展开:目标不在已加载分页时继续向后翻页查找(上限 10 页);展开后滚动定位到该卡 */
+/** 深链展开:目标不在已加载分页时继续向后翻页查找(上限 10 页);展开后滚动定位到该卡。
+ *  单日筛选会隐藏其它日期的档案,深链进入时先清筛选再找。 */
 async function expandTask(id: string) {
+  if (host.recordDate) host.recordDate = ''
   let guard = 0
   while (!items.value.find(t => t.id === id) && more.value && guard++ < 10) await load(true)
   const target = items.value.find(t => t.id === id)
@@ -123,9 +130,9 @@ watch(() => [host.page, props.nonce ?? -2] as const, ([p, nonce]) => {
   </view>
 
   <view v-if="!archived.length && !loading" class="dr-empty">
-    <text>还没有检测记录 — 从监控页导入视频并开始检测，一次检测会在这里生成一条记录</text>
+    <text>{{ host.recordDate ? '该日暂无检测记录 · 点右上挂绳「清除筛选」查看全部' : '还没有检测记录 — 从监控页导入视频并开始检测，一次检测会在这里生成一条记录' }}</text>
   </view>
-  <button v-if="more" class="qh-btn qh-btn--secondary qh-btn--sm dr-more" :disabled="loading" @click="load(true)">加载更早 ▾</button>
+  <button v-if="more" class="qh-btn qh-btn--secondary qh-btn--sm dr-more" :disabled="loading" @click="load(true)">加载更多 ▾</button>
   <text v-if="error" class="qh-note dr-foot">{{ error }}</text>
   <text v-if="archived.length" class="dr-foot">一次检测 = 一条记录 · 告警与驱离的完整执行链在「告警页 / 操作记录」内查看</text>
 </template>

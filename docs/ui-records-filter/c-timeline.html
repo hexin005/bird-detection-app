@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PREVIEW 2 · C 观测时间轴 · 挂绳日历下拉筛选</title>
+<style>
+  :root{--ink:#191919;--yellow:#f5c400;--red:#d3212c;--paper:#f6f4e8;--muted:#6f6f68;--card:#fffdf5}
+  *{box-sizing:border-box}
+  body{margin:0;background:#d8d6cb;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+  .phone{width:390px;margin:0 auto;min-height:844px;background:var(--paper) repeating-linear-gradient(180deg,transparent 0 55px,rgba(25,25,25,.07) 55px 57px);position:relative;padding-bottom:64px}
+  /* 应用壳导航(原布局) */
+  .navbar{background:var(--ink);color:#f2f1ea;display:flex;align-items:center;gap:12px;padding:10px 14px;position:relative;z-index:50}
+  .navbar .tab{font-size:13px;font-weight:900;color:var(--yellow)}
+  .navbar .crumb{font-size:12px;color:#9a9a92}
+  .navbar .time{margin-left:auto;font-size:13px;font-weight:700}
+  /* 页头(原布局) */
+  .head{padding:16px 16px 4px;display:flex;justify-content:space-between;align-items:flex-start}
+  .head .t{font-size:24px;font-weight:900;letter-spacing:8px;display:inline-block}
+  .badge{display:inline-block;vertical-align:6px;background:var(--yellow);border:2px solid var(--ink);box-shadow:2px 2px 0 rgba(25,25,25,.25);font-size:10px;font-weight:900;letter-spacing:3px;padding:4px 10px;margin-left:8px;font-family:ui-monospace,Consolas,monospace}
+  /* 统计条(原布局) */
+  .strip{display:flex;margin:10px 24px 0;border:2px solid var(--ink);background:var(--card);box-shadow:3px 4px 0 rgba(25,25,25,.2)}
+  .strip>div{flex:1;text-align:center;padding:12px 0;border-right:2px solid var(--ink)}
+  .strip>div:last-child{border-right:none}
+  .strip .n{display:block;font-size:26px;font-weight:700;font-family:ui-monospace,Consolas,monospace}
+  .strip .l{display:block;font-size:12px;letter-spacing:2px;color:var(--muted);margin-top:2px}
+  /* 唯一新增:挂绳小牌(垂在黑条之下) + 点击垂下日历 */
+  .hang{position:absolute;top:40px;right:18px;z-index:60;display:flex;flex-direction:column;align-items:center}
+  .rope{width:0;height:13px;border-left:2px dashed var(--ink)}
+  .tag{display:flex;align-items:center;gap:4px;border:2px solid var(--ink);background:var(--card);color:var(--ink);font-size:10.5px;font-weight:900;padding:4px 8px;cursor:pointer;letter-spacing:1px;box-shadow:3px 3px 0 rgba(25,25,25,.25);font-family:inherit}
+  .tag:hover{background:var(--yellow)}
+  .tag.on{background:var(--yellow)}
+  .cal{position:absolute;top:calc(100% + 3px);right:-10px;width:288px;border:2px solid var(--ink);background:var(--card);box-shadow:6px 8px 0 rgba(25,25,25,.3);padding:9px 11px 11px;transform-origin:top center;transform:translateY(-10px);opacity:0;visibility:hidden;transition:transform .26s ease-out,opacity .22s ease-out,visibility .26s;cursor:default}
+  .hang.open .cal{transform:none;opacity:1;visibility:visible}
+  .cal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+  .cal-hd .nav{font-size:12.5px;font-weight:900}
+  .cal-hd .nav span{cursor:pointer;padding:0 6px}
+  .cal-hd .r{display:flex;align-items:center;gap:9px}
+  .cal-hd .clr{font-size:9.5px;font-weight:800;color:var(--red);text-decoration:underline;cursor:pointer}
+  .cal-hd .x{font-size:10px;font-weight:900;cursor:pointer;border:2px solid var(--ink);width:18px;height:18px;display:flex;align-items:center;justify-content:center}
+  .week,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .week span{text-align:center;font-size:9px;font-weight:800;color:var(--muted);padding:2px 0}
+  .cell{height:31px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;border:2px solid transparent;background:var(--paper);cursor:pointer}
+  .cell:hover{border-color:var(--ink)}
+  .cell.empty{background:transparent;border:none;cursor:default}
+  .cell.sel{background:var(--yellow);border-color:var(--ink)}
+  .cell.today{border-color:var(--red)}
+  .cal-hint{margin-top:7px;font-size:9px;color:var(--muted)}
+  /* 原布局:日组 + 连续拉链导轨 + 事件卡,未改动(标题纯展示) */
+  .daysec{position:relative;margin:16px 20px 0}
+  .dayrow{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .dayrow .sq{width:13px;height:13px;background:var(--red);flex-shrink:0}
+  .dayrow .d{font-size:15px;font-weight:900;letter-spacing:2px;white-space:nowrap}
+  .dayrow .ln{flex:1;border-top:2px solid var(--ink)}
+  .dayrow .n2{font-size:11px;color:var(--muted);white-space:nowrap}
+  .rail{position:absolute;left:16px;top:30px;bottom:6px;width:13px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);background:repeating-linear-gradient(180deg,var(--card) 0 11px,var(--ink) 11px 13px)}
+  .row{position:relative;margin-left:38px}
+  .row .mark{position:absolute;left:-19px;top:10px;width:13px;height:13px;background:var(--yellow);border:2px solid var(--ink)}
+  .ev{border:2px solid var(--ink);background:var(--card);box-shadow:3px 4px 0 rgba(25,25,25,.25);padding:12px 13px;cursor:pointer}
+  .ev .r1{display:flex;align-items:center;gap:8px}
+  .ev .sp{font-size:16px;font-weight:900;flex:1}
+  .ev .x{font-size:11px;background:var(--ink);color:var(--yellow);padding:2px 8px;font-weight:900}
+  .ev .play{width:30px;height:30px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ev .play i{display:block;width:0;height:0;border:7px solid transparent;border-left:11px solid var(--yellow);border-right:0;margin-left:3px}
+  .ev .meta{display:flex;gap:10px;font-size:10px;color:var(--muted);margin-top:9px;font-family:ui-monospace,Consolas,monospace}
+  .ev .conf{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .ev .track{flex:1;height:9px;border:2px solid var(--ink);background:var(--card)}
+  .ev .track i{display:block;height:100%;background:var(--yellow)}
+  .ev .cv{font-size:11px;font-weight:800;font-family:ui-monospace,Consolas,monospace}
+  .emptynote{margin:18px 20px 0;border:2px dashed var(--ink);padding:18px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
+  .more{display:block;width:calc(100% - 40px);margin:14px 20px 0;border:2px solid var(--ink);background:var(--card);box-shadow:3px 3px 0 rgba(25,25,25,.2);font-size:12.5px;font-weight:900;padding:10px 0;cursor:pointer;letter-spacing:1px}
+  .more span{font-weight:400;font-size:10px;color:var(--muted)}
+  .librow{display:flex;justify-content:space-between;align-items:center;margin:14px 20px 0;border:2px solid var(--ink);background:var(--card);box-shadow:3px 3px 0 rgba(25,25,25,.2);padding:11px 13px;font-size:12px;font-weight:900;cursor:pointer}
+  .librow .sub{font-size:10px;color:var(--muted);font-weight:400}
+  .tabbar{display:flex;position:absolute;left:0;right:0;bottom:0;z-index:40;border-top:2px solid var(--ink);background:var(--paper)}
+  .tabbar div{flex:1;text-align:center;padding:11px 0;font-size:14px;font-weight:800;background:var(--paper);border-right:1px solid var(--ink)}
+  .tabbar div:last-child{border-right:none}
+  .tabbar .on{background:var(--ink);color:var(--yellow)}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar"><span class="tab">记录</span><span class="crumb">观测时间轴 · 只记鸟情</span><span class="time">9:41</span></div>
+
+  <!-- 挂绳小牌:点一下日历垂下来 -->
+  <div class="hang" id="hang">
+    <i class="rope"></i>
+    <button class="tag" id="tag">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5.5h11M4.5 1v3M9.5 1v3" stroke="currentColor" stroke-width="1.5"/></svg>
+      日期
+    </button>
+    <div class="cal">
+      <div class="cal-hd">
+        <span class="nav"><span>‹</span> 2026年11月 <span>›</span></span>
+        <span class="r"><span class="clr" id="clr">清除筛选</span><span class="x" id="close">✕</span></span>
+      </div>
+      <div class="week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="grid" id="grid"></div>
+      <div class="cal-hint">点某一天 = 只看该日 · 清除筛选恢复全部</div>
+    </div>
+  </div>
+
+  <div class="head">
+    <div><span class="t">观测时间轴</span><span class="badge">TIMELINE</span></div>
+  </div>
+
+  <div class="strip">
+    <div><span class="n">6</span><span class="l">今日检测</span></div>
+    <div><span class="n">10</span><span class="l">累计档案</span></div>
+  </div>
+
+  <div class="daysec" data-day="11月14日">
+    <div class="rail"></div>
+    <div class="dayrow"><i class="sq"></i><span class="d">11月14日 · 今天</span><i class="ln"></i><span class="n2">6 次发现</span></div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">白喉红臀鹎</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:46</span><span>东区 · CAM 01</span><span>片段 173.0 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:85%"></i></div><span class="cv">85%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">树麻雀</span><span class="x">×3</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:46</span><span>东区 · CAM 01</span><span>片段 123.0 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:88%"></i></div><span class="cv">88%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">丝光椋鸟</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:45</span><span>东区 · CAM 01</span><span>片段 50.5 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:92%"></i></div><span class="cv">92%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">丝光椋鸟</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:45</span><span>东区 · CAM 01</span><span>片段 5.5 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:83%"></i></div><span class="cv">83%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">黑领椋鸟</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:45</span><span>东区 · CAM 01</span><span>片段 5.5 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:94%"></i></div><span class="cv">94%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">树麻雀</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>18:45</span><span>东区 · CAM 01</span><span>片段 3.0 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:90%"></i></div><span class="cv">90%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="daysec" data-day="11月13日">
+    <div class="rail"></div>
+    <div class="dayrow"><i class="sq"></i><span class="d">11月13日</span><i class="ln"></i><span class="n2">2 次发现</span></div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">珠颈斑鸠</span><span class="x">×2</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>17:12</span><span>东区 · CAM 01</span><span>片段 88.0 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:91%"></i></div><span class="cv">91%</span></div>
+      </div>
+    </div>
+    <div class="row"><span class="mark"></span>
+      <div class="ev">
+        <div class="r1"><span class="sp">八哥</span><span class="x">×1</span><span class="play"><i></i></span></div>
+        <div class="meta"><span>09:40</span><span>东区 · CAM 01</span><span>片段 12.0 秒起</span></div>
+        <div class="conf"><div class="track"><i style="width:78%"></i></div><span class="cv">78%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="emptynote" id="empty" style="display:none">该日暂无鸟情发现 · 点右上挂绳「清除筛选」查看全部</div>
+
+  <button class="more" id="more">加载更多 ▾ <span>· 已显示 8 / 24 条</span></button>
+  <div class="librow"><span>打开视频档案 · 10 卷</span><span class="sub">按视频 / 按鸟类检索 ›</span></div>
+
+  <div class="tabbar">
+    <div>信号台</div><div>告警</div><div>升降</div><div class="on">记录</div><div>我的</div>
+  </div>
+</div>
+
+<script>
+  // 挂绳日历:点挂绳开合;点某天=只看该日;清除恢复全部。纯预览演示。
+  const TODAY=15, DAYS=30
+  const hang=document.getElementById('hang'),tag=document.getElementById('tag'),
+        grid=document.getElementById('grid'),clr=document.getElementById('clr'),
+        close=document.getElementById('close'),more=document.getElementById('more')
+  const groups=[...document.querySelectorAll('.daysec')]
+  const ICON='<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 5.5h11M4.5 1v3M9.5 1v3" stroke="currentColor" stroke-width="1.5"/></svg>'
+  let active=null
+  for(let d=1;d<=DAYS;d++){
+    const c=document.createElement('div')
+    c.className='cell'+(d===TODAY?' today':'')
+    c.textContent=d;c.dataset.d=d
+    grid.appendChild(c)
+  }
+  grid.addEventListener('click',e=>{
+    const c=e.target.closest('.cell');if(!c)return
+    active=Number(c.dataset.d);render();hang.classList.remove('open')
+  })
+  tag.addEventListener('click',()=>hang.classList.toggle('open'))
+  close.addEventListener('click',()=>hang.classList.remove('open'))
+  clr.addEventListener('click',()=>{active=null;render();hang.classList.remove('open')})
+  function render(){
+    groups.forEach(g=>{g.style.display=(!active||g.dataset.day==='11月'+active+'日')?'':'none'})
+    more.style.display=active?'none':''
+    const visible=groups.filter(g=>g.style.display!=='none').length
+    document.getElementById('empty').style.display=(active&&visible===0)?'block':'none'
+    ;[...grid.children].forEach(c=>c.classList.toggle('sel',Number(c.dataset.d)===active))
+    if(active){tag.classList.add('on');tag.innerHTML='11·'+String(active).padStart(2,'0')}
+    else{tag.classList.remove('on');tag.innerHTML=ICON+'日期'}
+  }
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 import tempfile
+import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 from fastapi.testclient import TestClient
 from backend.config import Settings
@@ -42,6 +44,24 @@ class LibraryTests(unittest.TestCase):
         for i in range(105):
             self.store.alarm('t'+str(i),'八哥',1,.9,'a.jpg',0,0,20)
         self.assertEqual(self.lib.alarm_groups()[0]['pending'],105)
+
+    def test_list_filters_by_local_day_and_limit(self):
+        # date=本地自然日 [00:00,次日) 只回该日;limit/offset 与 date 可叠加;非法 date 忽略
+        now=time.time()
+        with self.store.tx() as db:
+            db.execute('INSERT INTO videos (id,name,path,duration,fps,at) VALUES (?,?,?,?,?,?)',('video-2','昨日录像','source2.mp4',10,30,1))
+            db.execute("INSERT INTO tasks (id,status,at) VALUES ('task-old','ended',?)",(now-86400,))
+            db.execute("UPDATE tasks SET at=? WHERE id='task-1'",(now,))
+        self.lib.attach('task-old',self.lib.video('video-2'))
+        today=datetime.fromtimestamp(now).strftime('%Y-%m-%d')
+        yesterday=datetime.fromtimestamp(now-86400).strftime('%Y-%m-%d')
+        self.assertEqual([r['id'] for r in self.lib.list(date=today)],['task-1'])
+        self.assertEqual([r['id'] for r in self.lib.list(date=yesterday)],['task-old'])
+        self.assertEqual(len(self.lib.list(date=today,limit=1)),1)
+        # limit/offset 分页(无 date):两条任务按 at DESC 翻页不重不漏
+        page=[r['id'] for r in self.lib.list(limit=1)]+[r['id'] for r in self.lib.list(offset=1,limit=1)]
+        self.assertEqual(sorted(page),['task-1','task-old'])
+        self.assertEqual(len(self.lib.list(date='not-a-date',limit=1)),1)
 
     def test_alarm_merge_uses_video_time_when_processing_faster_than_playback(self):
         first,_=self.store.alarm('task-1','八哥',1,.9,'a.jpg',1,30,20,now=100,video_clock=True)

@@ -4,14 +4,19 @@
 // 旧「巡逻日志/视频档案」双段由 DetectionRecords 承接,VideoLibrary 仍被 Tower/Pixel 回落页引用。
 import { useHost } from '../hostContext'
 import DetectionRecords from '../DetectionRecords.vue'
+import RecordsDateFilter from '../RecordsDateFilter.vue'
 
 const host = useHost()
 </script>
 
 <template>
-  <view class="qh-header__brand">
-    <text class="qh-page-title">检测记录</text>
-    <text class="qh-page-subtitle">一次检测 = 一条记录 · 只看时间与结果</text>
+  <view class="rec-head">
+    <view class="qh-header__brand">
+      <text class="qh-page-title">检测记录</text>
+      <text class="qh-page-subtitle">一次检测 = 一条记录 · 只看时间与结果</text>
+    </view>
+    <!-- 挂绳日历:点牌垂下选天,只看该日 -->
+    <RecordsDateFilter />
   </view>
   <view class="rec-stats">
     <view class="rec-stat"><text class="n">{{ host.recordsSummary?.today_tasks ?? 0 }}</text><text class="l">今日检测</text></view>
@@ -22,6 +27,8 @@ const host = useHost()
 </template>
 
 <style scoped>
+/* 头部行:标题居左,挂绳日历悬右上 */
+.rec-head{display:flex;justify-content:space-between;align-items:flex-start;padding-right:14px}
 /* 统计条:三格合并横排(沿用旧版样式) */
 .rec-stats{display:flex;margin:6px 14px 4px;border:2px solid var(--ink-900);background:var(--surface-card);box-shadow:4px 4px 0 var(--shadow-ink)}
 .rec-stat{flex:1;text-align:center;padding:9px 0 7px;border-right:1px solid var(--line)}

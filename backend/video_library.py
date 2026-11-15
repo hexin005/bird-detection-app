@@ -3,6 +3,7 @@ import hashlib
 import secrets
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 from .store import Conflict
@@ -122,12 +123,25 @@ class VideoLibrary:
             db.executemany('INSERT INTO samples (task_id,species,video_time,count,confidence,frame_id,user_id) VALUES (?,?,?,?,?,?,?)',
                 [(task_id, species, timestamp, values[0], values[1], frame_id, owner_id) for species, values in grouped.items()])
 
-    def list(self, species=None, offset=0, user_id=None):
+    def list(self, species=None, offset=0, user_id=None, date=None, limit=30):
+        # date='YYYY-MM-DD' 时只返回该本地自然日的任务;非法日期忽略(不过滤)
         scope = 'AND t.user_id=?' if user_id is not None else ''
-        condition = 'WHERE EXISTS (SELECT 1 FROM samples s WHERE s.task_id=t.id AND s.species=?)' if species else 'WHERE 1=1'
-        args = ((species,) if species else ()) + ((user_id,) if user_id is not None else ()) + (offset,)
+        conds, args = [], []
+        if species:
+            conds.append('EXISTS (SELECT 1 FROM samples s WHERE s.task_id=t.id AND s.species=?)')
+            args.append(species)
+        if date:
+            try:
+                start = datetime.strptime(date, '%Y-%m-%d').timestamp()
+            except (TypeError, ValueError):
+                start = None
+            if start is not None:
+                conds.append('t.at>=? AND t.at<?')
+                args += [start, start + 86400]
+        condition = ('WHERE ' + ' AND '.join(conds)) if conds else 'WHERE 1=1'
+        args += ((user_id,) if user_id is not None else ()) + (int(limit), offset)
         rows = self.store.rows(f'''SELECT t.*,v.name FROM tasks t JOIN videos v ON v.id=t.video_id
-            {condition} {scope} ORDER BY t.at DESC LIMIT 30 OFFSET ?''', args)
+            {condition} {scope} ORDER BY t.at DESC LIMIT ? OFFSET ?''', args)
         for row in rows:
             row['species'] = self.store.rows('SELECT species,MIN(video_time) first_seen,MAX(video_time) last_seen,MAX(count) peak_count FROM samples WHERE task_id=? GROUP BY species', (row['id'],))
         return rows

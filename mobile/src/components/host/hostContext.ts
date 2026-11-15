@@ -62,6 +62,8 @@ export function createHost() {
   const recordsSummary = ref<LibrarySummary | null>(null)
   /** 告警页物种过滤(状态提升到 host:图鉴「查看该鸟告警」等语义动作可外部设置) */
   const alarmSpecies = ref('')
+  /** 记录页单日筛选(''=全部,YYYY-MM-DD=只看该日;B 检测记录/视频档案走后端 date,C 时间轴客户端过滤) */
+  const recordDate = ref('')
   const guideSpecies = ref('')
   /** AI 助手三态:按钮(两者皆 false)/小窗(open)/整页(max);消息与草稿在 data/assistantStore,切态不丢 */
   const assistantOpen = ref(false)
@@ -146,6 +148,8 @@ export function createHost() {
   function openAlarm(a: Alarm) { fetchedAlarm.value = a; detailId.value = a.id; modal.value = 'mAlarm' }
   function replayAlarm(a: Alarm) {
     modal.value = ''; recordMode.value = 'videos'
+    // 回放深链定位具体档案:清掉单日筛选,保证目标档案可见
+    recordDate.value = ''
     archiveTask.value = a.task_id; archiveTime.value = a.video_time
     archiveNonce.value++; nav('records')
   }
@@ -268,7 +272,7 @@ export function createHost() {
     recordMode, archiveTask, archiveTime, archiveNonce, recordFilter,
     preferences, older, historyEnd, fetchedAlarm, fetchedCommand, theme,
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
-    rules, patrol, recordsSummary, alarmSpecies, guideSpecies, assistantOpen, assistantMax,
+    rules, patrol, recordsSummary, alarmSpecies, guideSpecies, recordDate, assistantOpen, assistantMax,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms, viewSpeciesGuide,
     quickRepel, loadAutomation, saveRule, removeRule, savePatrol, askAIAbout,
     inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,

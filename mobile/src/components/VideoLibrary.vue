@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useOrchard } from '../store'
 import VideoPlayer from './VideoPlayer.vue'
+import RecordsDateFilter from './host/RecordsDateFilter.vue'
+import { useHost } from './host/hostContext'
 type Span = {species:string;start:number;end:number;peak_count:number}
 type Archive = {id:string;name:string;status:string;at:number;duration:number;progress:number;result_ready:boolean;stream_ready?:boolean;message:string;species:{species:string;first_seen:number;peak_count:number}[];intervals?:Span[]}
 const props = defineProps<{ initialTask?:string; initialTime?:number }>()
 const store = useOrchard()
+const host = useHost()
 const mode=ref('video'), species=ref(''), items=ref<Archive[]>([]), groups=ref<{species:string;videos:number}[]>([])
 const detail=ref<Archive|null>(null), seek=ref(0), error=ref(''), more=ref(false), loading=ref(false)
 const original=ref(false)
@@ -14,26 +17,34 @@ const path=computed(()=>detail.value && (original.value || detail.value.result_r
 const labels:Record<string,string>={ended:'已归档',running:'分析中',starting:'准备中',stopped:'已停止',stopping:'正在停止',error:'处理失败',interrupted:'处理中断'}
 const badgeOf = (s:string) => 'qh-badge qh-badge--' + ({ended:'handled',running:'running',starting:'info',stopping:'info',stopped:'neutral',error:'failed',interrupted:'new'} as Record<string,string>)[s] || 'qh-badge--neutral'
 const shortTime=(v:number)=>new Date(v*1000).toLocaleString('zh-CN',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+const PAGE=20
 
 async function load(append=false) {
   const current=++version; loading.value=true
   try {
-    const data=await store.request<{items:Archive[];species:typeof groups.value}>(`/library?offset=${append?items.value.length:0}${species.value?'&species='+encodeURIComponent(species.value):''}`)
+    const query=new URLSearchParams({ offset:String(append?items.value.length:0), limit:String(PAGE) })
+    if (species.value) query.set('species', species.value)
+    if (host.recordDate) query.set('date', host.recordDate)
+    const data=await store.request<{items:Archive[];species:typeof groups.value}>('/library?'+query)
     if(current!==version)return
-    items.value=append?[...items.value,...data.items]:data.items; groups.value=data.species; more.value=data.items.length===30; error.value=''
+    items.value=append?[...items.value,...data.items]:data.items; groups.value=data.species; more.value=data.items.length===PAGE; error.value=''
   }catch(e){error.value=(e as Error).message}finally{if(current===version)loading.value=false}
 }
+// 挂绳日历换日:重置列表重拉(date 过滤在服务端);回放深链由 host.replayAlarm 清筛选
+watch(() => host.recordDate, () => { void load() })
 async function open(task:string,time=0){try{original.value=false;detail.value=await store.request<Archive>('/library/'+task);seek.value=time}catch(e){error.value=(e as Error).message}}
 function folder(value:string){species.value=value;void load()}
 onMounted(()=>{void load();if(props.initialTask)void open(props.initialTask,props.initialTime||0);timer=setInterval(()=>{
   if(detail.value && ['starting','running','stopping'].includes(detail.value.status)) {
     const id=detail.value.id
     void store.request<Archive>('/library/'+id).then(value=>{if(detail.value?.id===id)detail.value=value}).catch(()=>{})
-  } else if(!detail.value && items.value.length<=30)void load()
+  } else if(!detail.value && items.value.length<=PAGE)void load()
 },5000)})
 onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
 </script>
 <template>
+  <!-- 挂绳日历:点牌垂下选天,只看该日(顶部子标签行上方右侧,不挤占布局) -->
+  <view class="vl-hangrow"><RecordsDateFilter /></view>
   <view class="qh-subtabs">
     <view class="qh-subtab" :class="{ 'is-active': mode === 'video' }" @click="mode = 'video'; folder('')"><text>按视频</text><view class="qh-subtab__bar"/></view>
     <view class="qh-subtab" :class="{ 'is-active': mode === 'species' }" @click="mode = 'species'; folder('')"><text>按鸟类</text><view class="qh-subtab__bar"/></view>
@@ -71,16 +82,9 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
     </view>
 
     <view v-if="!items.length && !loading" style="padding:40px 0;text-align:center">
-      <text class="qh-note">还没有检测档案，从首页导入视频并开始检测即可自动归档</text>
+      <text class="qh-note">{{ host.recordDate ? '该日暂无视频档案 · 点右上挂绳「清除筛选」查看全部' : '还没有检测档案，从首页导入视频并开始检测即可自动归档' }}</text>
     </view>
-    <button v-if="more" class="qh-btn qh-btn--secondary qh-btn--sm" style="width:100%" :disabled="loading" @click="load(true)">加载更早视频</button>
-
-    <text v-if="mode === 'video' && groups.length" class="qh-sectionlabel">按鸟类视图</text>
-    <view v-for="group in (mode === 'video' ? groups.slice(0, 4) : [])" :key="'g-' + group.species" class="qh-folder" @click="mode = 'species'; folder(group.species)">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15c0-5 3.5-9 8.5-9.5 2-.2 3.5.8 3.5 2.3 0 1.2-1 2.2-2.4 2.2h-2.1c-.3 2.8-2.6 5-5.5 5H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 15h9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <view class="qh-folder__info"><text class="qh-folder__name">{{ group.species }}</text><text class="qh-folder__stat">出现在 {{ group.videos }} 次视频检测中</text></view>
-      <text class="qh-chevron">›</text>
-    </view>
+    <button v-if="more" class="qh-btn qh-btn--secondary qh-btn--sm" style="width:100%" :disabled="loading" @click="load(true)">加载更多 ▾</button>
   </template>
 
   <text v-if="error" class="qh-note" style="display:block">{{ error }}</text>
@@ -116,3 +120,8 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);version++})
     </scroll-view>
   </view>
 </template>
+
+<style scoped>
+/* 挂绳日历行:顶部右对齐,不挤占子标签 */
+.vl-hangrow{display:flex;justify-content:flex-end;padding:8px 14px 0}
+</style>

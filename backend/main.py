@@ -490,8 +490,10 @@ def create_app(settings=None):
         return {'items': store.rows('SELECT id,name,duration,fps,at FROM videos WHERE user_id=? ORDER BY at DESC LIMIT 30', (user[1],))}
 
     @app.get('/api/library')
-    def library(species: Optional[str] = None, offset: int = Query(0, ge=0), user=Depends(auth)):
-        return {'items': monitor.library.list(species, offset, user[1]), 'species': monitor.library.species(user[1]),
+    def library(species: Optional[str] = None, offset: int = Query(0, ge=0), date: Optional[str] = None,
+                limit: int = Query(30, ge=1, le=100), user=Depends(auth)):
+        return {'items': monitor.library.list(species, offset, user[1], date=date, limit=limit),
+                'species': monitor.library.species(user[1]),
                 'alarm_groups': monitor.library.alarm_groups(user[1]),
                 'guide_images': [name for name in species_names if species_image(name)]}
 

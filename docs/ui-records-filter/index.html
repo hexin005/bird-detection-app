@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>记录页 · 时间筛选与加载更多 · 预览稿索引</title>
+<style>
+  body{margin:0;background:#26241f;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#f2f1ea;padding:40px 20px}
+  h1{font-size:22px;letter-spacing:4px;margin:0 0 6px}
+  .sub{color:#9a9a92;font-size:12px;margin-bottom:28px}
+  .grid{display:flex;flex-wrap:wrap;gap:26px}
+  a.card{display:block;width:300px;background:#191919;border:2px solid #f5c400;color:#f2f1ea;text-decoration:none;padding:18px}
+  a.card:hover{background:#222}
+  .tag{display:inline-block;font-size:10px;letter-spacing:2px;border:1px solid #f5c400;color:#f5c400;padding:2px 8px;margin-bottom:10px}
+  .name{font-size:15px;font-weight:900;letter-spacing:2px}
+  .desc{font-size:11px;color:#9a9a92;margin-top:8px;line-height:1.7}
+  .note{margin-top:30px;font-size:12px;color:#9a9a92;line-height:2}
+  .note b{color:#f5c400}
+</style>
+</head>
+<body>
+  <h1>记录页改版 · 预览稿</h1>
+  <div class="sub">顶部挂绳小牌,点击日历垂下展开(下拉动效),选某天只看该日 · 初始条数收敛 + 加载更多 · 去掉"按鸟类视图"区块 · 390×844</div>
+  <div class="grid">
+    <a class="card" href="b-records.html">
+      <span class="tag">PREVIEW 1 · B 主题</span>
+      <div class="name">检测记录 · 一检一记</div>
+      <div class="desc">右上挂绳「日期」小牌 → 日历垂下选天 → 记录卡 + 加载更多 ▾(三页均可实际点击体验)</div>
+    </a>
+    <a class="card" href="c-timeline.html">
+      <span class="tag">PREVIEW 2 · C 主题</span>
+      <div class="name">观测时间轴</div>
+      <div class="desc">头部右侧挂绳小牌 → 日历垂下选天 → 按日分组初始 20 条 + 加载更多 ▾(渐进 +20)</div>
+    </a>
+    <a class="card" href="video-archive.html">
+      <span class="tag">PREVIEW 3 · 共用</span>
+      <div class="name">视频档案(按视频检索)</div>
+      <div class="desc">挂绳小牌 → 日历垂下选天 → 平铺档案卡 + 加载更多 ▾ · 已去掉底部"按鸟类视图"区块 · 顶部按鸟类子标签保留</div>
+    </a>
+  </div>
+  <div class="note">
+    交互约定(三处一致)：<b>顶部挂绳小牌默认收起</b>(仅一枚小牌+短绳,几乎不占空间),点击日历牌从挂绳处垂下展开(transform-origin top,0.26s);
+    点某天=只看该日,面板自动收起,小牌变黄显示「11·14」;再点挂绳可改选或「清除筛选」恢复全部;筛选时隐藏「加载更多」;
+    <b>底部导航栏固定在屏幕最下方</b>(筛选后列表变短也不上浮);挂绳小牌只悬在各页顶角空白处,不遮挡任何文案(C 页头部右侧次要文案「发现即记录」删除让位);筛选无数据的日子显示虚线空态提示;
+    视频档案列表保持原平铺(无新增分组标题);告警回放深链进入时自动恢复"全部"保证目标档案可见。
+  </div>
+</body>
+</html>
