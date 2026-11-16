@@ -494,6 +494,18 @@ class Store:
         rows = self.rows(f'SELECT id,species,count,at FROM alarms {w} ORDER BY at DESC, rowid DESC LIMIT 1', args)
         return rows[0] if rows else None
 
+    def latest_new_alarm_by_species(self, species, user_id=None):
+        """该物种最新一条待处理告警 id(无则 None);AI 处置建议未绑定告警时的关联兜底。"""
+        w, args = ('AND user_id=?', (user_id,)) if user_id is not None else ('', ())
+        rows = self.rows(f"SELECT id FROM alarms WHERE species=? AND status='new' {w} ORDER BY at DESC, rowid DESC LIMIT 1",
+                         (species,) + args)
+        return rows[0]['id'] if rows else None
+
+    def new_alarm_exists(self, alarm_id, user_id=None):
+        """告警存在、归属当前账号且待处理(供 AI 建议绑定显式 alarm_id)。"""
+        w, args = ('AND user_id=?', (user_id,)) if user_id is not None else ('', ())
+        return bool(self.rows(f"SELECT 1 FROM alarms WHERE id=? AND status='new' {w}", (alarm_id,) + args))
+
     def stats(self, days, user_id=None):
         """果园数据分析聚合(口径见接口文档;user_id 给定时仅统计该账号数据):
 

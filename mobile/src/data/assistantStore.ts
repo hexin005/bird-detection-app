@@ -7,7 +7,7 @@ import type { AssistantRef, ChatMsg } from '../types'
 
 export type AssistantConn = { server: string; token: string }
 
-type SsePayload = { type: 'meta' | 'delta' | 'done' | 'error'; text?: string; refs?: AssistantRef[]; detail?: string }
+type SsePayload = { type: 'meta' | 'delta' | 'done' | 'error' | 'advice'; text?: string; refs?: AssistantRef[]; detail?: string; action?: 'repel' | 'ignore'; alarm_id?: string | null }
 
 export const IMAGE_MAX_BYTES = 8 * 1024 * 1024
 
@@ -38,6 +38,11 @@ function applyPayload(msg: ChatMsg, payload: SsePayload) {
     msg.text += payload.text || ''
   } else if (payload.type === 'done') {
     msg.streaming = false
+  } else if (payload.type === 'advice') {
+    // 处置建议(回答末尾暗号剥离而来):只在非错误消息上生效,回复结束后渲染按钮
+    if (payload.action === 'repel' || payload.action === 'ignore') {
+      msg.advice = { action: payload.action, alarm_id: payload.alarm_id ?? null }
+    }
   } else if (payload.type === 'error') {
     msg.phase = undefined
     msg.error = true
@@ -110,7 +115,7 @@ async function consumeStream(resp: Response, msg: ChatMsg, stopped: () => boolea
   }
 }
 
-export async function askAssistant(question: string, conn: AssistantConn) {
+export async function askAssistant(question: string, conn: AssistantConn, alarmId?: string) {
   const q = question.trim()
   const img = assistantState.pendingImageFile
   if ((!q && !img) || assistantState.busy) return
@@ -143,7 +148,7 @@ export async function askAssistant(question: string, conn: AssistantConn) {
       resp = await fetch(conn.server + '/api/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + conn.token },
-        body: JSON.stringify({ question: q, history }),
+        body: JSON.stringify({ question: q, history, ...(alarmId ? { alarm_id: alarmId } : {}) }),
         signal: ctrl.signal,
       })
     }

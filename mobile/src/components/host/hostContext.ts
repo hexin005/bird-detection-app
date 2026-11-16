@@ -210,7 +210,8 @@ export function createHost() {
     guideSpecies.value = name
     nav('guide')
   }
-  /** 告警详情「问 AI 怎么处理」:关掉详情弹窗(其遮罩层级高于助手窗),打开助手小窗并携带告警上下文自动提问;流式进行中则预填草稿 */
+  /** 告警详情「问 AI 怎么处理」:关掉详情弹窗(其遮罩层级高于助手窗),打开助手小窗并携带告警上下文自动提问;
+   *  alarm_id 随提问传给后端,AI 建议按钮可直接对该告警执行;流式进行中则预填草稿 */
   function askAIAbout(a: Alarm) {
     const pct = Math.round((a.confidence || 0) * 100)
     const question = `刚检测到${a.species} ${a.count} 只（置信度 ${pct}%），这条告警现在该怎么处理？`
@@ -221,8 +222,30 @@ export function createHost() {
       assistantState.draft = question
       notify('AI 正在回答上一条，问题已填入输入框')
     } else {
-      void askAssistant(question, { server: store.server, token: store.token })
+      void askAssistant(question, { server: store.server, token: store.token }, a.id)
     }
+  }
+  /** AI 助手处置建议按钮:点击即确认并真实执行(用户已确认此交互),完成后回到告警页。
+   *  alarm_id 为空 = 该鸟种当前无待处理告警,提示后打开告警页人工处理;409 冲突经 run 统一 toast,不跳页。 */
+  async function applyAdvice(advice: { action: 'repel' | 'ignore'; alarm_id?: string | null }) {
+    await run(async () => {
+      if (!advice.alarm_id) {
+        notify('当前没有待处理告警 · 已打开告警页可手动处理')
+        assistantOpen.value = false
+        assistantMax.value = false
+        nav('alarms')
+        return
+      }
+      if (advice.action === 'ignore') {
+        await requestIgnore(advice.alarm_id)
+      } else {
+        await store.command(duration.value, advice.alarm_id, mode.value)
+        notify('已提交驱离指令')
+      }
+      assistantOpen.value = false
+      assistantMax.value = false
+      nav('alarms')
+    })
   }
   /** S1 自动哨兵:规则/巡逻的读取与变更(错误经 run→toast 呈现) */
   async function loadAutomation() {
@@ -274,7 +297,7 @@ export function createHost() {
     alarm, command, pending, events, groupedEvents, remaining, offline, activeMode, tickerText, todayAlarms,
     rules, patrol, recordsSummary, alarmSpecies, guideSpecies, recordDate, assistantOpen, assistantMax,
     run, nav, openAlarm, replayAlarm, settings, openScene, handle, execute, notify, requestIgnore, viewSpeciesAlarms, viewSpeciesGuide,
-    quickRepel, loadAutomation, saveRule, removeRule, savePatrol, askAIAbout,
+    quickRepel, loadAutomation, saveRule, removeRule, savePatrol, askAIAbout, applyAdvice,
     inspectEvent, loadHistory, refreshToday, loadRecordsSummary, resetTransient, setTheme, onTokenChange,
   })
   return host

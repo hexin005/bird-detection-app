@@ -51,10 +51,13 @@ export type KnowledgeSource = 'loading' | 'api' | 'fallback'
 
 // ===== AI 助手(/api/assistant,SSE 流式) =====
 export type AssistantRef = { kind: 'species' | 'stats'; name?: string }
+/** AI 处置建议(回答末尾暗号剥离而来):点击按钮真实执行,alarm_id 为空表示无待处理告警 */
+export type AssistantAdvice = { action: 'repel' | 'ignore'; alarm_id?: string | null }
 export type ChatMsg = {
   role: 'user' | 'assistant'
   text: string
   refs?: AssistantRef[]
+  advice?: AssistantAdvice
   streaming?: boolean
   error?: boolean
   stopped?: boolean

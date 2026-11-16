@@ -50,6 +50,7 @@ class AssistantHistory(BaseModel):
 class AssistantAsk(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     history: list[AssistantHistory] = Field(default_factory=list)
+    alarm_id: Optional[str] = None  # 告警详情「问 AI」链路传入;建议绑定该告警(须归属且待处理)
 
 
 class Preferences(BaseModel):
@@ -557,8 +558,9 @@ def create_app(settings=None):
         """前端打开聊天即查;configured=False 时前端展示配置引导并禁用发送。"""
         return {'configured': bool(settings.deepseek_key), 'model': settings.deepseek_model}
 
-    def _assistant_stream(messages, refs):
-        """SSE 流式响应(文本/图片提问共用):meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
+    def _assistant_stream(messages, refs, alarm_ctx=None):
+        """SSE 流式响应(文本/图片提问共用):meta(参考资料) → delta* → [advice] → done。
+        AI 只读不触达设备接口;advice 由回答末尾建议暗号剥离而来,执行由用户点击按钮触发。"""
         def sse(obj) -> str:
             return 'data: ' + json.dumps(obj, ensure_ascii=False) + '\n\n'
 
@@ -568,6 +570,9 @@ def create_app(settings=None):
                 yield sse({'type': 'meta', 'refs': refs})
                 try:
                     async for delta in assistant_mod.stream_answer(messages, settings):
+                        if isinstance(delta, dict):  # 建议暗号 → advice 事件,绑定告警上下文(可能为 None)
+                            yield sse({'type': 'advice', 'alarm_id': alarm_ctx, **delta['advice']})
+                            continue
                         sent_delta = True
                         yield sse({'type': 'delta', 'text': delta})
                     yield sse({'type': 'done'})
@@ -582,15 +587,26 @@ def create_app(settings=None):
         return StreamingResponse(events(), media_type='text/event-stream',
                                  headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
+    def _advice_alarm_ctx(body: AssistantAsk, refs, user_id):
+        """建议绑定的告警:显式 alarm_id(须归属且待处理)优先,否则取命中物种最新待处理;都没有则 None。"""
+        if body.alarm_id and store.new_alarm_exists(body.alarm_id, user_id):
+            return body.alarm_id
+        for ref in refs:
+            if ref.get('kind') == 'species' and ref.get('name'):
+                found = store.latest_new_alarm_by_species(ref['name'], user_id)
+                if found:
+                    return found
+        return None
+
     @app.post('/api/assistant/chat')
     async def assistant_chat(body: AssistantAsk, user=Depends(auth)):
-        """SSE 流式问答:meta(参考资料) → delta* → done;AI 只读,不触达设备接口。"""
+        """SSE 流式问答:meta(参考资料) → delta* → [advice] → done;AI 只读,建议由用户点击执行。"""
         if not assistant_mod.IN_FLIGHT.acquire():
             raise HTTPException(409, '上一条回答仍在生成，请稍候')
         blocks, refs = assistant_mod.retrieve(body.question, store, user[1])
         messages = assistant_mod.build_messages(body.question, blocks,
                                                 [item.model_dump() for item in body.history])
-        return _assistant_stream(messages, refs)
+        return _assistant_stream(messages, refs, _advice_alarm_ctx(body, refs, user[1]))
 
     @app.post('/api/assistant/chat-image')
     async def assistant_chat_image(request: Request, question: str = '', user=Depends(auth)):

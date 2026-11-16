@@ -84,6 +84,14 @@ function refClick(r: AssistantRef) {
             </view>
             <text v-if="!m.refs?.length && !m.error" class="as-refs__generic">AI 通用回答 · 未引用本园知识库</text>
             <text v-if="m.stopped" class="as-refs__generic">已停止</text>
+            <!-- AI 处置建议:点击即确认并真实执行,完成后回到告警页 -->
+            <view v-if="m.advice && !m.error && !m.stopped" class="as-advice"
+              :class="{ 'as-advice--ghost': m.advice.action === 'ignore' }"
+              role="button" :aria-label="m.advice.action === 'repel' ? '按建议驱离' : '按建议忽略'"
+              @click="host.applyAdvice(m.advice)">
+              <text>{{ m.advice.action === 'repel' ? '▶ 按建议驱离' : '按建议忽略' }}</text>
+              <text v-if="!m.advice.alarm_id" class="as-advice__s">无待处理告警 · 去告警页</text>
+            </view>
           </view>
         </view>
       </view>
@@ -102,7 +110,7 @@ function refClick(r: AssistantRef) {
       <view v-if="!assistantState.busy" class="as-send" :class="{ 'as-send--off': assistantState.configured === false || (!assistantState.draft.trim() && !assistantState.pendingImage) }" @click="send()">发送</view>
       <view v-else class="as-send as-send--stop" @click="stopAssistant()">停止</view>
     </view>
-    <text class="as-chat__note">科普参考 · AI 不直接操作驱鸟设备</text>
+    <text class="as-chat__note">科普参考 · AI 只给建议，处置按钮由你点击执行</text>
   </view>
 </template>
 
@@ -137,6 +145,11 @@ function refClick(r: AssistantRef) {
 .as-attach{border:2px solid var(--ink-900);background:var(--surface-card);color:var(--ink-900);font-size:var(--text-sm);font-weight:700;padding:7px 8px;box-shadow:2px 2px 0 var(--shadow-ink);cursor:pointer;white-space:nowrap}
 .as-refs{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line-soft)}
 .as-refs__generic{font-size:var(--text-2xs);color:var(--ink-400)}
+/* AI 处置建议按钮:点击即真实执行(建议驱离=实心主按钮,建议忽略=描边),与告警墙动作按钮同族 */
+.as-advice{display:flex;align-items:center;gap:6px;width:100%;justify-content:center;margin-top:6px;border:2px solid var(--ink-900);background:var(--ink-900);color:var(--surface-card);font-size:var(--text-sm);font-weight:800;letter-spacing:1px;padding:9px 12px;box-shadow:2px 2px 0 var(--shadow-ink);cursor:pointer}
+.as-advice:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--shadow-ink)}
+.as-advice--ghost{background:var(--surface-card);color:var(--ink-900)}
+.as-advice__s{margin-left:6px;font-size:var(--text-2xs);font-weight:400;color:var(--ink-400);letter-spacing:0}
 .as-chat__composer{display:flex;align-items:center;gap:8px;margin-top:8px}
 .as-chat__field{flex:1;min-width:0}
 .as-send{border:2px solid var(--ink-900);background:var(--accent);color:var(--accent-fg);font-size:var(--text-sm);font-weight:700;padding:7px 11px;box-shadow:2px 2px 0 var(--shadow-ink);cursor:pointer;white-space:nowrap}

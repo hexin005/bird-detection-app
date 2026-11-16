@@ -145,6 +145,26 @@ class AssistantStreamTests(unittest.IsolatedAsyncioTestCase):
                 got.append(d)
         self.assertEqual(got, ['部分内容'])
 
+    async def test_stream_strips_suggest_tail_into_advice(self):
+        # 暗号跨分段到来:正文不含 [SUGGEST,末尾产出 advice dict
+        transport = upstream_sse('建议进行驱离', '\n[SUGGEST:', 'repel]')
+        got = [d async for d in mod.stream_answer([{'role': 'user', 'content': 'hi'}], self.settings, transport)]
+        text = ''.join(x for x in got if isinstance(x, str))
+        self.assertEqual(text, '建议进行驱离')
+        self.assertEqual([x for x in got if isinstance(x, dict)], [{'advice': {'action': 'repel'}}])
+
+    async def test_stream_without_suggest_yields_plain_text(self):
+        transport = upstream_sse('普通', '回答')
+        got = [d async for d in mod.stream_answer([{'role': 'user', 'content': 'hi'}], self.settings, transport)]
+        self.assertEqual(got, ['普通', '回答'])
+
+    async def test_stream_invalid_suggest_kept_as_text(self):
+        # 非约定值不剥离不出按钮,原样显示(人工兜底)
+        transport = upstream_sse('回答', '\n[SUGGEST:xyz]')
+        got = [d async for d in mod.stream_answer([{'role': 'user', 'content': 'hi'}], self.settings, transport)]
+        self.assertEqual([x for x in got if isinstance(x, dict)], [])
+        self.assertIn('[SUGGEST:xyz]', ''.join(x for x in got if isinstance(x, str)))
+
 
 class AssistantApiTests(unittest.TestCase):
     def setUp(self):
@@ -236,6 +256,53 @@ class AssistantApiTests(unittest.TestCase):
         self.assertEqual(events[-1]['type'], 'error')
         deltas = ''.join(e['text'] for e in events if e['type'] == 'delta')
         self.assertEqual(deltas, '部分')
+
+    def _make_alarm(self, species='八哥', task_id='task-adv'):
+        aid, _ = self.app.state.store.alarm(task_id, species, 1, .9, 'a.jpg', 0, 0, 20)
+        return aid
+
+    def _chat_events(self, body):
+        with self.client.stream('POST', '/api/assistant/chat', json=body, headers=self.headers) as resp:
+            return [json.loads(line[5:]) for line in resp.iter_lines() if line.startswith('data:')]
+
+    def test_chat_advice_event_binds_explicit_alarm_id(self):
+        aid = self._make_alarm()
+        self._patch_transport(upstream_sse('建议人工驱离', '\n[SUGGEST:repel]'))
+        events = self._chat_events({'question': '刚检测到八哥,怎么处理?', 'alarm_id': aid})
+        self.assertEqual(events[-1]['type'], 'done')
+        advice = [e for e in events if e['type'] == 'advice']
+        self.assertEqual(len(advice), 1)
+        self.assertEqual(advice[0]['action'], 'repel')
+        self.assertEqual(advice[0]['alarm_id'], aid)
+        deltas = ''.join(e['text'] for e in events if e['type'] == 'delta')
+        self.assertNotIn('[SUGGEST', deltas)
+        # advice 必须在 done 之前、最后一条 delta 之后
+        self.assertEqual(events[-2]['type'], 'advice')
+
+    def test_chat_advice_binds_latest_species_alarm_without_alarm_id(self):
+        self._make_alarm('八哥', 'task-adv-1')
+        latest = self._make_alarm('八哥', 'task-adv-2')  # 不同任务避开冷却合并;后创建者最新
+        self._patch_transport(upstream_sse('建议先观察', '\n[SUGGEST:ignore]'))
+        events = self._chat_events({'question': '八哥出现在果园怎么处理?'})
+        advice = [e for e in events if e['type'] == 'advice']
+        self.assertEqual(len(advice), 1)
+        self.assertEqual(advice[0]['action'], 'ignore')
+        self.assertEqual(advice[0]['alarm_id'], latest)
+
+    def test_chat_advice_invalid_alarm_id_falls_back_to_species(self):
+        aid = self._make_alarm('八哥')
+        self._patch_transport(upstream_sse('建议人工驱离', '\n[SUGGEST:repel]'))
+        events = self._chat_events({'question': '八哥怎么处理?', 'alarm_id': 'A-nope'})
+        advice = [e for e in events if e['type'] == 'advice']
+        self.assertEqual(len(advice), 1)
+        self.assertEqual(advice[0]['alarm_id'], aid)  # 无效显式 id 回退到命中物种最新待处理
+
+    def test_chat_advice_without_any_alarm_is_none(self):
+        self._patch_transport(upstream_sse('通用回答', '\n[SUGGEST:ignore]'))
+        events = self._chat_events({'question': '今天天气怎么样?'})  # 无物种命中 → alarm_id None
+        advice = [e for e in events if e['type'] == 'advice']
+        self.assertEqual(len(advice), 1)
+        self.assertIsNone(advice[0]['alarm_id'])
 
 
 class AssistantImageChatTests(unittest.TestCase):
